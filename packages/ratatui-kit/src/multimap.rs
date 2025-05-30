@@ -21,10 +21,18 @@ where
     }
 }
 
-#[derive(Default)]
 pub(crate) struct RemoveOnlyMultimap<K, V> {
     items: Vec<Option<V>>,
     m: HashMap<K, VecDeque<usize>>,
+}
+
+impl<K, V> Default for RemoveOnlyMultimap<K, V> {
+    fn default() -> Self {
+        Self {
+            items: Vec::new(),
+            m: HashMap::new(),
+        }
+    }
 }
 
 impl<K, V> From<AppendOnlyMultimap<K, V>> for RemoveOnlyMultimap<K, V>

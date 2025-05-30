@@ -1,9 +1,11 @@
-pub mod key;
-pub use key::ElementKey;
-pub mod any_element;
-pub use any_element::AnyElement;
-
 use crate::component::Component;
+
+mod key;
+pub use key::ElementKey;
+mod any_element;
+pub use any_element::AnyElement;
+mod element_ext;
+pub use element_ext::ElementExt;
 
 pub trait ElementType {
     type Props<'a>

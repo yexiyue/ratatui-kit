@@ -1,4 +1,4 @@
-use super::{Element, ElementKey};
+use super::{Element, ElementKey, element_ext::ElementExt};
 use crate::{
     component::{Component, ComponentHelper, ComponentHelperExt},
     props::AnyProps,
@@ -43,5 +43,19 @@ impl<'a, 'b: 'a> From<&'a mut AnyElement<'b>> for AnyElement<'b> {
             props: value.props.borrow(),
             helper: value.helper.copy(),
         }
+    }
+}
+
+impl ElementExt for AnyElement<'_> {
+    fn key(&self) -> &ElementKey {
+        &self.key
+    }
+
+    fn helper(&self) -> Box<dyn ComponentHelperExt> {
+        self.helper.copy()
+    }
+
+    fn props_mut(&mut self) -> AnyProps {
+        self.props.borrow()
     }
 }

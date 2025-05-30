@@ -1,7 +1,7 @@
 pub mod component;
 pub mod context;
 mod element;
-mod hooks;
+pub mod hooks;
 mod multimap;
 pub mod props;
 pub mod render;
