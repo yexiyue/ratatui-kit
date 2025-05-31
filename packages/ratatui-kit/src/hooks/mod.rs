@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::{
     context::ContextStack,
     render::{ComponentDrawer, ComponentUpdater},
