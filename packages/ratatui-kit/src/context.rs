@@ -52,6 +52,11 @@ pub struct ContextStack<'a> {
 }
 
 impl<'a> ContextStack<'a> {
+    pub(crate) fn root(root_context: &'a mut (dyn Any + Send + Sync)) -> Self {
+        ContextStack {
+            stack: vec![RefCell::new(Context::Mut(root_context))],
+        }
+    }
     // 在上下文栈中临时插入一个新的上下文，并在闭包 f 执行期间可用。
     pub(crate) fn with_context<'b, F>(&'b mut self, context: Option<Context<'b>>, f: F)
     where
@@ -91,5 +96,23 @@ impl<'a> ContextStack<'a> {
             }
         }
         None
+    }
+}
+
+pub struct SystemContext {
+    should_exit: bool,
+}
+
+impl SystemContext {
+    pub(crate) fn new() -> Self {
+        Self { should_exit: false }
+    }
+
+    pub(crate) fn should_exit(&self) -> bool {
+        self.should_exit
+    }
+
+    pub fn exit(&mut self) {
+        self.should_exit = true;
     }
 }

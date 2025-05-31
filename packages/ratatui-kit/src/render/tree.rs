@@ -1,0 +1,66 @@
+use futures::{FutureExt, future::select};
+
+use crate::{
+    component::{ComponentHelperExt, InstantiatedComponent},
+    context::{ContextStack, SystemContext},
+    element::ElementExt,
+    props::AnyProps,
+    terminal::Terminal,
+};
+
+use super::ComponentDrawer;
+
+pub struct Tree<'a> {
+    root_component: InstantiatedComponent,
+    props: AnyProps<'a>,
+    system_context: SystemContext,
+}
+
+impl<'a> Tree<'a> {
+    pub(crate) fn new(mut props: AnyProps<'a>, helper: Box<dyn ComponentHelperExt>) -> Self {
+        Tree {
+            root_component: InstantiatedComponent::new(props.borrow(), helper),
+            props,
+            system_context: SystemContext::new(),
+        }
+    }
+
+    fn render(&mut self, terminal: &mut Terminal) {
+        let mut component_context_stack = ContextStack::root(&mut self.system_context);
+        self.root_component
+            .update(terminal, &mut component_context_stack, self.props.borrow());
+
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                let mut drawer = ComponentDrawer { frame, area };
+                self.root_component.draw(&mut drawer);
+            })
+            .expect("Failed to draw the terminal");
+    }
+
+    async fn render_loop(&mut self, terminal: &mut Terminal) {
+        loop {
+            self.render(terminal);
+            if self.system_context.should_exit() || terminal.received_ctrl_c() {
+                break;
+            }
+            select(self.root_component.wait().boxed(), terminal.wait().boxed()).await;
+            if terminal.received_ctrl_c() {
+                break;
+            }
+        }
+    }
+}
+
+pub(crate) fn render<E: ElementExt>(mut element: E, mut terminal: Terminal) {
+    let helper = element.helper();
+    let mut tree = Tree::new(element.props_mut(), helper);
+    tree.render(&mut terminal);
+}
+
+pub(crate) async fn render_loop<E: ElementExt>(mut element: E, mut terminal: Terminal) {
+    let helper = element.helper();
+    let mut tree = Tree::new(element.props_mut(), helper);
+    tree.render_loop(&mut terminal).await;
+}

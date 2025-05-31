@@ -1,4 +1,4 @@
-pub struct ComponentDrawer<'a> {
-    pub frame: &'a mut ratatui::Frame<'a>,
+pub struct ComponentDrawer<'a, 'b: 'a> {
+    pub frame: &'a mut ratatui::Frame<'b>,
     pub area: ratatui::layout::Rect,
 }

@@ -11,13 +11,28 @@ use crate::{
 use ratatui::layout::{Constraint, Direction};
 use std::{
     future::poll_fn,
+    ops::{Deref, DerefMut},
     pin::Pin,
     task::{Context, Poll},
 };
 
 #[derive(Default)]
-pub struct Components {
-    components: RemoveOnlyMultimap<ElementKey, InstantiatedComponent>,
+pub(crate) struct Components {
+    pub components: RemoveOnlyMultimap<ElementKey, InstantiatedComponent>,
+}
+
+impl Deref for Components {
+    type Target = RemoveOnlyMultimap<ElementKey, InstantiatedComponent>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.components
+    }
+}
+
+impl DerefMut for Components {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.components
+    }
 }
 
 impl Components {

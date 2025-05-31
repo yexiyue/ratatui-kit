@@ -10,7 +10,7 @@ mod component_helper;
 pub(crate) use component_helper::{ComponentHelper, ComponentHelperExt};
 
 mod instantiated_component;
-pub(crate) use instantiated_component::Components;
+pub(crate) use instantiated_component::{Components, InstantiatedComponent};
 
 pub trait Component: Any + Send + Sync + Unpin {
     type Props<'a>: Props
@@ -27,7 +27,7 @@ pub trait Component: Any + Send + Sync + Unpin {
     ) {
     }
 
-    fn draw(&mut self, drawer: &mut ComponentDrawer<'_>) {
+    fn draw(&mut self, drawer: &mut ComponentDrawer<'_, '_>) {
         self.render_ref(drawer.area, drawer.frame.buffer_mut());
     }
 
