@@ -7,6 +7,6 @@ edition = "2024"
 futures = "0.3.31"
 generational-box = "0.6.2"
 crossterm = { version = "0.29.0", features = ["event-stream"] }
-ratatui = { version = "=0.30.0-alpha.4", features = ["unstable-widget-ref"] }
-tokio = { version = "1.45.1", features = ["full"] }
+ratatui = "0.29.0"
 any_key = "0.1.1"
+ratatui-kit-macros = { version = "0.1.0", path = "../ratatui-kit-macros" }

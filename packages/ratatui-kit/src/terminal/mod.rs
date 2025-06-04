@@ -1,6 +1,7 @@
 use futures::{Stream, StreamExt, future::pending, stream::BoxStream};
 use std::{
     collections::VecDeque,
+    fmt::Debug,
     io,
     sync::{Arc, Mutex, Weak},
     task::{Poll, Waker},
@@ -10,7 +11,7 @@ mod cross_terminal;
 pub use cross_terminal::CrossTerminal;
 
 pub trait TerminalImpl: Send {
-    type Event: Clone;
+    type Event: Clone + Debug;
     fn is_raw_mode_enabled(&self) -> bool;
     fn event_stream(&mut self) -> io::Result<BoxStream<'static, Self::Event>>;
     fn received_ctrl_c(event: Self::Event) -> bool;

@@ -1,4 +1,5 @@
 use futures::{FutureExt, future::select};
+use std::io::{self};
 
 use crate::{
     component::{ComponentHelperExt, InstantiatedComponent},
@@ -25,7 +26,7 @@ impl<'a> Tree<'a> {
         }
     }
 
-    fn render(&mut self, terminal: &mut Terminal) {
+    fn render(&mut self, terminal: &mut Terminal) -> io::Result<()> {
         let mut component_context_stack = ContextStack::root(&mut self.system_context);
         self.root_component
             .update(terminal, &mut component_context_stack, self.props.borrow());
@@ -37,11 +38,13 @@ impl<'a> Tree<'a> {
                 self.root_component.draw(&mut drawer);
             })
             .expect("Failed to draw the terminal");
+        terminal.events()?;
+        Ok(())
     }
 
-    async fn render_loop(&mut self, terminal: &mut Terminal) {
+    async fn render_loop(&mut self, terminal: &mut Terminal) -> io::Result<()> {
         loop {
-            self.render(terminal);
+            self.render(terminal)?;
             if self.system_context.should_exit() || terminal.received_ctrl_c() {
                 break;
             }
@@ -50,17 +53,23 @@ impl<'a> Tree<'a> {
                 break;
             }
         }
+        Ok(())
     }
 }
 
-pub(crate) fn render<E: ElementExt>(mut element: E, mut terminal: Terminal) {
+pub(crate) fn render<E: ElementExt>(mut element: E, mut terminal: Terminal) -> io::Result<()> {
     let helper = element.helper();
     let mut tree = Tree::new(element.props_mut(), helper);
-    tree.render(&mut terminal);
+    tree.render(&mut terminal)?;
+    Ok(())
 }
 
-pub(crate) async fn render_loop<E: ElementExt>(mut element: E, mut terminal: Terminal) {
+pub(crate) async fn render_loop<E: ElementExt>(
+    mut element: E,
+    mut terminal: Terminal,
+) -> io::Result<()> {
     let helper = element.helper();
     let mut tree = Tree::new(element.props_mut(), helper);
-    tree.render_loop(&mut terminal).await;
+    tree.render_loop(&mut terminal).await?;
+    Ok(())
 }

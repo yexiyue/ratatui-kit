@@ -2,7 +2,7 @@ use crate::{
     element::ElementType,
     hooks::Hooks,
     props::{AnyProps, Props},
-    render::{ComponentDrawer, ComponentUpdater, layout_style::LayoutStyle},
+    render::{ComponentDrawer, ComponentUpdater},
 };
 use std::{any::Any, pin::Pin, task::Context};
 
@@ -36,10 +36,6 @@ pub trait Component: Any + Send + Sync + Unpin {
     }
 
     fn render_ref(&self, _area: ratatui::layout::Rect, _buf: &mut ratatui::buffer::Buffer) {}
-
-    fn get_layout_style(&self, _props: &Self::Props<'_>) -> LayoutStyle {
-        LayoutStyle::default()
-    }
 }
 
 pub trait AnyComponent: Any + Send + Sync + Unpin {
@@ -50,8 +46,6 @@ pub trait AnyComponent: Any + Send + Sync + Unpin {
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()>;
 
     fn render_ref(&self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer);
-
-    fn get_layout_style(&self, props: AnyProps) -> LayoutStyle;
 }
 
 impl<C> ElementType for C
@@ -84,9 +78,5 @@ where
 
     fn render_ref(&self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
         Component::render_ref(self, area, buf);
-    }
-
-    fn get_layout_style(&self, props: AnyProps) -> LayoutStyle {
-        Component::get_layout_style(self, unsafe { props.downcast_ref_unchecked() })
     }
 }

@@ -19,6 +19,7 @@ fn set_panic_hook() {
             cursor::Show
         )
         .unwrap();
+        ratatui::restore();
         hook(info);
     }));
 }

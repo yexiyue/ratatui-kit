@@ -7,6 +7,7 @@ use crate::{
     component::{Components, InstantiatedComponent},
     context::{Context, ContextStack},
     element::ElementExt,
+    layout_style::LayoutStyle,
     multimap::AppendOnlyMultimap,
     terminal::Terminal,
 };
@@ -15,6 +16,8 @@ pub struct ComponentUpdater<'a, 'c: 'a> {
     component_context_stack: &'a mut ContextStack<'c>,
     terminal: &'a mut Terminal,
     components: &'a mut Components,
+    transparent_layout: bool,
+    layout_style: &'a mut Option<LayoutStyle>,
 }
 
 impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
@@ -22,11 +25,14 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
         component_context_stack: &'a mut ContextStack<'c>,
         terminal: &'a mut Terminal,
         components: &'a mut Components,
+        layout_style: &'a mut Option<LayoutStyle>,
     ) -> ComponentUpdater<'a, 'c> {
         ComponentUpdater {
             component_context_stack,
             terminal,
             components,
+            transparent_layout: false,
+            layout_style,
         }
     }
 
@@ -44,6 +50,18 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
 
     pub fn terminal(&mut self) -> &mut Terminal {
         self.terminal
+    }
+
+    pub fn set_transparent_layout(&mut self, transparent: bool) {
+        self.transparent_layout = transparent;
+    }
+
+    pub(crate) fn has_transparent_layout(&self) -> bool {
+        self.transparent_layout
+    }
+
+    pub fn set_layout_style(&mut self, layout_style: LayoutStyle) {
+        self.layout_style.replace(layout_style);
     }
 
     pub fn update_children<I, T>(&mut self, elements: I, context: Option<Context>)

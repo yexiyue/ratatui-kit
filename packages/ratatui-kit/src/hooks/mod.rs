@@ -8,9 +8,9 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-mod use_context;
-mod use_future;
-mod use_state;
+pub mod use_context;
+pub mod use_future;
+pub mod use_state;
 
 pub trait Hook: Unpin + Send {
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
@@ -92,7 +92,7 @@ impl<'a> Hooks<'a, '_> {
         }
     }
 
-    pub(crate) fn with_context_stack<'c, 'd>(
+    pub fn with_context_stack<'c, 'd>(
         &'c mut self,
         context: &'c ContextStack<'d>,
     ) -> Hooks<'c, 'd> {

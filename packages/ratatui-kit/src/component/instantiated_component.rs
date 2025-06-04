@@ -8,7 +8,7 @@ use crate::{
     render::{ComponentDrawer, ComponentUpdater, layout_style::LayoutStyle},
     terminal::Terminal,
 };
-use ratatui::layout::{Constraint, Direction};
+use ratatui::layout::{Constraint, Direction, Layout};
 use std::{
     future::poll_fn,
     ops::{Deref, DerefMut},
@@ -40,8 +40,16 @@ impl Components {
         self.components
             .iter()
             .map(|c| match direction {
-                Direction::Horizontal => c.layout_style.get_width(),
-                Direction::Vertical => c.layout_style.get_height(),
+                Direction::Horizontal => c
+                    .layout_style
+                    .as_ref()
+                    .map(|style| style.get_width())
+                    .unwrap_or_default(),
+                Direction::Vertical => c
+                    .layout_style
+                    .as_ref()
+                    .map(|style| style.get_height())
+                    .unwrap_or_default(),
             })
             .collect()
     }
@@ -68,7 +76,8 @@ pub(crate) struct InstantiatedComponent {
     helper: Box<dyn ComponentHelperExt>,
     children: Components,
     first_update: bool,
-    layout_style: LayoutStyle,
+    layout_style: Option<LayoutStyle>,
+    has_transparent_layout: bool,
 }
 
 impl InstantiatedComponent {
@@ -76,11 +85,12 @@ impl InstantiatedComponent {
         let component = helper.new_component(props.borrow());
         Self {
             hooks: Default::default(),
-            layout_style: component.get_layout_style(props),
+            layout_style: None,
             component,
             children: Components::default(),
             helper,
             first_update: true,
+            has_transparent_layout: false,
         }
     }
 
@@ -94,7 +104,12 @@ impl InstantiatedComponent {
         context_stack: &mut ContextStack,
         mut props: AnyProps,
     ) {
-        let mut updater = ComponentUpdater::new(context_stack, terminal, &mut self.children);
+        let mut updater = ComponentUpdater::new(
+            context_stack,
+            terminal,
+            &mut self.children,
+            &mut self.layout_style,
+        );
         self.hooks.pre_component_update(&mut updater);
         self.helper.update_component(
             &mut self.component,
@@ -102,25 +117,46 @@ impl InstantiatedComponent {
             Hooks::new(&mut self.hooks, self.first_update),
             &mut updater,
         );
-        self.layout_style = self.component.get_layout_style(props);
         self.hooks.post_component_update(&mut updater);
         self.first_update = false;
+        self.has_transparent_layout = updater.has_transparent_layout();
     }
 
     pub fn draw(&mut self, drawer: &mut ComponentDrawer) {
-        let area = self.layout_style.inner_area(drawer.area);
+        let default_layout_style = LayoutStyle::default();
+        let layout_style = self.layout_style.as_ref().unwrap_or(&default_layout_style);
 
-        let layout = self.layout_style.get_layout().constraints(
-            self.children
-                .get_constraints(self.layout_style.flex_direction),
-        );
+        let area = if self.has_transparent_layout {
+            drawer.area
+        } else {
+            layout_style.inner_area(drawer.area)
+        };
+
+        let layout = layout_style
+            .get_layout()
+            .constraints(self.children.get_constraints(layout_style.flex_direction));
+
         let areas = layout.split(area);
+
+        let mut new_areas: Vec<ratatui::prelude::Rect> = vec![];
+
+        let rev_direction = match layout_style.flex_direction {
+            Direction::Horizontal => Direction::Vertical,
+            Direction::Vertical => Direction::Horizontal,
+        };
+        for (area, constraint) in areas
+            .iter()
+            .zip(self.children.get_constraints(rev_direction))
+        {
+            new_areas.push(Layout::new(rev_direction, [constraint]).split(*area)[0]);
+        }
+
         drawer.area = area;
 
         self.hooks.pre_component_draw(drawer);
         self.component.draw(drawer);
 
-        for (child, area) in self.children.components.iter_mut().zip(areas.iter()) {
+        for (child, area) in self.children.components.iter_mut().zip(new_areas.iter()) {
             drawer.area = *area;
             child.draw(drawer);
         }

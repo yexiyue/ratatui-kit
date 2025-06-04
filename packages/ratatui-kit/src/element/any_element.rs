@@ -64,19 +64,19 @@ impl ElementExt for AnyElement<'_> {
 
     fn render(&mut self) -> io::Result<()> {
         let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render(self, terminal);
+        render(self, terminal)?;
         Ok(())
     }
 
     async fn render_loop(&mut self) -> io::Result<()> {
         let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render_loop(self, terminal).await;
+        render_loop(self, terminal).await?;
         Ok(())
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
         let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render_loop(self, terminal).await;
+        render_loop(self, terminal).await?;
         Ok(())
     }
 }
@@ -96,19 +96,19 @@ impl ElementExt for &mut AnyElement<'_> {
 
     fn render(&mut self) -> io::Result<()> {
         let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render(&mut **self, terminal);
+        render(&mut **self, terminal)?;
         Ok(())
     }
 
     async fn render_loop(&mut self) -> io::Result<()> {
         let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render_loop(&mut **self, terminal).await;
+        render_loop(&mut **self, terminal).await?;
         Ok(())
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
         let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render_loop(&mut **self, terminal).await;
+        render_loop(&mut **self, terminal).await?;
         Ok(())
     }
 }

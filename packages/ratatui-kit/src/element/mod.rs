@@ -6,6 +6,8 @@ mod element_ext;
 pub use element_ext::ElementExt;
 mod element;
 pub use element::Element;
+mod extend_with_elements;
+pub use extend_with_elements::{ExtendWithElements, extend_with_elements};
 
 pub trait ElementType {
     type Props<'a>
