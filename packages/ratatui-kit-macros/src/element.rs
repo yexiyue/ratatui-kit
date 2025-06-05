@@ -5,8 +5,10 @@ use syn::{
 };
 use uuid::Uuid;
 
+use crate::adapter::ParsedAdapter;
+
 enum ParsedElementChild {
-    Element(ParsedElement),
+    Element(ElementOrAdapter),
     Expr(Expr),
 }
 
@@ -101,5 +103,32 @@ impl ToTokens for ParsedElement {
                 _element
             }
         });
+    }
+}
+
+pub enum ElementOrAdapter {
+    Element(ParsedElement),
+    Adapter(ParsedAdapter),
+}
+
+impl Parse for ElementOrAdapter {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        if input.peek(Token![$]) {
+            input.parse::<Token![$]>()?;
+            let adapter: ParsedAdapter = input.parse()?;
+            Ok(ElementOrAdapter::Adapter(adapter))
+        } else {
+            let element: ParsedElement = input.parse()?;
+            Ok(ElementOrAdapter::Element(element))
+        }
+    }
+}
+
+impl ToTokens for ElementOrAdapter {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            ElementOrAdapter::Element(element) => element.to_tokens(tokens),
+            ElementOrAdapter::Adapter(adapter) => adapter.to_tokens(tokens),
+        }
     }
 }

@@ -1,2 +1,4 @@
+mod adapter;
 pub mod flex;
-pub mod text;
+pub mod fragment;
+pub use adapter::*;

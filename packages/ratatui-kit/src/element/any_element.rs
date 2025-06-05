@@ -49,7 +49,7 @@ impl<'a, 'b: 'a> From<&'a mut AnyElement<'b>> for AnyElement<'b> {
     }
 }
 
-impl ElementExt for AnyElement<'_> {
+impl<'a> ElementExt for AnyElement<'a> {
     fn key(&self) -> &ElementKey {
         &self.key
     }
@@ -75,13 +75,13 @@ impl ElementExt for AnyElement<'_> {
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+        let terminal = Terminal::new(CrossTerminal::new(true)?);
         render_loop(self, terminal).await?;
         Ok(())
     }
 }
 
-impl ElementExt for &mut AnyElement<'_> {
+impl<'a> ElementExt for &mut AnyElement<'a> {
     fn key(&self) -> &ElementKey {
         &self.key
     }
@@ -107,7 +107,7 @@ impl ElementExt for &mut AnyElement<'_> {
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+        let terminal = Terminal::new(CrossTerminal::new(true)?);
         render_loop(&mut **self, terminal).await?;
         Ok(())
     }

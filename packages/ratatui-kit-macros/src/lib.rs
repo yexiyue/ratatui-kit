@@ -1,8 +1,9 @@
-use element::ParsedElement;
+use element::ElementOrAdapter;
 use proc_macro::TokenStream;
 use props::ParsedProps;
 use quote::ToTokens;
 
+mod adapter;
 mod component;
 mod element;
 mod props;
@@ -15,7 +16,7 @@ pub fn derive_props(item: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn element(input: TokenStream) -> TokenStream {
-    let element = syn::parse_macro_input!(input as ParsedElement);
+    let element = syn::parse_macro_input!(input as ElementOrAdapter);
     element.to_token_stream().into()
 }
 

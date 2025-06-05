@@ -1,10 +1,8 @@
-use ratatui::{
-    layout::Alignment,
-    style::{Style, Stylize},
-};
+use ratatui::text::Line;
 use ratatui_kit::{
-    AnyElement, ElementExt, Hooks, NoProps, Props, component, element,
-    text::{Text, TextProps},
+    AnyElement, ElementExt, Hooks, component, element,
+    prelude::fragment::Fragment,
+    ratatui::style::{Style, Stylize},
     use_future::UseFuture,
     use_state::UseState,
 };
@@ -28,9 +26,17 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         }
     });
 
-    element!(Text(
-        text: format!("Hello World {}", state),
-        alignment: Some(Alignment::Center),
-        style:Style::default().yellow(),
-    ))
+    let line = Line::styled(
+        format!("Counter: {}", state),
+        Style::default().fg(ratatui::style::Color::Green).bold(),
+    )
+    .centered()
+    .bold()
+    .underlined();
+
+    element!(
+        Fragment{
+            $line
+        }
+    )
 }

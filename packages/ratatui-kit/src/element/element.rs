@@ -23,7 +23,7 @@ where
     }
 }
 
-impl<T> ElementExt for Element<'_, T>
+impl<'a, T> ElementExt for Element<'a, T>
 where
     T: Component,
 {
@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<T> ElementExt for &mut Element<'_, T>
+impl<'a, T> ElementExt for &mut Element<'a, T>
 where
     T: Component,
 {
@@ -87,7 +87,7 @@ where
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+        let terminal = Terminal::new(CrossTerminal::new(true)?);
         render_loop(&mut **self, terminal).await?;
         Ok(())
     }

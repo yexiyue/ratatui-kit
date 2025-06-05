@@ -37,6 +37,9 @@ pub struct AnyProps<'a> {
     _marker: std::marker::PhantomData<&'a mut ()>,
 }
 
+unsafe impl Send for AnyProps<'_> {}
+unsafe impl Sync for AnyProps<'_> {}
+
 impl<'a> AnyProps<'a> {
     // 创建拥有所有权的AnyProps实例
     // T: 实现Props trait的类型

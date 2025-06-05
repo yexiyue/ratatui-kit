@@ -10,11 +10,11 @@ mod private {
 
     pub trait Sealed {}
 
-    impl Sealed for AnyElement<'_> {}
-    impl Sealed for &mut AnyElement<'_> {}
+    impl<'a> Sealed for AnyElement<'a> {}
+    impl<'a> Sealed for &mut AnyElement<'a> {}
 
-    impl<T> Sealed for Element<'_, T> where T: Component {}
-    impl<T> Sealed for &mut Element<'_, T> where T: Component {}
+    impl<'a, T> Sealed for Element<'a, T> where T: Component {}
+    impl<'a, T> Sealed for &mut Element<'a, T> where T: Component {}
 }
 
 pub trait ElementExt: private::Sealed + Sized {
