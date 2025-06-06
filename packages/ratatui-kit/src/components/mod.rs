@@ -1,4 +1,5 @@
 mod adapter;
-pub mod flex;
 pub mod fragment;
+pub mod view;
 pub use adapter::*;
+pub mod border;

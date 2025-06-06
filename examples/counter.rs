@@ -1,7 +1,7 @@
-use ratatui::text::Line;
+use ratatui::{layout::Constraint, text::Line};
 use ratatui_kit::{
     AnyElement, ElementExt, Hooks, component, element,
-    prelude::fragment::Fragment,
+    prelude::{border::Border, view::View},
     ratatui::style::{Style, Stylize},
     use_future::UseFuture,
     use_state::UseState,
@@ -35,8 +35,29 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     .underlined();
 
     element!(
-        Fragment{
-            $line
+        View(
+            justify_content:ratatui::layout::Flex::SpaceAround,
+            flex_direction:ratatui::layout::Direction::Horizontal,
+        ){
+            View(
+
+                height:Constraint::Length(10),
+                justify_content:ratatui::layout::Flex::End,
+                flex_direction:ratatui::layout::Direction::Vertical,
+            ){
+                View(height:Constraint::Length(1)){
+                    $line.clone()
+                }
+            }
+            View(){
+                Border(
+                    border_style:Style::default().blue(),
+                    style:Style::default().on_white(),
+                    width:Constraint::Length(20)
+                ){
+                    $line
+                }
+            }
         }
     )
 }

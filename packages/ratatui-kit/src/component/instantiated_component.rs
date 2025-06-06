@@ -132,11 +132,18 @@ impl InstantiatedComponent {
             layout_style.inner_area(drawer.area)
         };
 
+        drawer.area = area;
+
+        // 先渲染在计算子组件的areas
+        self.hooks.pre_component_draw(drawer);
+        // drawer.ares可能在组件绘制时改变
+        self.component.draw(drawer);
+
         let layout = layout_style
             .get_layout()
             .constraints(self.children.get_constraints(layout_style.flex_direction));
 
-        let areas = layout.split(area);
+        let areas = layout.split(drawer.area);
 
         let mut new_areas: Vec<ratatui::prelude::Rect> = vec![];
 
@@ -148,13 +155,9 @@ impl InstantiatedComponent {
             .iter()
             .zip(self.children.get_constraints(rev_direction))
         {
-            new_areas.push(Layout::new(rev_direction, [constraint]).split(*area)[0]);
+            let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
+            new_areas.push(area);
         }
-
-        drawer.area = area;
-
-        self.hooks.pre_component_draw(drawer);
-        self.component.draw(drawer);
 
         for (child, area) in self.children.components.iter_mut().zip(new_areas.iter()) {
             drawer.area = *area;

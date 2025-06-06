@@ -4,7 +4,6 @@ use crate::{AnyElement, Component, ComponentUpdater, Hooks};
 
 #[derive(Default, Props)]
 pub struct FragmentProps<'a> {
-    /// The children of the component.
     pub children: Vec<AnyElement<'a>>,
 }
 
