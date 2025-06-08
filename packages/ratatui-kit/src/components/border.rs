@@ -1,6 +1,7 @@
 use ratatui::{
     layout::{Constraint, Offset},
     symbols::border,
+    text::Line,
     widgets::{Block, Padding},
 };
 use ratatui_kit_macros::Props;
@@ -18,6 +19,8 @@ pub struct BorderProps<'a> {
     pub border_set: border::Set,
     pub style: ratatui::style::Style,
     pub children: Vec<AnyElement<'a>>,
+    pub top_title: Option<Line<'static>>,
+    pub bottom_title: Option<Line<'static>>,
 }
 
 impl Default for BorderProps<'_> {
@@ -32,6 +35,8 @@ impl Default for BorderProps<'_> {
             children: Vec::new(),
             border_set: border::Set::default(),
             style: ratatui::style::Style::default(),
+            top_title: None,
+            bottom_title: None,
         }
     }
 }
@@ -53,6 +58,8 @@ pub struct Border {
     pub borders: ratatui::widgets::Borders,
     pub border_set: border::Set,
     pub style: ratatui::style::Style,
+    pub top_title: Option<Line<'static>>,
+    pub bottom_title: Option<Line<'static>>,
 }
 
 impl Component for Border {
@@ -65,6 +72,8 @@ impl Component for Border {
             borders: props.borders,
             border_set: props.border_set,
             style: props.style,
+            top_title: props.top_title.clone(),
+            bottom_title: props.bottom_title.clone(),
         }
     }
 
@@ -82,12 +91,20 @@ impl Component for Border {
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
-        let block = Block::new()
+        let mut block = Block::new()
             .style(self.style)
             .borders(self.borders)
             .border_set(self.border_set)
             .border_style(self.border_style)
             .padding(self.padding);
+
+        if let Some(top_title) = &self.top_title {
+            block = block.title_top(top_title.clone());
+        }
+
+        if let Some(bottom_title) = &self.bottom_title {
+            block = block.title_bottom(bottom_title.clone());
+        }
 
         let inner_area = block.inner(drawer.area);
         drawer.frame.render_widget(block, drawer.area);

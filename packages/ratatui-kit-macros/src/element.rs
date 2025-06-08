@@ -73,7 +73,7 @@ impl ToTokens for ParsedElement {
             .filter_map(|FieldValue { member, expr, .. }| {
                 match member {
                     Member::Named(ident) if ident == "key" => None, // key 已经处理过了
-                    _ => Some(quote!(_props.#member = #expr)),
+                    _ => Some(quote!(_props.#member = (#expr).into())),
                 }
             })
             .collect::<Vec<_>>();

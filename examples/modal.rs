@@ -1,7 +1,7 @@
-use ratatui::{layout::Constraint, text::Line};
+use ratatui::{layout::Constraint, text::Line, widgets::Padding};
 use ratatui_kit::{
     AnyElement, ElementExt, Hooks, component, element,
-    prelude::{border::Border, view::View},
+    prelude::{border::Border, modal::Modal, view::View},
     ratatui::style::{Style, Stylize},
     use_future::UseFuture,
     use_state::UseState,
@@ -39,25 +39,28 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             justify_content:ratatui::layout::Flex::SpaceAround,
             flex_direction:ratatui::layout::Direction::Horizontal,
         ){
-            View(
-
-                height:Constraint::Length(10),
-                justify_content:ratatui::layout::Flex::End,
-                flex_direction:ratatui::layout::Direction::Vertical,
-            ){
-                View(height:Constraint::Length(1)){
-                    $line.clone()
-                }
-            }
-            View(){
+            View{
                 Border(
                     border_style:Style::default().blue(),
-                    style:Style::default().on_white(),
-                    // width:Constraint::Length(20),
                     top_title:Some(Line::from("Counter")),
                     bottom_title:Some(Line::from("Press Ctrl+C to exit").centered()),
                 ){
-                    $line
+                    $line.clone()
+                }
+            }
+            Modal(
+                open:true,
+                width:Constraint::Percentage(50),
+                height:Constraint::Percentage(50),
+                style:Style::default().dim(),
+            ){
+                Border(
+                    top_title:Some(Line::from("Modal Title").centered().yellow()),
+                    padding:Padding::new(4,4,1,1),
+                ) {
+                    View(height:Constraint::Length(1)){
+                        $line
+                    }
                 }
             }
         }
