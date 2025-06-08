@@ -18,6 +18,7 @@ mod flatten_export {
     pub use crate::terminal::*;
 }
 
+pub use crossterm;
 pub use flatten_export::*;
 pub use ratatui;
 pub use ratatui_kit_macros::*;

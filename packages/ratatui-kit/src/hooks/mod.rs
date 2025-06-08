@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
 };
 pub mod use_context;
+pub mod use_events;
 pub mod use_future;
 pub mod use_state;
 
@@ -20,8 +21,8 @@ pub trait Hook: Unpin + Send {
     fn pre_component_update(&mut self, _updater: &mut ComponentUpdater) {}
     fn post_component_update(&mut self, _updater: &mut ComponentUpdater) {}
 
-    fn pre_component_draw(&mut self, _updater: &mut ComponentDrawer) {}
-    fn post_component_draw(&mut self, _updater: &mut ComponentDrawer) {}
+    fn pre_component_draw(&mut self, _drawer: &mut ComponentDrawer) {}
+    fn post_component_draw(&mut self, _drawer: &mut ComponentDrawer) {}
 }
 
 pub(crate) trait AnyHook: Hook {

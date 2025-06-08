@@ -1,8 +1,11 @@
 use ratatui::{layout::Constraint, text::Line, widgets::Padding};
 use ratatui_kit::{
-    AnyElement, ElementExt, Hooks, component, element,
+    AnyElement, ElementExt, Hooks, component,
+    crossterm::event::{Event, KeyCode, KeyEventKind},
+    element,
     prelude::{border::Border, modal::Modal, view::View},
     ratatui::style::{Style, Stylize},
+    use_events::UseEvents,
     use_future::UseFuture,
     use_state::UseState,
 };
@@ -19,11 +22,21 @@ async fn main() {
 #[component]
 fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut state = hooks.use_state(|| 0);
+    let mut open = hooks.use_state(|| false);
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             state += 1;
         }
+    });
+
+    hooks.use_events(move |event| match event {
+        Event::Key(key_event) => {
+            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Tab {
+                open.set(!open.get());
+            }
+        }
+        _ => {}
     });
 
     let line = Line::styled(
@@ -49,7 +62,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 }
             }
             Modal(
-                open:true,
+                open:open.get(),
                 width:Constraint::Percentage(50),
                 height:Constraint::Percentage(50),
                 style:Style::default().dim(),
