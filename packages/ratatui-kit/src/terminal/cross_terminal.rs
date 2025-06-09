@@ -5,8 +5,8 @@ use crossterm::{
     execute, queue, terminal,
 };
 use futures::{StreamExt, stream::BoxStream};
+use ratatui::Frame;
 use std::io::{self, IsTerminal, stdout};
-
 fn set_panic_hook() {
     let hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -19,6 +19,7 @@ fn set_panic_hook() {
             cursor::Show
         )
         .unwrap();
+        ratatui::restore();
         hook(info);
     }));
 }
@@ -37,6 +38,7 @@ pub struct CrossTerminal {
     raw_mode_enabled: bool,
     enabled_keyboard_enhancement: bool,
     fullscreen: bool,
+    terminal: ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
 }
 
 impl CrossTerminal {
@@ -56,11 +58,12 @@ impl CrossTerminal {
         set_panic_hook();
 
         Ok(Self {
-            dest,
             input_is_terminal: io::stdin().is_terminal(),
             raw_mode_enabled: false,
             enabled_keyboard_enhancement: false,
             fullscreen,
+            terminal: ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(stdout()))?,
+            dest,
         })
     }
 
@@ -161,5 +164,13 @@ impl TerminalImpl for CrossTerminal {
                 ..
             })
         )
+    }
+
+    fn draw<F>(&mut self, f: F) -> io::Result<()>
+    where
+        F: FnOnce(&mut Frame),
+    {
+        self.terminal.draw(f)?;
+        Ok(())
     }
 }

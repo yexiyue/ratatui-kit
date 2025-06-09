@@ -1,20 +1,32 @@
-use crate::{context::ContextStack, render::ComponentUpdater};
+#![allow(unused)]
+use crate::{
+    context::ContextStack,
+    render::{ComponentDrawer, ComponentUpdater},
+};
 use std::{
     any::Any,
     pin::Pin,
     task::{Context, Poll},
 };
 mod use_context;
-mod use_state;
+pub use use_context::UseContext;
+mod use_events;
+pub use use_events::UseEvents;
 mod use_future;
+pub use use_future::UseFuture;
+mod use_state;
+pub use use_state::UseState;
 
 pub trait Hook: Unpin + Send {
-    fn pool_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
+    fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
         Poll::Pending
     }
 
     fn pre_component_update(&mut self, _updater: &mut ComponentUpdater) {}
     fn post_component_update(&mut self, _updater: &mut ComponentUpdater) {}
+
+    fn pre_component_draw(&mut self, _drawer: &mut ComponentDrawer) {}
+    fn post_component_draw(&mut self, _drawer: &mut ComponentDrawer) {}
 }
 
 pub(crate) trait AnyHook: Hook {
@@ -28,10 +40,10 @@ impl<T: Hook + 'static> AnyHook for T {
 }
 
 impl Hook for Vec<Box<dyn AnyHook>> {
-    fn pool_change(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
+    fn poll_change(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
         let mut is_ready = false;
         for hook in self.iter_mut() {
-            if let Poll::Ready(_) = Pin::new(&mut **hook).pool_change(_cx) {
+            if Pin::new(&mut **hook).poll_change(_cx).is_ready() {
                 is_ready = true;
             }
         }
@@ -54,6 +66,18 @@ impl Hook for Vec<Box<dyn AnyHook>> {
             hook.post_component_update(_updater);
         }
     }
+
+    fn pre_component_draw(&mut self, _updater: &mut ComponentDrawer) {
+        for hook in self.iter_mut() {
+            hook.pre_component_draw(_updater);
+        }
+    }
+
+    fn post_component_draw(&mut self, _updater: &mut ComponentDrawer) {
+        for hook in self.iter_mut() {
+            hook.post_component_draw(_updater);
+        }
+    }
 }
 
 pub struct Hooks<'a, 'b: 'a> {
@@ -73,7 +97,7 @@ impl<'a> Hooks<'a, '_> {
         }
     }
 
-    pub(crate) fn with_context_stack<'c, 'd>(
+    pub fn with_context_stack<'c, 'd>(
         &'c mut self,
         context: &'c ContextStack<'d>,
     ) -> Hooks<'c, 'd> {

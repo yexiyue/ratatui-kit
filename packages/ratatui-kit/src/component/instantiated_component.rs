@@ -1,0 +1,184 @@
+use super::{AnyComponent, ComponentHelperExt};
+use crate::{
+    context::ContextStack,
+    element::ElementKey,
+    hooks::{AnyHook, Hook, Hooks},
+    multimap::RemoveOnlyMultimap,
+    props::AnyProps,
+    render::{ComponentDrawer, ComponentUpdater, layout_style::LayoutStyle},
+    terminal::Terminal,
+};
+use ratatui::layout::{Constraint, Direction, Layout};
+use std::{
+    future::poll_fn,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+#[derive(Default)]
+pub(crate) struct Components {
+    pub components: RemoveOnlyMultimap<ElementKey, InstantiatedComponent>,
+}
+
+impl Deref for Components {
+    type Target = RemoveOnlyMultimap<ElementKey, InstantiatedComponent>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.components
+    }
+}
+
+impl DerefMut for Components {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.components
+    }
+}
+
+impl Components {
+    pub fn get_constraints(&self, direction: Direction) -> Vec<Constraint> {
+        self.components
+            .iter()
+            .map(|c| match direction {
+                Direction::Horizontal => c
+                    .layout_style
+                    .as_ref()
+                    .map(|style| style.get_width())
+                    .unwrap_or_default(),
+                Direction::Vertical => c
+                    .layout_style
+                    .as_ref()
+                    .map(|style| style.get_height())
+                    .unwrap_or_default(),
+            })
+            .collect()
+    }
+
+    fn poll_change(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let mut is_ready = false;
+        for component in self.components.iter_mut() {
+            if Pin::new(component).poll_change(cx).is_ready() {
+                is_ready = true;
+            }
+        }
+
+        if is_ready {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+pub(crate) struct InstantiatedComponent {
+    hooks: Vec<Box<dyn AnyHook>>,
+    component: Box<dyn AnyComponent>,
+    helper: Box<dyn ComponentHelperExt>,
+    children: Components,
+    first_update: bool,
+    layout_style: Option<LayoutStyle>,
+    has_transparent_layout: bool,
+}
+
+impl InstantiatedComponent {
+    pub fn new(mut props: AnyProps, helper: Box<dyn ComponentHelperExt>) -> Self {
+        let component = helper.new_component(props.borrow());
+        Self {
+            hooks: Default::default(),
+            layout_style: None,
+            component,
+            children: Components::default(),
+            helper,
+            first_update: true,
+            has_transparent_layout: false,
+        }
+    }
+
+    pub fn component(&self) -> &dyn AnyComponent {
+        &*self.component
+    }
+
+    pub fn update(
+        &mut self,
+        terminal: &mut Terminal,
+        context_stack: &mut ContextStack,
+        mut props: AnyProps,
+    ) {
+        let mut updater = ComponentUpdater::new(
+            context_stack,
+            terminal,
+            &mut self.children,
+            &mut self.layout_style,
+        );
+        self.hooks.pre_component_update(&mut updater);
+        self.helper.update_component(
+            &mut self.component,
+            props.borrow(),
+            Hooks::new(&mut self.hooks, self.first_update),
+            &mut updater,
+        );
+        self.hooks.post_component_update(&mut updater);
+        self.first_update = false;
+        self.has_transparent_layout = updater.has_transparent_layout();
+    }
+
+    pub fn draw(&mut self, drawer: &mut ComponentDrawer) {
+        let default_layout_style = LayoutStyle::default();
+        let layout_style = self.layout_style.as_ref().unwrap_or(&default_layout_style);
+
+        let area = if self.has_transparent_layout {
+            drawer.area
+        } else {
+            layout_style.inner_area(drawer.area)
+        };
+
+        drawer.area = area;
+
+        // 先渲染在计算子组件的areas
+        self.hooks.pre_component_draw(drawer);
+        // drawer.ares可能在组件绘制时改变
+        self.component.draw(drawer);
+
+        let layout = layout_style
+            .get_layout()
+            .constraints(self.children.get_constraints(layout_style.flex_direction));
+
+        let areas = layout.split(drawer.area);
+
+        let mut new_areas: Vec<ratatui::prelude::Rect> = vec![];
+
+        let rev_direction = match layout_style.flex_direction {
+            Direction::Horizontal => Direction::Vertical,
+            Direction::Vertical => Direction::Horizontal,
+        };
+        for (area, constraint) in areas
+            .iter()
+            .zip(self.children.get_constraints(rev_direction))
+        {
+            let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
+            new_areas.push(area);
+        }
+
+        for (child, area) in self.children.components.iter_mut().zip(new_areas.iter()) {
+            drawer.area = *area;
+            child.draw(drawer);
+        }
+        self.hooks.post_component_draw(drawer);
+    }
+
+    pub(crate) fn poll_change(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
+        let component_status = Pin::new(&mut *self.component).poll_change(cx);
+        let children_status = Pin::new(&mut self.children).poll_change(cx);
+        let hooks_status = Pin::new(&mut self.hooks).poll_change(cx);
+        if component_status.is_ready() || children_status.is_ready() || hooks_status.is_ready() {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+
+    pub async fn wait(&mut self) {
+        let mut self_mut = Pin::new(self);
+        poll_fn(|cx| self_mut.as_mut().poll_change(cx)).await;
+    }
+}

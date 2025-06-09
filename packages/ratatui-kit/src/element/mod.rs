@@ -1,27 +1,16 @@
-pub mod key;
+mod key;
 pub use key::ElementKey;
-pub mod any_element;
+mod any_element;
 pub use any_element::AnyElement;
-
-use crate::component::Component;
+mod element_ext;
+pub use element_ext::ElementExt;
+mod element;
+pub use element::Element;
+mod extend_with_elements;
+pub use extend_with_elements::{ExtendWithElements, extend_with_elements};
 
 pub trait ElementType {
     type Props<'a>
     where
         Self: 'a;
-}
-
-#[derive(Clone)]
-pub struct Element<'a, T: ElementType + 'a> {
-    key: ElementKey,
-    props: T::Props<'a>,
-}
-
-impl<'a, T> Element<'a, T>
-where
-    T: Component + 'a,
-{
-    pub fn into_any(self) -> AnyElement<'a> {
-        self.into()
-    }
 }

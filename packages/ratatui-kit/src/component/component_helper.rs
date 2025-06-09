@@ -10,7 +10,7 @@ pub trait ComponentHelperExt: Any + Send + Sync {
     fn update_component(
         &self,
         component: &mut Box<dyn AnyComponent>,
-        props: &mut AnyProps,
+        props: AnyProps,
         hooks: Hooks,
         updater: &mut ComponentUpdater,
     );
@@ -56,7 +56,7 @@ where
     fn update_component(
         &self,
         component: &mut Box<dyn AnyComponent>,
-        props: &mut AnyProps,
+        props: AnyProps,
         hooks: Hooks,
         updater: &mut ComponentUpdater,
     ) {

@@ -1,19 +1,23 @@
-use cross_terminal::CrossTerminal;
 use futures::{Stream, StreamExt, future::pending, stream::BoxStream};
 use std::{
     collections::VecDeque,
+    fmt::Debug,
     io,
     sync::{Arc, Mutex, Weak},
     task::{Poll, Waker},
 };
 
 mod cross_terminal;
+pub use cross_terminal::CrossTerminal;
 
 pub trait TerminalImpl: Send {
-    type Event: Clone;
+    type Event: Clone + Debug;
     fn is_raw_mode_enabled(&self) -> bool;
     fn event_stream(&mut self) -> io::Result<BoxStream<'static, Self::Event>>;
     fn received_ctrl_c(event: Self::Event) -> bool;
+    fn draw<F>(&mut self, f: F) -> io::Result<()>
+    where
+        F: FnOnce(&mut ratatui::Frame);
 }
 
 // ================== 发布订阅模式核心组件 ==================
@@ -84,6 +88,13 @@ where
 
     pub fn received_ctrl_c(&self) -> bool {
         self.received_ctrl_c
+    }
+
+    pub fn draw<F>(&mut self, f: F) -> io::Result<()>
+    where
+        F: FnOnce(&mut ratatui::Frame),
+    {
+        self.inner.draw(f)
     }
 
     // 事件订阅方法

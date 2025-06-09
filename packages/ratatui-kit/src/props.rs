@@ -1,3 +1,5 @@
+use ratatui_kit_macros::Props;
+
 // 安全标记trait，用于表示属性可以跨线程传递
 // 需要实现Send+Sync保证线程安全
 pub unsafe trait Props: Send + Sync {}
@@ -34,6 +36,9 @@ pub struct AnyProps<'a> {
     drop: Option<Box<dyn DropRaw + 'a>>,
     _marker: std::marker::PhantomData<&'a mut ()>,
 }
+
+unsafe impl Send for AnyProps<'_> {}
+unsafe impl Sync for AnyProps<'_> {}
 
 impl<'a> AnyProps<'a> {
     // 创建拥有所有权的AnyProps实例
@@ -96,3 +101,6 @@ impl Drop for AnyProps<'_> {
         }
     }
 }
+
+#[derive(Debug, Clone, Default, Props)]
+pub struct NoProps;

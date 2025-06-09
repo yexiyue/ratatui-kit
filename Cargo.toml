@@ -1,3 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["packages/ratatui-kit"]
+members = ["packages/ratatui-kit", "packages/ratatui-kit-macros"]
+
+[package]
+name = "ratatui-kit-examples"
+version = "0.1.0"
+edition = "2024"
+
+[dev-dependencies]
+tokio = { version = "1.45.1", features = ["full"] }
+ratatui-kit = { path = "packages/ratatui-kit" }
+ratatui = "0.29.0"
