@@ -1,6 +1,10 @@
 mod adapter;
-pub mod fragment;
-pub mod view;
 pub use adapter::*;
-pub mod border;
-pub mod modal;
+mod fragment;
+pub use fragment::*;
+mod view;
+pub use view::*;
+mod border;
+pub use border::*;
+mod modal;
+pub use modal::*;

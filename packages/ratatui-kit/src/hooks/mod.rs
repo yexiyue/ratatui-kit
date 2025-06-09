@@ -8,10 +8,14 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-pub mod use_context;
-pub mod use_events;
-pub mod use_future;
-pub mod use_state;
+mod use_context;
+pub use use_context::UseContext;
+mod use_events;
+pub use use_events::UseEvents;
+mod use_future;
+pub use use_future::UseFuture;
+mod use_state;
+pub use use_state::UseState;
 
 pub trait Hook: Unpin + Send {
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {

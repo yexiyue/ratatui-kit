@@ -1,14 +1,11 @@
-use ratatui::{layout::Constraint, text::Line, widgets::Padding};
-use ratatui_kit::{
-    AnyElement, ElementExt, Hooks, component,
-    crossterm::event::{Event, KeyCode, KeyEventKind},
-    element,
-    prelude::{border::Border, modal::Modal, view::View},
-    ratatui::style::{Style, Stylize},
-    use_events::UseEvents,
-    use_future::UseFuture,
-    use_state::UseState,
+use ratatui::{
+    layout::Constraint,
+    style::{Style, Stylize},
+    text::Line,
+    widgets::Padding,
 };
+use ratatui_kit::crossterm::event::{Event, KeyCode, KeyEventKind};
+use ratatui_kit::prelude::*;
 
 #[tokio::main]
 async fn main() {
