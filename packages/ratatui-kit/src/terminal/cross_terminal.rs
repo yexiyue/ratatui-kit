@@ -144,12 +144,7 @@ impl TerminalImpl for CrossTerminal {
 
         // 创建事件流并过滤错误
         Ok(EventStream::new()
-            .filter_map(|event| async move {
-                match event {
-                    Ok(event) => Some(event),
-                    Err(_) => None, // 忽略无效事件
-                }
-            })
+            .filter_map(|event| async move { event.ok() })
             .boxed())
     }
 

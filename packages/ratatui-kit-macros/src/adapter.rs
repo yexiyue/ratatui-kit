@@ -2,7 +2,6 @@ use quote::{ToTokens, quote};
 use syn::{Expr, parse::Parse, spanned::Spanned};
 use uuid::Uuid;
 
-#[derive(Debug)]
 pub struct ParsedAdapter {
     pub expr: syn::Expr,
 }

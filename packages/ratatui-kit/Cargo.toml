@@ -2,6 +2,10 @@
 name = "ratatui-kit"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/yexiyue/ratatui-kit"
+description = "A framework for building interactive terminal user interfaces with ratatui"
+authors = ["yexiyue <yexiyue666@qq.com>"]
 
 [dependencies]
 futures = "0.3.31"

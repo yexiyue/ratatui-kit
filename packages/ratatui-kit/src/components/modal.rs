@@ -91,10 +91,11 @@ impl Component for Modal {
             updater.update_children(props.children.iter_mut(), None);
         }
 
-        let mut layout_style = LayoutStyle::default();
-        layout_style.width = Constraint::Percentage(0);
-        layout_style.height = Constraint::Percentage(0);
-        updater.set_layout_style(layout_style);
+        updater.set_layout_style(LayoutStyle {
+            width: Constraint::Percentage(0),
+            height: Constraint::Percentage(0),
+            ..Default::default()
+        });
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {

@@ -1,6 +1,6 @@
 use ratatui_kit_macros::Props;
 
-// 安全标记trait，用于表示属性可以跨线程传递
+// # Safety，用于表示属性可以跨线程传递
 // 需要实现Send+Sync保证线程安全
 pub unsafe trait Props: Send + Sync {}
 
