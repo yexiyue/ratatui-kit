@@ -45,15 +45,13 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     .underlined();
 
     element!(
-        View(
-            justify_content:ratatui::layout::Flex::SpaceAround,
-            flex_direction:ratatui::layout::Direction::Horizontal,
-        ){
+        View{
             View{
                 Border(
                     border_style:Style::default().blue(),
                     top_title:Some(Line::from("Counter")),
                     bottom_title:Some(Line::from("Press Ctrl+C to exit").centered()),
+                    ..Default::default()
                 ){
                     $line.clone()
                 }
@@ -63,12 +61,14 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 width:Constraint::Percentage(50),
                 height:Constraint::Percentage(50),
                 style:Style::default().dim(),
+                ..Default::default()
             ){
                 Border(
                     top_title:Some(Line::from("Modal Title").centered().yellow()),
                     padding:Padding::new(4,4,1,1),
+                    ..Default::default()
                 ) {
-                    View(height:Constraint::Length(1)){
+                    View(height:Constraint::Length(1),..Default::default()){
                         $line
                     }
                 }

@@ -2,6 +2,7 @@ mod component;
 pub mod components;
 mod context;
 mod element;
+mod handler;
 mod hooks;
 mod multimap;
 mod props;
@@ -12,6 +13,7 @@ mod flatten_export {
     pub use crate::component::*;
     pub use crate::context::*;
     pub use crate::element::*;
+    pub use crate::handler::*;
     pub use crate::hooks::*;
     pub use crate::props::*;
     pub use crate::render::*;

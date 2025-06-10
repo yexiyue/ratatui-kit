@@ -29,7 +29,9 @@ impl ToTokens for ParsedAdapter {
             {
                 let mut _element=::ratatui_kit::Element::<::ratatui_kit::components::Adapter>{
                     key: ::ratatui_kit::ElementKey::new(#decl_key),
-                    props: ::ratatui_kit::components::AdapterProps(Some(std::sync::Arc::new(#expr))),
+                    props: ::ratatui_kit::components::AdapterProps{
+                        inner: std::sync::Arc::new(#expr)
+                    },
                 };
                 _element
             }

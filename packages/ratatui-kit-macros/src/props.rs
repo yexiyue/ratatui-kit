@@ -1,6 +1,8 @@
 use quote::{ToTokens, quote};
 use syn::{ItemStruct, Result, parse::Parse};
 
+use crate::utils::get_fields;
+
 pub struct ParsedProps {
     pub def: ItemStruct,
 }
@@ -8,8 +10,9 @@ pub struct ParsedProps {
 impl Parse for ParsedProps {
     fn parse(input: syn::parse::ParseStream) -> Result<Self> {
         let input: ItemStruct = input.parse()?;
+        let fields = get_fields(&input)?;
 
-        for field in input.fields.iter() {
+        for field in fields.iter() {
             if let Some(ident) = &field.ident {
                 if ident == "key" {
                     return Err(syn::Error::new_spanned(

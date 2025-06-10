@@ -1,12 +1,12 @@
-use syn::{Field, Fields, FieldsNamed, ItemStruct, Result, punctuated::Punctuated, token::Comma};
+use syn::{Field, Fields, ItemStruct, Result, punctuated::Punctuated, token::Comma};
 
-pub fn get_struct_named(input: &ItemStruct) -> Result<&Punctuated<Field, Comma>> {
-    if let Fields::Named(FieldsNamed { named, .. }) = &input.fields {
-        Ok(named)
-    } else {
-        Err(syn::Error::new_spanned(
+pub fn get_fields(input: &ItemStruct) -> Result<Punctuated<Field, Comma>> {
+    match &input.fields {
+        Fields::Unnamed(_) => Err(syn::Error::new_spanned(
             input,
-            "only named fields are supported",
-        ))
+            "only named fields and unit are supported",
+        )),
+        Fields::Unit => Ok(Punctuated::new()),
+        Fields::Named(fields) => Ok(fields.named.clone()),
     }
 }

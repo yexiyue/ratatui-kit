@@ -7,6 +7,7 @@ mod adapter;
 mod component;
 mod element;
 mod props;
+mod utils;
 
 #[proc_macro_derive(Props)]
 pub fn derive_props(item: TokenStream) -> TokenStream {

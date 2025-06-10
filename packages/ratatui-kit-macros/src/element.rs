@@ -1,7 +1,8 @@
+use proc_macro2::Span;
 use quote::{ToTokens, quote};
 use syn::{
     Expr, FieldValue, Member, Token, TypePath, braced, parse::Parse, punctuated::Punctuated,
-    token::Comma,
+    spanned::Spanned, token::Comma,
 };
 use uuid::Uuid;
 
@@ -12,9 +13,47 @@ enum ParsedElementChild {
     Expr(Expr),
 }
 
+pub enum PropsItem {
+    FieldValue(FieldValue),
+    Rest(Expr),
+}
+
+impl Parse for PropsItem {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        if input.peek(Token![..]) {
+            input.parse::<Token![..]>()?;
+            let rest_expr: Expr = input.parse()?;
+            Ok(PropsItem::Rest(rest_expr))
+        } else {
+            let field_value: FieldValue = input.parse()?;
+            Ok(PropsItem::FieldValue(field_value))
+        }
+    }
+}
+
+impl ToTokens for PropsItem {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            PropsItem::FieldValue(field_value) => tokens.extend(quote!(#field_value)),
+            PropsItem::Rest(expr) => {
+                tokens.extend(quote!(..#expr));
+            }
+        }
+    }
+}
+
+impl PropsItem {
+    pub fn span(&self) -> Span {
+        match self {
+            PropsItem::FieldValue(field_value) => field_value.span(),
+            PropsItem::Rest(expr) => expr.span(),
+        }
+    }
+}
+
 pub struct ParsedElement {
     ty: TypePath,
-    props: Punctuated<FieldValue, Comma>,
+    props: Punctuated<PropsItem, Comma>,
     children: Vec<ParsedElementChild>,
 }
 
@@ -28,6 +67,17 @@ impl Parse for ParsedElement {
         } else {
             Punctuated::new()
         };
+        let rest_position = props
+            .iter()
+            .position(|item| matches!(item, PropsItem::Rest(_)));
+        if let Some(pos) = rest_position {
+            if pos != props.len() - 1 {
+                return Err(syn::Error::new(
+                    props[pos].span(),
+                    "the rest property must be the last item",
+                ));
+            }
+        }
 
         let mut children = Vec::new();
 
@@ -61,8 +111,11 @@ impl ToTokens for ParsedElement {
         let key = self
             .props
             .iter()
-            .find_map(|FieldValue { member, expr, .. }| match member {
-                Member::Named(ident) if ident == "key" => Some(quote!((#decl_key,#expr))),
+            .find_map(|props_item: &PropsItem| match props_item {
+                PropsItem::FieldValue(FieldValue { member, expr, .. }) => match member {
+                    Member::Named(ident) if ident == "key" => Some(quote!((#decl_key,#expr))),
+                    _ => None,
+                },
                 _ => None,
             })
             .unwrap_or_else(|| quote!(#decl_key));
@@ -70,11 +123,12 @@ impl ToTokens for ParsedElement {
         let props_assignments = self
             .props
             .iter()
-            .filter_map(|FieldValue { member, expr, .. }| {
-                match member {
-                    Member::Named(ident) if ident == "key" => None, // key 已经处理过了
-                    _ => Some(quote!(_props.#member = (#expr).into())),
-                }
+            .filter_map(|props_item: &PropsItem| match props_item {
+                PropsItem::FieldValue(FieldValue { member, .. }) => match member {
+                    Member::Named(ident) if ident == "key" => None,
+                    _ => Some(quote!(#props_item)),
+                },
+                _ => Some(quote!(#props_item)),
             })
             .collect::<Vec<_>>();
 
@@ -90,19 +144,37 @@ impl ToTokens for ParsedElement {
             None
         };
 
-        tokens.extend(quote! {
-            {
-                type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
-                let mut _props = Props::default();
-                #(#props_assignments;)*
-                let mut _element=::ratatui_kit::Element::<#ty>{
-                    key: ::ratatui_kit::ElementKey::new(#key),
-                    props: _props,
-                };
-                #set_children
-                _element
-            }
-        });
+        let has_props_assignments = !props_assignments.is_empty();
+        if has_props_assignments {
+            tokens.extend(quote! {
+                {
+                    type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
+                    let mut _props = Props{
+                        #(#props_assignments),*
+                    };
+
+                    let mut _element=::ratatui_kit::Element::<#ty>{
+                        key: ::ratatui_kit::ElementKey::new(#key),
+                        props: _props,
+                    };
+                    #set_children
+                    _element
+                }
+            });
+        } else {
+            tokens.extend(quote! {
+                {
+                    type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
+                    let mut _props = Props::default();
+                    let mut _element=::ratatui_kit::Element::<#ty>{
+                        key: ::ratatui_kit::ElementKey::new(#key),
+                        props: _props,
+                    };
+                    #set_children
+                    _element
+                }
+            });
+        }
     }
 }
 

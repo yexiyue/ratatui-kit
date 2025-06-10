@@ -3,8 +3,10 @@ use ratatui::widgets::WidgetRef;
 use ratatui_kit_macros::Props;
 use std::sync::Arc;
 
-#[derive(Props, Default)]
-pub struct AdapterProps(pub Option<Arc<dyn WidgetRef + Sync + Send + 'static>>);
+#[derive(Props)]
+pub struct AdapterProps {
+    pub inner: Arc<dyn WidgetRef + Sync + Send + 'static>,
+}
 
 pub struct Adapter {
     inner: Arc<dyn WidgetRef + Sync + Send + 'static>,
@@ -14,11 +16,7 @@ impl Component for Adapter {
 
     fn new(props: &Self::Props<'_>) -> Self {
         Self {
-            inner: props
-                .0
-                .as_ref()
-                .expect("AdapterProps must contain a WidgetRef")
-                .clone(),
+            inner: props.inner.clone(),
         }
     }
 
@@ -28,11 +26,7 @@ impl Component for Adapter {
         _hooks: crate::Hooks,
         _updater: &mut crate::ComponentUpdater,
     ) {
-        self.inner = props
-            .0
-            .as_ref()
-            .expect("AdapterProps must contain a WidgetRef")
-            .clone();
+        self.inner = props.inner.clone();
     }
 
     fn render_ref(&self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
