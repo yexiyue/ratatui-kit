@@ -1,0 +1,41 @@
+name: Publish Rust Crate by Tag
+
+on:
+  push:
+    tags:
+      - "*/v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Extract crate prefix and version from tag
+        id: extract
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          PREFIX=$(echo "$TAG_NAME" | sed -E 's/(.*)v[0-9].*/\1/')
+          VERSION=$(echo "$TAG_NAME" | sed -E 's/.*v([0-9].*)/\1/')
+          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Publish crate
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          CRATE_PATH="packages/${{ steps.extract.outputs.prefix }}"
+          if [ ! -f "$CRATE_PATH/Cargo.toml" ]; then
+            echo "Crate path $CRATE_PATH not found!" && exit 1
+          fi
+          cd "$CRATE_PATH"
+          cargo publish --token "$CARGO_REGISTRY_TOKEN"
