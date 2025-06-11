@@ -28,13 +28,12 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         }
     });
 
-    hooks.use_events(move |event| match event {
-        Event::Key(key_event) => {
+    hooks.use_events(move |event| {
+        if let Event::Key(key_event) = event {
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Tab {
                 open.set(!open.get());
             }
         }
-        _ => {}
     });
 
     let line = Line::styled(

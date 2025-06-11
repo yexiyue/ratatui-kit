@@ -48,10 +48,8 @@ impl Component for TextArea {
             move |event| {
                 if is_focus {
                     let input = Input::from(event);
-                    if !multiline {
-                        if input.key == Key::Enter {
-                            return;
-                        }
+                    if !multiline && input.key == Key::Enter {
+                        return;
                     }
                     inner.write().unwrap().input(input);
                     handler(inner.read().unwrap().lines().join("\n"));

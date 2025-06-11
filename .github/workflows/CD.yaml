@@ -3,7 +3,7 @@ name: Publish Rust Crate by Tag
 on:
   push:
     tags:
-      - "*/v*"
+      - "*-v*"
   workflow_dispatch:
 
 jobs:
@@ -27,8 +27,8 @@ jobs:
         id: extract
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          PREFIX=$(echo "$TAG_NAME" | sed -E 's/(.*)v[0-9].*/\1/')
-          VERSION=$(echo "$TAG_NAME" | sed -E 's/.*v([0-9].*)/\1/')
+          PREFIX=$(echo "$TAG_NAME" | sed -E 's/(.*)-v[0-9].*/\1/')
+          VERSION=$(echo "$TAG_NAME" | sed -E 's/.*-v([0-9].*)/\1/')
           echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 

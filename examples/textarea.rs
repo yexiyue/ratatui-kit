@@ -18,7 +18,7 @@ async fn main() {
 
 #[component]
 fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut value = hooks.use_state(|| String::new());
+    let mut value = hooks.use_state(String::new);
     let mut is_focus = hooks.use_state(|| true);
     let mut should_exit = hooks.use_state(|| false);
     let mut system_ctx = hooks.use_context_mut::<SystemContext>();
@@ -27,8 +27,8 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         system_ctx.exit();
     }
 
-    hooks.use_events(move |event| match event {
-        Event::Key(key_event) => {
+    hooks.use_events(move |event| {
+        if let Event::Key(key_event) = event {
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
                 is_focus.set(false);
             }
@@ -39,7 +39,6 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 should_exit.set(true);
             }
         }
-        _ => {}
     });
 
     element!(Border(

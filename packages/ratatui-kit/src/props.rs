@@ -1,7 +1,6 @@
 use ratatui_kit_macros::Props;
 
-// # Safety，用于表示属性可以跨线程传递
-// 需要实现Send+Sync保证线程安全
+/// # Safety
 pub unsafe trait Props: Send + Sync {}
 
 // 用于处理原始指针释放的trait
