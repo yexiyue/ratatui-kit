@@ -3,6 +3,7 @@ use ratatui::{
     text::Line,
 };
 use ratatui_kit::prelude::*;
+use ratatui_kit::ratatui;
 
 #[tokio::main]
 async fn main() {

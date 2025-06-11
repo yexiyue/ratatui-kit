@@ -9,5 +9,4 @@ edition = "2024"
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
-ratatui-kit = { path = "packages/ratatui-kit" }
-ratatui = "0.29.0"
+ratatui-kit = { path = "packages/ratatui-kit", features = ["full"] }

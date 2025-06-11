@@ -103,6 +103,9 @@ pub struct SystemContext {
     should_exit: bool,
 }
 
+unsafe impl Send for SystemContext {}
+unsafe impl Sync for SystemContext {}
+
 impl SystemContext {
     pub(crate) fn new() -> Self {
         Self { should_exit: false }

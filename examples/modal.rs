@@ -6,6 +6,7 @@ use ratatui::{
 };
 use ratatui_kit::crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui_kit::prelude::*;
+use ratatui_kit::ratatui;
 
 #[tokio::main]
 async fn main() {

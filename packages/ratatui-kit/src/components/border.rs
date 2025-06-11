@@ -84,8 +84,15 @@ impl Component for Border {
         updater: &mut crate::ComponentUpdater,
     ) {
         let layout_style = LayoutStyle::from(&*props);
-        self.padding = props.padding;
-        self.border_style = props.border_style;
+        *self = Self {
+            padding: props.padding,
+            border_style: props.border_style,
+            borders: props.borders,
+            border_set: props.border_set,
+            style: props.style,
+            top_title: props.top_title.clone(),
+            bottom_title: props.bottom_title.clone(),
+        };
         updater.set_layout_style(layout_style);
         updater.update_children(&mut props.children, None);
     }

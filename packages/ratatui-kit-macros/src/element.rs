@@ -34,7 +34,12 @@ impl Parse for PropsItem {
 impl ToTokens for PropsItem {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         match self {
-            PropsItem::FieldValue(field_value) => tokens.extend(quote!(#field_value)),
+            PropsItem::FieldValue(field_value) => {
+                let mut field_value = field_value.clone();
+                let expr = &field_value.expr;
+                field_value.expr = syn::parse2(quote!((#expr).into())).unwrap();
+                tokens.extend(quote!(#field_value))
+            }
             PropsItem::Rest(expr) => {
                 tokens.extend(quote!(..#expr));
             }
