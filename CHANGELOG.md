@@ -7,10 +7,19 @@ All notable changes to this project will be documented in this file.
 ### 💼 Other
 
 - 自动发布release
+- 修复CD触发逻辑
+
+### 🎨 Styling
+
+- Clippy
 
 ### 🧪 Testing
 
 - CI/CD
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [ratatui-kit-v0.2.0] - 2025-06-11
 
