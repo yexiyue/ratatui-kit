@@ -45,6 +45,7 @@ jobs:
 
       - name: Extract release notes from CHANGELOG
         id: changelog
+
         run: |
           VERSION=${{ steps.extract.outputs.version }}
           awk "/^##? ?v?$VERSION( |$)/{flag=1;next}/^##? /{flag=0}flag" CHANGELOG.md > RELEASE_BODY.md
@@ -53,6 +54,7 @@ jobs:
           echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
+        if: steps.extract.outputs.prefix == 'ratatui-kit'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}

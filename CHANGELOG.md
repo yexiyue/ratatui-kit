@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.0] - 2025-06-11
+## [0.2.1] - 2025-06-11
+
+### 💼 Other
+
+- 自动发布release
+
+### 🧪 Testing
+
+- CI/CD
+
+## [ratatui-kit-v0.2.0] - 2025-06-11
 
 ### 🚀 Features
 
@@ -11,6 +21,10 @@ All notable changes to this project will be documented in this file.
 ### 💼 Other
 
 - Element支持rest参数
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [ratatui-kit-v0.1.0] - 2025-06-09
 
