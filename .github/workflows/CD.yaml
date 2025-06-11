@@ -45,10 +45,14 @@ jobs:
 
       - name: Extract release notes from CHANGELOG
         id: changelog
-
         run: |
           VERSION=${{ steps.extract.outputs.version }}
-          awk "/^##? ?v?$VERSION( |$)/{flag=1;next}/^##? /{flag=0}flag" CHANGELOG.md > RELEASE_BODY.md
+          # 先尝试 [0.2.1] 这种格式
+          awk "/^##? \\[${VERSION}]/ {flag=1;next} /^##? /{flag=0}flag" CHANGELOG.md > RELEASE_BODY.md
+          # 如果没内容，再尝试 [ratatui-kit-v0.2.1] 这种格式
+          if [ ! -s RELEASE_BODY.md ]; then
+            awk "/^##? \\[ratatui-kit-v${VERSION}]/ {flag=1;next} /^##? /{flag=0}flag" CHANGELOG.md > RELEASE_BODY.md
+          fi
           echo 'body<<EOF' >> $GITHUB_OUTPUT
           cat RELEASE_BODY.md >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
