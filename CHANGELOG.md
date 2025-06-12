@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-06-12
+
+### 🚀 Features
+
+- Add hook useMemo
+- Add hook useEffect
+
+### 🐛 Bug Fixes
+
+- 修复ci自动发布release body为空的bug
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
+
 ## [0.2.1] - 2025-06-11
 
 ### 💼 Other
@@ -19,6 +34,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
+- Release
 - Release
 
 ## [ratatui-kit-v0.2.0] - 2025-06-11
