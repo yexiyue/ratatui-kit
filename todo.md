@@ -6,7 +6,7 @@
 - [*] TextArea
 - [ ] TextInput
 - [ ] useEffect
-- [ ] useMemo
+- [*] useMemo
 
 ### 0.3.0
 
