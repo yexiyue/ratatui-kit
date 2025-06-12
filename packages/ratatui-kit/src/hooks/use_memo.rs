@@ -15,7 +15,7 @@ pub trait UseMemo: private::Sealed {
         T: Clone + Send + Unpin + 'static;
 }
 
-fn hash_deps<D: Hash>(deps: D) -> u64 {
+pub(crate) fn hash_deps<D: Hash>(deps: D) -> u64 {
     let mut hasher = DefaultHasher::new();
     deps.hash(&mut hasher);
     hasher.finish()
