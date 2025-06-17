@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "any_key",
  "crossterm",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit-examples"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "ratatui-kit",
  "tokio",
