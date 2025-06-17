@@ -29,7 +29,7 @@ where
     }
 }
 
-pub(crate) struct RemoveOnlyMultimap<K, V> {
+pub struct RemoveOnlyMultimap<K, V> {
     items: Vec<Option<V>>,
     m: HashMap<K, VecDeque<usize>>,
 }

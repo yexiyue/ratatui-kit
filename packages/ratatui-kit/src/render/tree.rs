@@ -34,7 +34,7 @@ impl<'a> Tree<'a> {
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                let mut drawer = ComponentDrawer { frame, area };
+                let mut drawer = ComponentDrawer::new(frame, area);
                 self.root_component.draw(&mut drawer);
             })
             .expect("Failed to draw the terminal");

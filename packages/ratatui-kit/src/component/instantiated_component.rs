@@ -8,7 +8,7 @@ use crate::{
     render::{ComponentDrawer, ComponentUpdater, layout_style::LayoutStyle},
     terminal::Terminal,
 };
-use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::layout::{Constraint, Direction};
 use std::{
     future::poll_fn,
     ops::{Deref, DerefMut},
@@ -17,7 +17,7 @@ use std::{
 };
 
 #[derive(Default)]
-pub(crate) struct Components {
+pub struct Components {
     pub components: RemoveOnlyMultimap<ElementKey, InstantiatedComponent>,
 }
 
@@ -70,7 +70,7 @@ impl Components {
     }
 }
 
-pub(crate) struct InstantiatedComponent {
+pub struct InstantiatedComponent {
     hooks: Vec<Box<dyn AnyHook>>,
     component: Box<dyn AnyComponent>,
     helper: Box<dyn ComponentHelperExt>,
@@ -136,30 +136,22 @@ impl InstantiatedComponent {
 
         // 先渲染在计算子组件的areas
         self.hooks.pre_component_draw(drawer);
+
         // drawer.ares可能在组件绘制时改变
         self.component.draw(drawer);
 
-        let layout = layout_style
-            .get_layout()
-            .constraints(self.children.get_constraints(layout_style.flex_direction));
+        // 更新子组件的区域
+        self.component
+            .update_children_areas(&self.children, layout_style, drawer);
 
-        let areas = layout.split(drawer.area);
+        let children_areas = drawer.children_areas.clone();
 
-        let mut new_areas: Vec<ratatui::prelude::Rect> = vec![];
-
-        let rev_direction = match layout_style.flex_direction {
-            Direction::Horizontal => Direction::Vertical,
-            Direction::Vertical => Direction::Horizontal,
-        };
-        for (area, constraint) in areas
-            .iter()
-            .zip(self.children.get_constraints(rev_direction))
+        for (child, area) in self
+            .children
+            .components
+            .iter_mut()
+            .zip(children_areas.iter())
         {
-            let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
-            new_areas.push(area);
-        }
-
-        for (child, area) in self.children.components.iter_mut().zip(new_areas.iter()) {
             drawer.area = *area;
             child.draw(drawer);
         }

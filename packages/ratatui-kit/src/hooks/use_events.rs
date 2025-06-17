@@ -99,7 +99,7 @@ impl Hook for UseEventsImpl {
         }
     }
 
-    fn post_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
+    fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
         self.component_area = drawer.area;
     }
 }

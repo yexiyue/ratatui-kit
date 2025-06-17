@@ -1,7 +1,7 @@
 use ratatui::{
     layout::{Constraint, Flex, Layout, Margin, Offset},
     style::Style,
-    widgets::{Block, Clear},
+    widgets::{Block, Clear, Widget},
 };
 use ratatui_kit_macros::Props;
 
@@ -100,17 +100,17 @@ impl Component for Modal {
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
         if self.open {
-            let area = drawer.frame.area();
+            let area = drawer.buffer_mut().area();
             let area = area.inner(self.margin).offset(self.offset);
             let block = Block::default().style(self.style);
-            drawer.frame.render_widget(block, area);
+            block.render(area, drawer.buffer_mut());
 
             let [v, h] = self.placement.to_flex();
 
             let vertical = Layout::vertical([self.height]).flex(v).split(area)[0];
             let horizontal = Layout::horizontal([self.width]).flex(h).split(vertical)[0];
 
-            drawer.frame.render_widget(Clear, horizontal);
+            Clear.render(horizontal, drawer.buffer_mut());
             drawer.area = horizontal;
         }
     }

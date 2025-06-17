@@ -1,6 +1,7 @@
 use crate::{
     element::ElementType,
     hooks::Hooks,
+    layout_style::LayoutStyle,
     props::{AnyProps, Props},
     render::{ComponentDrawer, ComponentUpdater},
 };
@@ -10,7 +11,8 @@ mod component_helper;
 pub(crate) use component_helper::{ComponentHelper, ComponentHelperExt};
 
 mod instantiated_component;
-pub(crate) use instantiated_component::{Components, InstantiatedComponent};
+pub use instantiated_component::{Components, InstantiatedComponent};
+use ratatui::layout::{Direction, Layout};
 
 pub trait Component: Any + Send + Sync + Unpin {
     type Props<'a>: Props
@@ -28,7 +30,34 @@ pub trait Component: Any + Send + Sync + Unpin {
     }
 
     fn draw(&mut self, drawer: &mut ComponentDrawer<'_, '_>) {
-        self.render_ref(drawer.area, drawer.frame.buffer_mut());
+        self.render_ref(drawer.area, drawer.buffer_mut());
+    }
+
+    // 默认使用flex布局计算子组件的area
+    fn update_children_areas(
+        &mut self,
+        children: &Components,
+        layout_style: &LayoutStyle,
+        drawer: &mut ComponentDrawer<'_, '_>,
+    ) {
+        let layout = layout_style
+            .get_layout()
+            .constraints(children.get_constraints(layout_style.flex_direction));
+
+        let areas = layout.split(drawer.area);
+
+        let mut new_areas: Vec<ratatui::prelude::Rect> = vec![];
+
+        let rev_direction = match layout_style.flex_direction {
+            Direction::Horizontal => Direction::Vertical,
+            Direction::Vertical => Direction::Horizontal,
+        };
+        for (area, constraint) in areas.iter().zip(children.get_constraints(rev_direction)) {
+            let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
+            new_areas.push(area);
+        }
+
+        drawer.children_areas = new_areas;
     }
 
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> std::task::Poll<()> {
@@ -42,6 +71,13 @@ pub trait AnyComponent: Any + Send + Sync + Unpin {
     fn update(&mut self, props: AnyProps, hooks: Hooks, updater: &mut ComponentUpdater);
 
     fn draw(&mut self, drawer: &mut ComponentDrawer);
+
+    fn update_children_areas(
+        &mut self,
+        children: &Components,
+        layout_style: &LayoutStyle,
+        drawer: &mut ComponentDrawer,
+    );
 
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()>;
 
@@ -70,6 +106,15 @@ where
 
     fn draw(&mut self, drawer: &mut ComponentDrawer) {
         Component::draw(self, drawer);
+    }
+
+    fn update_children_areas(
+        &mut self,
+        children: &Components,
+        layout_style: &LayoutStyle,
+        drawer: &mut ComponentDrawer,
+    ) {
+        Component::update_children_areas(self, children, layout_style, drawer);
     }
 
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()> {

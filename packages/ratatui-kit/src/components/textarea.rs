@@ -1,5 +1,5 @@
 use crate::{Component, Handler, Hooks, UseEvents};
-use ratatui::style::Style;
+use ratatui::{style::Style, widgets::Widget};
 use ratatui_kit_macros::Props;
 use std::{
     borrow::Cow,
@@ -69,6 +69,6 @@ impl Component for TextArea {
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
         let inner = self.inner.read().unwrap();
-        drawer.frame.render_widget(&*inner, drawer.area);
+        inner.render(drawer.area, drawer.buffer_mut());
     }
 }

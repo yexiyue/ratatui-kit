@@ -1,4 +1,39 @@
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    widgets::{Widget, WidgetRef},
+};
+
 pub struct ComponentDrawer<'a, 'b: 'a> {
-    pub frame: &'a mut ratatui::Frame<'b>,
     pub area: ratatui::layout::Rect,
+    pub frame: &'a mut ratatui::Frame<'b>,
+    pub children_areas: Vec<ratatui::prelude::Rect>,
+    pub scroll_buffer: Option<Buffer>,
+}
+
+impl<'a, 'b> ComponentDrawer<'a, 'b> {
+    pub fn new(frame: &'a mut ratatui::Frame<'b>, area: ratatui::layout::Rect) -> Self {
+        Self {
+            area,
+            frame,
+            children_areas: vec![],
+            scroll_buffer: None,
+        }
+    }
+
+    pub fn buffer_mut(&mut self) -> &mut ratatui::buffer::Buffer {
+        if let Some(scroll_buffer) = &mut self.scroll_buffer {
+            scroll_buffer
+        } else {
+            self.frame.buffer_mut()
+        }
+    }
+
+    pub fn render_widget<W: Widget>(&mut self, widget: W, area: Rect) {
+        widget.render(area, self.buffer_mut());
+    }
+
+    pub fn render_widget_ref<W: WidgetRef>(&mut self, widget: W, area: Rect) {
+        widget.render_ref(area, self.buffer_mut());
+    }
 }

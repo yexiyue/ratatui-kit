@@ -2,9 +2,8 @@
 
 ### 0.2.0
 
-- [ ] ScrollView
+- [*] ScrollView
 - [*] TextArea
-- [ ] TextInput
 - [*] useEffect
 - [*] useMemo
 

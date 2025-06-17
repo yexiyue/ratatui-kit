@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Constraint, Offset},
     symbols::border,
     text::Line,
-    widgets::{Block, Padding},
+    widgets::{Block, Padding, Widget},
 };
 use ratatui_kit_macros::Props;
 
@@ -114,8 +114,7 @@ impl Component for Border {
         }
 
         let inner_area = block.inner(drawer.area);
-        drawer.frame.render_widget(block, drawer.area);
-
+        block.render(drawer.area, drawer.buffer_mut());
         drawer.area = inner_area;
     }
 }

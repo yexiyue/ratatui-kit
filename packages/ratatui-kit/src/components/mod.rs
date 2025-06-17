@@ -8,6 +8,9 @@ mod border;
 pub use border::*;
 mod modal;
 pub use modal::*;
+pub mod scroll_view;
+pub use scroll_view::*;
+
 #[cfg(feature = "textarea")]
 mod textarea;
 #[cfg(feature = "textarea")]
