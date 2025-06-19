@@ -44,15 +44,12 @@ pub fn RouterProvider<'a>(
     element!(
         ContextProvider(
             value: Context::owned(history),
-            ..Default::default()
         ) {
             ContextProvider(
                 value: Context::owned(ctx),
-                ..Default::default()
             ){
                 ContextProvider(
                     value: Context::owned(props.routes.borrow()),
-                    ..Default::default()
                 ) {
                     Outlet
                 }

@@ -48,7 +48,6 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         } else {
             Style::default()
         },
-        ..Default::default()
     ) {
         TextArea(
             value: value.read().to_string(),
@@ -68,7 +67,6 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
              } else {
                 Style::default().dim()
             },
-            ..Default::default(),
         )
     })
 }

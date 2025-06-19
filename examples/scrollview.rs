@@ -34,7 +34,6 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         View(
             flex_direction:ratatui::layout::Direction::Horizontal,
             gap:4,
-            ..Default::default()
         ){
             View{
                 Border{
@@ -50,9 +49,8 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             ScrollView(
                 flex_direction:Direction::Vertical,
                 scroll_view_state: scroll_view_state.get(),
-                ..Default::default()
             ){
-                View( flex_direction:Direction::Horizontal,width:Constraint::Percentage(200), ..Default::default()){
+                View( flex_direction:Direction::Horizontal,width:Constraint::Percentage(200), ){
                     View{
                         Border{
                             $Line::styled(

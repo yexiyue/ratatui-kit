@@ -33,12 +33,10 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
     let current_element = AnyElement::from(&mut current_route.component);
 
     element!(ContextProvider(
-        value:Context::owned(current_route.children.borrow()),
-        ..Default::default()
+        value:Context::owned(current_route.children.borrow())
     ){
         ContextProvider(
-            value:Context::owned(current_route.borrow()),
-            ..Default::default()
+            value:Context::owned(current_route.borrow())
         ){
             #(current_element)
         }

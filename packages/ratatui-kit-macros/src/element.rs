@@ -72,9 +72,11 @@ impl Parse for ParsedElement {
         } else {
             Punctuated::new()
         };
+
         let rest_position = props
             .iter()
             .position(|item| matches!(item, PropsItem::Rest(_)));
+
         if let Some(pos) = rest_position {
             if pos != props.len() - 1 {
                 return Err(syn::Error::new(
@@ -113,6 +115,7 @@ impl ToTokens for ParsedElement {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let ty = &self.ty;
         let decl_key = Uuid::new_v4().as_u128();
+        let mut has_rest = false;
         let key = self
             .props
             .iter()
@@ -121,7 +124,10 @@ impl ToTokens for ParsedElement {
                     Member::Named(ident) if ident == "key" => Some(quote!((#decl_key,#expr))),
                     _ => None,
                 },
-                _ => None,
+                PropsItem::Rest(_) => {
+                    has_rest = true;
+                    None
+                }
             })
             .unwrap_or_else(|| quote!(#decl_key));
 
@@ -150,12 +156,24 @@ impl ToTokens for ParsedElement {
         };
 
         let has_props_assignments = !props_assignments.is_empty();
+
+        let default_rest = if has_rest {
+            quote! {
+                #(#props_assignments),*
+            }
+        } else {
+            quote! {
+                #(#props_assignments,)*
+                ..Default::default()
+            }
+        };
+
         if has_props_assignments {
             tokens.extend(quote! {
                 {
                     type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
                     let mut _props = Props{
-                        #(#props_assignments),*
+                        #default_rest
                     };
 
                     let mut _element=::ratatui_kit::Element::<#ty>{
