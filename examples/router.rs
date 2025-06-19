@@ -31,8 +31,8 @@ async fn main() {
 
     // Using the `routes!` macro to define routes
     let routes = routes! {
-        "/home" => Counter {
-            "/:title" => Counter2,
+        "/" => Counter {
+            "/counter/:title/:test" => Counter2,
         },
         "/text-input" => MyTextInput
     };
@@ -93,7 +93,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             }
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
                 is_focus.set(true);
-                navigate.push("/home/hello world params".into());
+                navigate.push("/counter/hello world params/111".into());
             }
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q') {
                 should_exit.set(true);
@@ -140,6 +140,7 @@ fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     // let title = hooks.use_route_state::<String>();
     // let title = &*title.unwrap();
     let title = hooks.use_params().get("title").cloned().unwrap_or_default();
+    let test = hooks.use_params().get("test").cloned().unwrap_or_default();
 
     hooks.use_future(async move {
         loop {
@@ -158,7 +159,7 @@ fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     element!(
         $Line::styled(
-            format!("{}: {}",title, state),
+            format!("{}: {} -- {}",title, state,test),
             Style::default().fg(ratatui::style::Color::Yellow).bold(),
         )
         .centered()

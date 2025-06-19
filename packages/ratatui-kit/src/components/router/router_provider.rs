@@ -34,7 +34,7 @@ pub fn RouterProvider<'a>(
         max_length: props.history_length.unwrap_or(10),
         history: VecDeque::from(vec![RouteContext {
             params: HashMap::new(),
-            path: split_path(&props.index_path),
+            path: props.index_path.clone(),
             state: None,
         }]),
     });
@@ -69,6 +69,16 @@ mod tests {
         assert_eq!(
             result,
             VecDeque::from(vec!["/a".to_string(), "/b".to_string(), "/c".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_split_path2() {
+        let path = "//b/c";
+        let result = split_path(path);
+        assert_eq!(
+            result,
+            VecDeque::from(vec!["/b".to_string(), "/c".to_string()])
         );
     }
 }

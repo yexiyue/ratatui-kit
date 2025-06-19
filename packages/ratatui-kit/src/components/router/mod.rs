@@ -1,7 +1,7 @@
 use crate::AnyElement;
 use std::{
     any::Any,
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -69,7 +69,7 @@ unsafe impl Sync for Routes {}
 
 #[derive(Default, Clone)]
 pub(crate) struct RouteContext {
-    pub path: VecDeque<String>,
+    pub path: String,
     pub params: HashMap<String, String>,
     pub state: Option<Arc<dyn Any + Send + Sync>>,
 }

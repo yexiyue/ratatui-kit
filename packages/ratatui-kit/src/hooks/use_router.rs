@@ -66,38 +66,38 @@ impl Navigate {
         Navigate { history }
     }
 
-    pub fn push(&mut self, path: String) {
+    pub fn push(&mut self, path: &str) {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
-        ctx.path = split_path(&path);
+        ctx.path = path.to_string();
         history.push(ctx);
     }
 
-    pub fn push_with_state<T>(&mut self, path: String, state: T)
+    pub fn push_with_state<T>(&mut self, path: &str, state: T)
     where
         T: Send + Sync + 'static,
     {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
-        ctx.path = split_path(&path);
+        ctx.path = path.to_string();
         ctx.state = Some(Arc::new(state));
         history.push(ctx);
     }
 
-    pub fn replace(&mut self, path: String) {
+    pub fn replace(&mut self, path: &str) {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
-        ctx.path = split_path(&path);
+        ctx.path = path.to_string();
         history.replace(ctx);
     }
 
-    pub fn replace_with_state<T>(&mut self, path: String, state: T)
+    pub fn replace_with_state<T>(&mut self, path: &str, state: T)
     where
         T: Send + Sync + 'static,
     {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
-        ctx.path = split_path(&path);
+        ctx.path = path.to_string();
         ctx.state = Some(Arc::new(state));
         history.replace(ctx);
     }
