@@ -13,7 +13,16 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
         .iter_mut()
         .find(|r| {
             let path = route_context.path.front().cloned().unwrap_or_default();
-            let res = r.path == path;
+            let res = if r.path.starts_with("/:") {
+                let name = r.path.trim_start_matches("/:").to_string();
+                route_context
+                    .params
+                    .insert(name, path.trim_start_matches("/").to_string());
+                true
+            } else {
+                r.path == path
+            };
+
             if res {
                 route_context.path.pop_front();
             }
@@ -27,6 +36,11 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
         value:Context::owned(current_route.children.borrow()),
         ..Default::default()
     ){
-        #(current_element)
+        ContextProvider(
+            value:Context::owned(current_route.borrow()),
+            ..Default::default()
+        ){
+            #(current_element)
+        }
     })
 }

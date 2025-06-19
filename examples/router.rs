@@ -16,7 +16,7 @@ async fn main() {
             path: "/home".into(),
             component: element!(Counter).into_any(),
             children: vec![Route {
-                path: "/counter".into(),
+                path: "/:title".into(),
                 component: element!(Counter2).into_any(),
                 children: Vec::new().into(),
             }]
@@ -29,11 +29,15 @@ async fn main() {
         },
     ];
 
-    element!(RouterProvider(routes:routes,index_path:"/text-input"))
-        .into_any()
-        .fullscreen()
-        .await
-        .expect("Failed to run the application");
+    element!(RouterProvider(
+        routes:routes,
+        index_path:"/text-input",
+        ..Default::default()
+    ))
+    .into_any()
+    .fullscreen()
+    .await
+    .expect("Failed to run the application");
 }
 
 #[component]
@@ -82,7 +86,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             }
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
                 is_focus.set(true);
-                navigate("/home/counter".into());
+                navigate.push("/home/hello world params".into());
             }
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q') {
                 should_exit.set(true);
@@ -125,7 +129,12 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 #[component]
 fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut state = hooks.use_state(|| 0);
+
     let mut navigate = hooks.use_navigate();
+    // let title = hooks.use_route_state::<String>();
+    // let title = &*title.unwrap();
+    let title = hooks.use_params().get("title").cloned().unwrap_or_default();
+
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -136,14 +145,14 @@ fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event {
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
-                navigate("/text-input".into());
+                navigate.back();
             }
         }
     });
 
     element!(
         $Line::styled(
-            format!("Counter2: {}", state),
+            format!("{}: {}",title, state),
             Style::default().fg(ratatui::style::Color::Yellow).bold(),
         )
         .centered()

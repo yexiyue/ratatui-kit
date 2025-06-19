@@ -9,6 +9,7 @@ mod outlet;
 pub use outlet::*;
 mod router_provider;
 pub use router_provider::*;
+pub(crate) mod history;
 
 pub struct Route {
     pub path: String,
@@ -67,7 +68,8 @@ unsafe impl Send for Routes {}
 unsafe impl Sync for Routes {}
 
 #[derive(Default, Clone)]
-pub struct RouteContext {
+pub(crate) struct RouteContext {
     pub path: VecDeque<String>,
-    pub params: HashMap<String, Arc<dyn Any + Send + Sync>>,
+    pub params: HashMap<String, String>,
+    pub state: Option<Arc<dyn Any + Send + Sync>>,
 }

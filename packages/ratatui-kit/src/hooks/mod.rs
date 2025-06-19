@@ -21,9 +21,9 @@ pub use use_memo::*;
 mod use_effect;
 pub use use_effect::*;
 #[cfg(feature = "router")]
-mod use_navigate;
+mod use_router;
 #[cfg(feature = "router")]
-pub use use_navigate::*;
+pub use use_router::*;
 
 pub trait Hook: Unpin + Send {
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
