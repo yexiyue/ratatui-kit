@@ -32,6 +32,7 @@ unsafe impl Sync for Route {}
 
 pub struct Routes(Vec<Route>);
 
+#[allow(clippy::derivable_impls)]
 impl Default for Routes {
     fn default() -> Self {
         Routes(Vec::new())

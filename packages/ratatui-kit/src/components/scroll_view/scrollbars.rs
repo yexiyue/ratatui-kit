@@ -202,8 +202,8 @@ impl StatefulWidgetRef for ScrollBars<'_> {
         state.size = Some(scroll_buffer.area.as_size());
         state.page_size = Some(area.into());
         let visible_area = self
-            .render_scrollbars(area, buf, state, &scroll_buffer)
+            .render_scrollbars(area, buf, state, scroll_buffer)
             .intersection(scroll_buffer.area);
-        self.render_visible_area(area, buf, visible_area, &scroll_buffer);
+        self.render_visible_area(area, buf, visible_area, scroll_buffer);
     }
 }

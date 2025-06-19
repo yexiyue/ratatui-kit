@@ -93,7 +93,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             }
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
                 is_focus.set(true);
-                navigate.push("/counter/hello world params/111".into());
+                navigate.push("/counter/hello world params/111");
             }
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q') {
                 should_exit.set(true);
