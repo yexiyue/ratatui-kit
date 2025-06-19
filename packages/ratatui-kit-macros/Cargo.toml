@@ -15,3 +15,9 @@ uuid = { version = "1.17.0", features = ["v4"] }
 
 [lib]
 proc-macro = true
+
+[features]
+default = []
+router = []
+
+full = ["router"]

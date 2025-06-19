@@ -11,28 +11,35 @@ use ratatui_kit::{
 
 #[tokio::main]
 async fn main() {
-    let routes = vec![
-        Route {
-            path: "/home".into(),
-            component: element!(Counter).into_any(),
-            children: vec![Route {
-                path: "/:title".into(),
-                component: element!(Counter2).into_any(),
-                children: Vec::new().into(),
-            }]
-            .into(),
+    // let routes = vec![
+    //     Route {
+    //         path: "/home".into(),
+    //         component: element!(Counter).into_any(),
+    //         children: vec![Route {
+    //             path: "/:title".into(),
+    //             component: element!(Counter2).into_any(),
+    //             children: Vec::new().into(),
+    //         }]
+    //         .into(),
+    //     },
+    //     Route {
+    //         path: "/text-input".into(),
+    //         component: element!(MyTextInput).into_any(),
+    //         children: Vec::new().into(),
+    //     },
+    // ];
+
+    // Using the `routes!` macro to define routes
+    let routes = routes! {
+        "/home" => Counter {
+            "/:title" => Counter2,
         },
-        Route {
-            path: "/text-input".into(),
-            component: element!(MyTextInput).into_any(),
-            children: Vec::new().into(),
-        },
-    ];
+        "/text-input" => MyTextInput
+    };
 
     element!(RouterProvider(
         routes:routes,
         index_path:"/text-input",
-
     ))
     .into_any()
     .fullscreen()

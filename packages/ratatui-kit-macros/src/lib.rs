@@ -7,6 +7,9 @@ mod adapter;
 mod component;
 mod element;
 mod props;
+
+#[cfg(feature = "router")]
+mod router;
 mod utils;
 
 #[proc_macro_derive(Props)]
@@ -25,4 +28,11 @@ pub fn element(input: TokenStream) -> TokenStream {
 pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let component = syn::parse_macro_input!(item as component::ParsedComponent);
     component.to_token_stream().into()
+}
+
+#[cfg(feature = "router")]
+#[proc_macro]
+pub fn routes(input: TokenStream) -> TokenStream {
+    let routes = syn::parse_macro_input!(input as router::Routes);
+    routes.to_token_stream().into()
 }
