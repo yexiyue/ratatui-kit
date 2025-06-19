@@ -2,11 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-06-19
+
+### 🚀 Features
+
+- Add ContextProvider
+- Add router
+- Add use_navigate
+- Support router history and router params
+- Add routes macro
+
+### 🐛 Bug Fixes
+
+- 优化element宏
+- 优化Outlet组件,修复路由路径bug
+
+### 🎨 Styling
+
+- Clippy
+
 ## [0.2.3] - 2025-06-17
 
 ### 🚀 Features
 
 - Add ScrollView
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.2.2] - 2025-06-12
 
