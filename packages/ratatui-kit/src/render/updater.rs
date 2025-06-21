@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    ElementKey,
     component::{Components, InstantiatedComponent},
     context::{Context, ContextStack},
     element::ElementExt,
@@ -13,6 +14,7 @@ use crate::{
 };
 
 pub struct ComponentUpdater<'a, 'c: 'a> {
+    key: ElementKey,
     component_context_stack: &'a mut ContextStack<'c>,
     terminal: &'a mut Terminal,
     components: &'a mut Components,
@@ -22,12 +24,14 @@ pub struct ComponentUpdater<'a, 'c: 'a> {
 
 impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
     pub(crate) fn new(
+        key: ElementKey,
         component_context_stack: &'a mut ContextStack<'c>,
         terminal: &'a mut Terminal,
         components: &'a mut Components,
         layout_style: &'a mut Option<LayoutStyle>,
     ) -> ComponentUpdater<'a, 'c> {
         ComponentUpdater {
+            key,
             component_context_stack,
             terminal,
             components,
@@ -38,6 +42,10 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
 
     pub fn component_context_stack(&self) -> &ContextStack<'c> {
         self.component_context_stack
+    }
+
+    pub fn key(&self) -> &ElementKey {
+        &self.key
     }
 
     pub fn get_context<T: Any>(&self) -> Option<Ref<T>> {
@@ -83,7 +91,7 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
                         }
                         _ => {
                             let h = child.helper();
-                            InstantiatedComponent::new(child.props_mut(), h)
+                            InstantiatedComponent::new(child.key().clone(), child.props_mut(), h)
                         }
                     };
 

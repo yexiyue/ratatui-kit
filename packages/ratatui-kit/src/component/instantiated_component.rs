@@ -71,6 +71,7 @@ impl Components {
 }
 
 pub struct InstantiatedComponent {
+    key: ElementKey,
     hooks: Vec<Box<dyn AnyHook>>,
     component: Box<dyn AnyComponent>,
     helper: Box<dyn ComponentHelperExt>,
@@ -81,9 +82,10 @@ pub struct InstantiatedComponent {
 }
 
 impl InstantiatedComponent {
-    pub fn new(mut props: AnyProps, helper: Box<dyn ComponentHelperExt>) -> Self {
+    pub fn new(key: ElementKey, mut props: AnyProps, helper: Box<dyn ComponentHelperExt>) -> Self {
         let component = helper.new_component(props.borrow());
         Self {
+            key,
             hooks: Default::default(),
             layout_style: None,
             component,
@@ -105,6 +107,7 @@ impl InstantiatedComponent {
         mut props: AnyProps,
     ) {
         let mut updater = ComponentUpdater::new(
+            self.key.clone(),
             context_stack,
             terminal,
             &mut self.children,

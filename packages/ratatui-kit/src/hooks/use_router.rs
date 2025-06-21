@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     Handler, State, UseContext,
-    prelude::{Route, RouteContext, history::RouterHistory, split_path},
+    prelude::{Route, RouteContext, history::RouterHistory},
 };
 
 mod private {

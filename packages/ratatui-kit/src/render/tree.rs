@@ -2,6 +2,7 @@ use futures::{FutureExt, future::select};
 use std::io::{self};
 
 use crate::{
+    ElementKey,
     component::{ComponentHelperExt, InstantiatedComponent},
     context::{ContextStack, SystemContext},
     element::ElementExt,
@@ -20,7 +21,11 @@ pub struct Tree<'a> {
 impl<'a> Tree<'a> {
     pub(crate) fn new(mut props: AnyProps<'a>, helper: Box<dyn ComponentHelperExt>) -> Self {
         Tree {
-            root_component: InstantiatedComponent::new(props.borrow(), helper),
+            root_component: InstantiatedComponent::new(
+                ElementKey::new("_root_tree_"),
+                props.borrow(),
+                helper,
+            ),
             props,
             system_context: SystemContext::new(),
         }
@@ -38,7 +43,7 @@ impl<'a> Tree<'a> {
                 self.root_component.draw(&mut drawer);
             })
             .expect("Failed to draw the terminal");
-        terminal.events()?;
+
         Ok(())
     }
 
@@ -60,6 +65,9 @@ impl<'a> Tree<'a> {
 pub(crate) fn render<E: ElementExt>(mut element: E, mut terminal: Terminal) -> io::Result<()> {
     let helper = element.helper();
     let mut tree = Tree::new(element.props_mut(), helper);
+
+    terminal.events()?;
+
     tree.render(&mut terminal)?;
     Ok(())
 }
@@ -70,6 +78,9 @@ pub(crate) async fn render_loop<E: ElementExt>(
 ) -> io::Result<()> {
     let helper = element.helper();
     let mut tree = Tree::new(element.props_mut(), helper);
+
+    terminal.events()?;
+
     tree.render_loop(&mut terminal).await?;
     Ok(())
 }

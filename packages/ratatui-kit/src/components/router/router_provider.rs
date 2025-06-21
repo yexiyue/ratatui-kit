@@ -13,17 +13,6 @@ pub struct RouterProviderProps {
     pub history_length: Option<usize>,
 }
 
-pub(crate) fn split_path(path: &str) -> VecDeque<String> {
-    let mut res = VecDeque::new();
-    let reg = regex::Regex::new(r"(\/[^/]+)").unwrap();
-
-    for cap in reg.captures_iter(path) {
-        res.push_back(cap[1].to_string());
-    }
-
-    res
-}
-
 #[component]
 pub fn RouterProvider<'a>(
     props: &mut RouterProviderProps,
@@ -56,29 +45,4 @@ pub fn RouterProvider<'a>(
             }
         }
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_split_path() {
-        let path = "/a/b/c";
-        let result = split_path(path);
-        assert_eq!(
-            result,
-            VecDeque::from(vec!["/a".to_string(), "/b".to_string(), "/c".to_string()])
-        );
-    }
-
-    #[test]
-    fn test_split_path2() {
-        let path = "//b/c";
-        let result = split_path(path);
-        assert_eq!(
-            result,
-            VecDeque::from(vec!["/b".to_string(), "/c".to_string()])
-        );
-    }
 }

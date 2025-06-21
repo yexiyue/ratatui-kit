@@ -19,34 +19,35 @@ impl RouterHistory {
 
     pub fn replace(&mut self, route: RouteContext) {
         self.history[self.current] = route;
+        self.history.truncate(self.current + 1);
     }
 
-    pub fn back(&mut self) -> Option<RouteContext> {
+    pub fn back(&mut self) -> bool {
         if self.current > 0 {
             self.current -= 1;
-            Some(self.history[self.current].clone())
+            true
         } else {
-            None
+            false
         }
     }
 
-    pub fn forward(&mut self) -> Option<RouteContext> {
+    pub fn forward(&mut self) -> bool {
         if self.current < self.history.len() - 1 {
             self.current += 1;
-            Some(self.history[self.current].clone())
+            true
         } else {
-            None
+            false
         }
     }
 
-    pub fn go(&mut self, n: i32) -> Option<RouteContext> {
+    pub fn go(&mut self, n: i32) -> bool {
         let new_index = self.current as i32 + n;
 
         if new_index >= 0 && (new_index as usize) < self.history.len() {
             self.current = new_index as usize;
-            Some(self.history[self.current].clone())
+            true
         } else {
-            None
+            false
         }
     }
 

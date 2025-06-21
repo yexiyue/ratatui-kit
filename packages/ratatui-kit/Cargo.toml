@@ -22,5 +22,6 @@ regex = { version = "1.11.1", optional = true }
 default = []
 textarea = ["tui-textarea"]
 router = ["regex", "ratatui-kit-macros/router"]
+store = []
 
-full = ["textarea", "router", "ratatui-kit-macros/full"]
+full = ["textarea", "router", "store", "ratatui-kit-macros/full"]

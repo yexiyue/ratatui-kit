@@ -7,6 +7,8 @@ mod hooks;
 mod multimap;
 mod props;
 mod render;
+#[cfg(feature = "store")]
+mod store;
 mod terminal;
 
 mod flatten_export {
@@ -17,6 +19,8 @@ mod flatten_export {
     pub use crate::hooks::*;
     pub use crate::props::*;
     pub use crate::render::*;
+    #[cfg(feature = "store")]
+    pub use crate::store::*;
     pub use crate::terminal::*;
 }
 

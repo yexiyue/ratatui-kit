@@ -78,7 +78,7 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
     }
 
     // 解包 Option 并确保存在匹配的路由
-    let current_route = current_route.unwrap();
+    let current_route = current_route.expect("No matching route found");
 
     // 构建当前路由对应的 UI 元素
     let current_element = AnyElement::from(&mut current_route.component);

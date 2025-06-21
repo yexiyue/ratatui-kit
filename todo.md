@@ -13,7 +13,7 @@
 - [*] useNavigate
 - [*] history 支持路由历史
 - [*] 路由宏
-- [ ] 全局状态管理
+- [*] 全局状态管理
 - [ ] examples
 - [ ] books
 
