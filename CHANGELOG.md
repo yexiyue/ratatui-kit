@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-06-21
+
+### 🚀 Features
+
+- Add global store
+
 ## [0.3.0] - 2025-06-19
 
 ### 🚀 Features
@@ -20,6 +26,10 @@ All notable changes to this project will be documented in this file.
 ### 🎨 Styling
 
 - Clippy
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.2.3] - 2025-06-17
 
