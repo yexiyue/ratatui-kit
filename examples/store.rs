@@ -16,6 +16,7 @@ pub struct CounterAndTextInput {
     pub is_focus: bool,
     pub should_exit: bool,
 }
+
 impl Default for CounterAndTextInput {
     fn default() -> Self {
         Self {

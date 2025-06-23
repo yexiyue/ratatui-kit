@@ -1,7 +1,8 @@
 use proc_macro2::Span;
 use quote::{ToTokens, quote};
 use syn::{
-    parse::Parse, punctuated::Punctuated, spanned::Spanned, token::Comma, Expr, Field, Fields, Ident, ItemStruct, Path, Type, TypePath
+    Expr, Field, Fields, GenericParam, Ident, ItemStruct, Path, Type, TypePath, parse::Parse,
+    punctuated::Punctuated, spanned::Spanned, token::Comma,
 };
 
 use crate::utils::get_fields;
@@ -33,6 +34,18 @@ pub struct Store {
 impl Parse for Store {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let store: ItemStruct = input.parse()?;
+        let first_type_params = store
+            .generics
+            .params
+            .iter()
+            .find(|params| matches!(params, GenericParam::Type(_)));
+
+        if let Some(param) = first_type_params {
+            return Err(syn::Error::new_spanned(
+                param,
+                "Store cannot have type parameters",
+            ));
+        }
 
         if !matches!(store.fields, Fields::Named(_)) {
             return Err(syn::Error::new_spanned(
@@ -66,7 +79,7 @@ impl ToTokens for Store {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = &self.store.ident;
         let store_name = Ident::new(&format!("{}Store", name), Span::call_site());
-        
+
         let vis = &self.store.vis;
 
         let store_fields = self
@@ -85,27 +98,24 @@ impl ToTokens for Store {
             }
         });
 
-        
-
         let (impl_generics, ty_generics, where_clause) = self.store.generics.split_for_impl();
 
-        let static_store_name=store_name.to_string();
+        let static_store_name = store_name.to_string();
         let mut new_static_store_name = String::new();
-        for (index,str) in static_store_name.chars().enumerate(){
-            if index==0{
+        for (index, str) in static_store_name.chars().enumerate() {
+            if index == 0 {
                 new_static_store_name.push_str(&str.to_uppercase().to_string());
                 continue;
-            }else if str.is_uppercase() {
+            } else if str.is_uppercase() {
                 new_static_store_name.push_str(&format!("_{str}"));
-            }else{
+            } else {
                 new_static_store_name.push_str(&str.to_uppercase().to_string());
             }
         }
 
         let new_static_store_name = Ident::new(&new_static_store_name, Span::call_site());
-        
+
         tokens.extend(quote! {
-            
             #vis struct #store_name #impl_generics #where_clause{
                 #(#store_fields),*
             }
@@ -125,7 +135,6 @@ impl ToTokens for Store {
                     }
                 }
             }
-            
             pub static #new_static_store_name: std::sync::LazyLock<#store_name #ty_generics> = std::sync::LazyLock::new(||#name::default().into());
         });
     }

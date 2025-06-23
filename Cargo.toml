@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["packages/ratatui-kit", "packages/ratatui-kit-macros"]
+members = [
+    "packages/ratatui-components",
+    "packages/ratatui-kit",
+    "packages/ratatui-kit-macros",
+]
 
 [package]
 name = "ratatui-kit-examples"
