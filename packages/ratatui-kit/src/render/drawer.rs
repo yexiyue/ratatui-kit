@@ -7,7 +7,6 @@ use ratatui::{
 pub struct ComponentDrawer<'a, 'b: 'a> {
     pub area: ratatui::layout::Rect,
     pub frame: &'a mut ratatui::Frame<'b>,
-    pub children_areas: Vec<ratatui::prelude::Rect>,
     pub scroll_buffer: Option<Buffer>,
 }
 
@@ -16,7 +15,6 @@ impl<'a, 'b> ComponentDrawer<'a, 'b> {
         Self {
             area,
             frame,
-            children_areas: vec![],
             scroll_buffer: None,
         }
     }

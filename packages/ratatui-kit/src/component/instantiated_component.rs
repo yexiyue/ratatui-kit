@@ -40,16 +40,8 @@ impl Components {
         self.components
             .iter()
             .map(|c| match direction {
-                Direction::Horizontal => c
-                    .layout_style
-                    .as_ref()
-                    .map(|style| style.get_width())
-                    .unwrap_or_default(),
-                Direction::Vertical => c
-                    .layout_style
-                    .as_ref()
-                    .map(|style| style.get_height())
-                    .unwrap_or_default(),
+                Direction::Horizontal => c.layout_style.get_width(),
+                Direction::Vertical => c.layout_style.get_height(),
             })
             .collect()
     }
@@ -77,7 +69,7 @@ pub struct InstantiatedComponent {
     helper: Box<dyn ComponentHelperExt>,
     children: Components,
     first_update: bool,
-    layout_style: Option<LayoutStyle>,
+    layout_style: LayoutStyle,
     has_transparent_layout: bool,
 }
 
@@ -87,7 +79,7 @@ impl InstantiatedComponent {
         Self {
             key,
             hooks: Default::default(),
-            layout_style: None,
+            layout_style: LayoutStyle::default(),
             component,
             children: Components::default(),
             helper,
@@ -126,8 +118,7 @@ impl InstantiatedComponent {
     }
 
     pub fn draw(&mut self, drawer: &mut ComponentDrawer) {
-        let default_layout_style = LayoutStyle::default();
-        let layout_style = self.layout_style.as_ref().unwrap_or(&default_layout_style);
+        let layout_style = &self.layout_style;
 
         let area = if self.has_transparent_layout {
             drawer.area
@@ -142,12 +133,10 @@ impl InstantiatedComponent {
 
         // drawer.ares可能在组件绘制时改变
         self.component.draw(drawer);
-
-        // 更新子组件的区域
-        self.component
-            .update_children_areas(&self.children, layout_style, drawer);
-
-        let children_areas = drawer.children_areas.clone();
+        // 计算子组件的区域
+        let children_areas =
+            self.component
+                .calc_children_areas(&self.children, layout_style, drawer);
 
         for (child, area) in self
             .children

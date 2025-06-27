@@ -90,12 +90,12 @@ impl Component for ScrollView {
         updater.update_children(&mut props.children, None);
     }
 
-    fn update_children_areas(
-        &mut self,
+    fn calc_children_areas(
+        &self,
         children: &crate::Components,
         layout_style: &LayoutStyle,
         drawer: &mut crate::ComponentDrawer<'_, '_>,
-    ) {
+    ) -> Vec<ratatui::prelude::Rect> {
         let constraint_sum = |d: Direction, len: u16| {
             children
                 .get_constraints(d)
@@ -227,7 +227,7 @@ impl Component for ScrollView {
             new_areas.push(area);
         }
 
-        drawer.children_areas = new_areas;
+        new_areas
     }
 }
 

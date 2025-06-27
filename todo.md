@@ -15,7 +15,7 @@
 - [*] 路由宏
 - [*] 全局状态管理
 - [ ] examples
-- [ ] books
+- [ ] books (ratatui-kit-website)
 
 ### 0.4.0
 

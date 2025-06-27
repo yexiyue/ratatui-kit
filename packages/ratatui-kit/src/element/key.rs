@@ -7,7 +7,7 @@ pub struct ElementKey(Arc<Box<dyn AnyHash + Send + Sync>>);
 impl ElementKey {
     pub fn new<T>(key: T) -> Self
     where
-        T: Debug + Hash + Send + Sync + Eq + 'static,
+        T: Debug + Send + Sync + AnyHash,
     {
         Self(Arc::new(Box::new(key)))
     }

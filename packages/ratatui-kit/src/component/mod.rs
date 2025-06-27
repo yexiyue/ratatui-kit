@@ -34,19 +34,19 @@ pub trait Component: Any + Send + Sync + Unpin {
     }
 
     // 默认使用flex布局计算子组件的area
-    fn update_children_areas(
-        &mut self,
+    fn calc_children_areas(
+        &self,
         children: &Components,
         layout_style: &LayoutStyle,
         drawer: &mut ComponentDrawer<'_, '_>,
-    ) {
+    ) -> Vec<ratatui::prelude::Rect> {
         let layout = layout_style
             .get_layout()
             .constraints(children.get_constraints(layout_style.flex_direction));
 
         let areas = layout.split(drawer.area);
 
-        let mut new_areas: Vec<ratatui::prelude::Rect> = vec![];
+        let mut children_areas: Vec<ratatui::prelude::Rect> = vec![];
 
         let rev_direction = match layout_style.flex_direction {
             Direction::Horizontal => Direction::Vertical,
@@ -54,10 +54,10 @@ pub trait Component: Any + Send + Sync + Unpin {
         };
         for (area, constraint) in areas.iter().zip(children.get_constraints(rev_direction)) {
             let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
-            new_areas.push(area);
+            children_areas.push(area);
         }
 
-        drawer.children_areas = new_areas;
+        children_areas
     }
 
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> std::task::Poll<()> {
@@ -72,12 +72,12 @@ pub trait AnyComponent: Any + Send + Sync + Unpin {
 
     fn draw(&mut self, drawer: &mut ComponentDrawer);
 
-    fn update_children_areas(
-        &mut self,
+    fn calc_children_areas(
+        &self,
         children: &Components,
         layout_style: &LayoutStyle,
         drawer: &mut ComponentDrawer,
-    );
+    ) -> Vec<ratatui::prelude::Rect>;
 
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()>;
 
@@ -108,13 +108,13 @@ where
         Component::draw(self, drawer);
     }
 
-    fn update_children_areas(
-        &mut self,
+    fn calc_children_areas(
+        &self,
         children: &Components,
         layout_style: &LayoutStyle,
         drawer: &mut ComponentDrawer,
-    ) {
-        Component::update_children_areas(self, children, layout_style, drawer);
+    ) -> Vec<ratatui::prelude::Rect> {
+        Component::calc_children_areas(self, children, layout_style, drawer)
     }
 
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()> {
