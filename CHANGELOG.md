@@ -2,11 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-06-27
+
+### 🐛 Bug Fixes
+
+- 优化Store宏
+
+### 🎨 Styling
+
+- Element
+
 ## [0.3.1] - 2025-06-21
 
 ### 🚀 Features
 
 - Add global store
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.3.0] - 2025-06-19
 
