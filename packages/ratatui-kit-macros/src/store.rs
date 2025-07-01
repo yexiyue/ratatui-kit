@@ -78,7 +78,7 @@ impl Parse for Store {
 impl ToTokens for Store {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = &self.store.ident;
-        let store_name = Ident::new(&format!("{}Store", name), Span::call_site());
+        let store_name = Ident::new(&format!("{name}Store"), Span::call_site());
 
         let vis = &self.store.vis;
 

@@ -26,7 +26,7 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
                     // 如果是动态参数段（以 ':' 开头），则生成正则表达式捕获组
                     if s.starts_with(":") {
                         let name = s.trim_start_matches(":");
-                        format!("(?<{}>[^/]+)", name) // 使用 [^/]+ 确保只匹配单个路径段
+                        format!("(?<{name}>[^/]+)") // 使用 [^/]+ 确保只匹配单个路径段
                     } else {
                         s.to_string()
                     }

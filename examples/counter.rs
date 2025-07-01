@@ -26,7 +26,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     element!(
         $Line::styled(
-            format!("Counter: {}", state),
+            format!("Counter: {state}"),
             Style::default().fg(ratatui::style::Color::Green).bold(),
         )
         .centered()

@@ -38,7 +38,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             View{
                 Border{
                     $Line::styled(
-                        format!("Counter: {}", state),
+                        format!("Counter: {state}"),
                         Style::default().fg(ratatui::style::Color::Green).bold(),
                     )
                     .centered()
@@ -54,7 +54,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     View{
                         Border{
                             $Line::styled(
-                                format!("Counter: {}", state),
+                                format!("Counter: {state}"),
                                 Style::default().fg(ratatui::style::Color::Green).bold(),
                             )
                             .centered()
@@ -65,7 +65,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     View{
                         Border{
                             $Line::styled(
-                                format!("Counter: {}", state),
+                                format!("Counter: {state}"),
                                 Style::default().fg(ratatui::style::Color::Green).bold(),
                             )
                             .centered()
@@ -77,7 +77,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 View{
                     Border{
                         $Line::styled(
-                            format!("Counter: {}", state),
+                            format!("Counter: {state}"),
                             Style::default().fg(ratatui::style::Color::Green).bold(),
                         )
                         .centered()
