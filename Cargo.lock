@@ -1084,13 +1084,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ratatui-components"
-version = "0.1.1"
-dependencies = [
- "ratatui-kit",
-]
-
-[[package]]
 name = "ratatui-kit"
 version = "0.3.2"
 dependencies = [

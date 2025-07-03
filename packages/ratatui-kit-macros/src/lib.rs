@@ -2,6 +2,9 @@ use element::ElementOrAdapter;
 use proc_macro::TokenStream;
 use props::ParsedProps;
 use quote::ToTokens;
+use syn::DeriveInput;
+
+use crate::with_layout_style::impl_layout_style;
 
 mod adapter;
 mod component;
@@ -12,8 +15,9 @@ mod router;
 #[cfg(feature = "store")]
 mod store;
 mod utils;
+mod with_layout_style;
 
-#[proc_macro_derive(Props)]
+#[proc_macro_derive(Props, attributes(layout))]
 pub fn derive_props(item: TokenStream) -> TokenStream {
     let props = syn::parse_macro_input!(item as ParsedProps);
     props.to_token_stream().into()
@@ -50,4 +54,11 @@ pub fn use_stores(input: TokenStream) -> TokenStream {
 pub fn derive_store(item: TokenStream) -> TokenStream {
     let store = syn::parse_macro_input!(item as store::Store);
     store.to_token_stream().into()
+}
+
+#[proc_macro_attribute]
+pub fn with_layout_style(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let layout_style = syn::parse_macro_input!(attr as with_layout_style::ParsedLayoutStyle);
+    let props = syn::parse_macro_input!(item as DeriveInput);
+    impl_layout_style(&layout_style, props).into()
 }

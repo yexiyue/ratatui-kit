@@ -1,18 +1,15 @@
 use ratatui::{
-    layout::{Constraint, Offset},
     symbols::border,
     text::Line,
     widgets::{Block, Padding, Widget},
 };
-use ratatui_kit_macros::Props;
+use ratatui_kit_macros::{Props, with_layout_style};
 
-use crate::{AnyElement, Component, layout_style::LayoutStyle};
+use crate::{AnyElement, Component};
 
+#[with_layout_style]
 #[derive(Props)]
 pub struct BorderProps<'a> {
-    pub offset: Offset,
-    pub width: Constraint,
-    pub height: Constraint,
     pub padding: Padding,
     pub border_style: ratatui::style::Style,
     pub borders: ratatui::widgets::Borders,
@@ -26,9 +23,6 @@ pub struct BorderProps<'a> {
 impl Default for BorderProps<'_> {
     fn default() -> Self {
         Self {
-            offset: Offset::default(),
-            width: Constraint::default(),
-            height: Constraint::default(),
             padding: Padding::default(),
             border_style: ratatui::style::Style::default(),
             borders: ratatui::widgets::Borders::ALL,
@@ -37,17 +31,13 @@ impl Default for BorderProps<'_> {
             style: ratatui::style::Style::default(),
             top_title: None,
             bottom_title: None,
-        }
-    }
-}
-
-impl From<&BorderProps<'_>> for LayoutStyle {
-    fn from(props: &BorderProps) -> Self {
-        LayoutStyle {
-            offset: props.offset,
-            width: props.width,
-            height: props.height,
-            ..Default::default()
+            margin: Default::default(),
+            offset: Default::default(),
+            width: Default::default(),
+            height: Default::default(),
+            gap: Default::default(),
+            flex_direction: Default::default(),
+            justify_content: Default::default(),
         }
     }
 }
@@ -83,7 +73,7 @@ impl Component for Border {
         _hooks: crate::Hooks,
         updater: &mut crate::ComponentUpdater,
     ) {
-        let layout_style = LayoutStyle::from(&*props);
+        let layout_style = props.layout_style();
         *self = Self {
             padding: props.padding,
             border_style: props.border_style,

@@ -2,24 +2,18 @@ use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{Hook, State, UseEffect, UseState};
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Flex, Layout, Margin, Offset, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     widgets::StatefulWidgetRef,
 };
-use ratatui_kit_macros::Props;
+use ratatui_kit_macros::{Props, with_layout_style};
 mod state;
 pub use state::ScrollViewState;
 mod scrollbars;
 pub use scrollbars::{ScrollBars, ScrollbarVisibility};
 
+#[with_layout_style]
 #[derive(Default, Props)]
 pub struct ScrollViewProps<'a> {
-    pub flex_direction: Direction,
-    pub justify_content: Flex,
-    pub gap: i32,
-    pub margin: Margin,
-    pub offset: Offset,
-    pub width: Constraint,
-    pub height: Constraint,
     pub children: Vec<AnyElement<'a>>,
     pub scroll_bars: ScrollBars<'static>,
     pub scroll_view_state: ScrollViewState,
@@ -27,20 +21,6 @@ pub struct ScrollViewProps<'a> {
 
 pub struct ScrollView {
     scroll_bars: ScrollBars<'static>,
-}
-
-impl<'a> From<&ScrollViewProps<'a>> for LayoutStyle {
-    fn from(props: &ScrollViewProps) -> Self {
-        LayoutStyle {
-            flex_direction: props.flex_direction,
-            justify_content: props.justify_content,
-            gap: props.gap,
-            margin: props.margin,
-            offset: props.offset,
-            width: props.width,
-            height: props.height,
-        }
-    }
 }
 
 impl Component for ScrollView {
@@ -58,7 +38,7 @@ impl Component for ScrollView {
         mut hooks: crate::Hooks,
         updater: &mut crate::ComponentUpdater,
     ) {
-        let layout_style = LayoutStyle::from(&*props);
+        let layout_style = props.layout_style();
 
         let scroll_view_state = hooks.use_state(|| props.scroll_view_state);
 

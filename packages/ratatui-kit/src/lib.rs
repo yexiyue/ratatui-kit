@@ -1,3 +1,4 @@
+#![allow(clippy::needless_update)]
 mod component;
 pub mod components;
 mod context;

@@ -3,7 +3,7 @@ use ratatui::{
     style::Style,
     widgets::{Block, Clear, Widget},
 };
-use ratatui_kit_macros::Props;
+use ratatui_kit_macros::{Props, with_layout_style};
 
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 
@@ -37,13 +37,10 @@ impl Placement {
     }
 }
 
+#[with_layout_style(margin, offset, width, height)]
 #[derive(Default, Props)]
 pub struct ModalProps<'a> {
     pub children: Vec<AnyElement<'a>>,
-    pub margin: Margin,
-    pub offset: Offset,
-    pub width: Constraint,
-    pub height: Constraint,
     pub style: Style,
     pub placement: Placement,
     pub open: bool,

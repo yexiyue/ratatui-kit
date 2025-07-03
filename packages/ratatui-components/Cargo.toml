@@ -1,7 +1,0 @@
-[package]
-name = "ratatui-components"
-version = "0.1.1"
-edition = "2024"
-
-[dependencies]
-ratatui-kit = { version = "0.3.2", path = "../ratatui-kit" }
