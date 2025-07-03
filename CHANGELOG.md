@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2025-07-03
+
+### 🚀 Features
+
+- Add with_layout_style util
+
+### 🎨 Styling
+
+- Clippy
+
 ## [0.3.2] - 2025-06-27
 
 ### 🐛 Bug Fixes
@@ -11,6 +21,10 @@ All notable changes to this project will be documented in this file.
 ### 🎨 Styling
 
 - Element
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.3.1] - 2025-06-21
 
