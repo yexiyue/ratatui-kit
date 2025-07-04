@@ -12,9 +12,11 @@ mod private {
     impl Sealed for crate::hooks::Hooks<'_, '_> {}
 }
 
+type FnBox = Box<dyn FnOnce(&mut Buffer) + Send>;
+
 #[derive(Clone, Default)]
 pub struct InsertBeforeHandler {
-    queue: Arc<Mutex<VecDeque<(u16, Box<dyn FnOnce(&mut Buffer) + Send>)>>>,
+    queue: Arc<Mutex<VecDeque<(u16, FnBox)>>>,
 }
 
 impl Hook for InsertBeforeHandler {
