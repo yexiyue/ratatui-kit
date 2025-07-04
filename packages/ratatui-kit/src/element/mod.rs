@@ -1,6 +1,6 @@
 use crate::{
     AnyProps, Component, ComponentHelper, ComponentHelperExt, CrossTerminal, Terminal,
-    tree::{render, render_loop},
+    tree::render_loop,
 };
 use std::io;
 mod key;
@@ -11,6 +11,7 @@ mod element_ext;
 pub use element_ext::ElementExt;
 mod extend_with_elements;
 pub use extend_with_elements::{ExtendWithElements, extend_with_elements};
+use ratatui::TerminalOptions;
 
 pub trait ElementType {
     type Props<'a>
@@ -49,20 +50,14 @@ where
         AnyProps::borrowed(&mut self.props)
     }
 
-    fn render(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render(self, terminal)?;
-        Ok(())
-    }
-
-    async fn render_loop(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+    async fn render_loop(&mut self, options: TerminalOptions) -> io::Result<()> {
+        let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
         render_loop(self, terminal).await?;
         Ok(())
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(true)?);
+        let terminal = Terminal::new(CrossTerminal::new()?)?;
         render_loop(self, terminal).await?;
         Ok(())
     }
@@ -84,20 +79,14 @@ where
         AnyProps::borrowed(&mut self.props)
     }
 
-    fn render(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render(&mut **self, terminal)?;
-        Ok(())
-    }
-
-    async fn render_loop(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+    async fn render_loop(&mut self, options: TerminalOptions) -> io::Result<()> {
+        let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
         render_loop(&mut **self, terminal).await?;
         Ok(())
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(true)?);
+        let terminal = Terminal::new(CrossTerminal::new()?)?;
         render_loop(&mut **self, terminal).await?;
         Ok(())
     }

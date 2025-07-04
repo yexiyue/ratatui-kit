@@ -62,16 +62,6 @@ impl<'a> Tree<'a> {
     }
 }
 
-pub(crate) fn render<E: ElementExt>(mut element: E, mut terminal: Terminal) -> io::Result<()> {
-    let helper = element.helper();
-    let mut tree = Tree::new(element.props_mut(), helper);
-
-    terminal.events()?;
-
-    tree.render(&mut terminal)?;
-    Ok(())
-}
-
 pub(crate) async fn render_loop<E: ElementExt>(
     mut element: E,
     mut terminal: Terminal,

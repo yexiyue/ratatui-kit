@@ -1,8 +1,10 @@
+use ratatui::TerminalOptions;
+
 use super::{Element, ElementKey, element_ext::ElementExt};
 use crate::{
     component::{Component, ComponentHelper, ComponentHelperExt},
     props::AnyProps,
-    render::tree::{render, render_loop},
+    render::tree::render_loop,
     terminal::{CrossTerminal, Terminal},
 };
 use std::io;
@@ -62,20 +64,14 @@ impl<'a> ElementExt for AnyElement<'a> {
         self.props.borrow()
     }
 
-    fn render(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render(self, terminal)?;
-        Ok(())
-    }
-
-    async fn render_loop(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+    async fn render_loop(&mut self, options: TerminalOptions) -> io::Result<()> {
+        let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
         render_loop(self, terminal).await?;
         Ok(())
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(true)?);
+        let terminal = Terminal::new(CrossTerminal::new()?)?;
         render_loop(self, terminal).await?;
         Ok(())
     }
@@ -94,20 +90,14 @@ impl<'a> ElementExt for &mut AnyElement<'a> {
         self.props.borrow()
     }
 
-    fn render(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
-        render(&mut **self, terminal)?;
-        Ok(())
-    }
-
-    async fn render_loop(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(false)?);
+    async fn render_loop(&mut self, options: TerminalOptions) -> io::Result<()> {
+        let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
         render_loop(&mut **self, terminal).await?;
         Ok(())
     }
 
     async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new(true)?);
+        let terminal = Terminal::new(CrossTerminal::new()?)?;
         render_loop(&mut **self, terminal).await?;
         Ok(())
     }

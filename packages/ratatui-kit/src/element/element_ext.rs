@@ -1,3 +1,5 @@
+use ratatui::TerminalOptions;
+
 use super::ElementKey;
 use crate::{component::ComponentHelperExt, props::AnyProps};
 use std::io;
@@ -21,7 +23,6 @@ pub trait ElementExt: private::Sealed + Sized {
     fn key(&self) -> &ElementKey;
     fn props_mut(&mut self) -> AnyProps;
     fn helper(&self) -> Box<dyn ComponentHelperExt>;
-    fn render(&mut self) -> io::Result<()>;
-    fn render_loop(&mut self) -> impl Future<Output = io::Result<()>>;
+    fn render_loop(&mut self, options: TerminalOptions) -> impl Future<Output = io::Result<()>>;
     fn fullscreen(&mut self) -> impl Future<Output = io::Result<()>>;
 }

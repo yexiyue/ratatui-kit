@@ -20,6 +20,8 @@ mod use_memo;
 pub use use_memo::*;
 mod use_effect;
 pub use use_effect::*;
+mod use_insert_before;
+pub use use_insert_before::*;
 
 #[cfg(feature = "router")]
 mod use_router;
