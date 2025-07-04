@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.4] - 2025-07-04
+
+### 🚀 Features
+
+- Add hook use_insert_before
+
+### 🎨 Styling
+
+- Clippy
+
 ## [0.3.3] - 2025-07-03
 
 ### 🚀 Features
@@ -11,6 +21,10 @@ All notable changes to this project will be documented in this file.
 ### 🎨 Styling
 
 - Clippy
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.3.2] - 2025-06-27
 
