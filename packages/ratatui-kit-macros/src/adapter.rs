@@ -1,5 +1,5 @@
 use quote::{ToTokens, quote};
-use syn::{Expr, parse::Parse, spanned::Spanned};
+use syn::{Expr, parse::Parse};
 use uuid::Uuid;
 
 pub struct ParsedAdapter {
@@ -9,14 +9,7 @@ pub struct ParsedAdapter {
 impl Parse for ParsedAdapter {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let expr: Expr = input.parse()?;
-        match expr {
-            Expr::Path(_) => Ok(Self { expr }),
-            Expr::MethodCall(_) => Ok(Self { expr }),
-            _ => Err(syn::Error::new(
-                expr.span(),
-                "Expected a path or method call expression for ratatui widget",
-            )),
-        }
+        Ok(Self { expr })
     }
 }
 

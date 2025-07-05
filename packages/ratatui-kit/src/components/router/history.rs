@@ -13,8 +13,9 @@ impl RouterHistory {
         if self.history.len() >= self.max_length {
             self.history.pop_front();
         }
-        self.history.push_back(context);
-        self.current = self.history.len() - 1;
+        self.current += 1;
+        self.history.insert(self.current, context);
+        self.history.truncate(self.current + 1);
     }
 
     pub fn replace(&mut self, route: RouteContext) {
