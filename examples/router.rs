@@ -2,44 +2,29 @@ use ratatui::{
     style::{Style, Stylize},
     text::Line,
 };
-use ratatui_kit::ratatui;
+use ratatui_kit::{
+    crossterm::event::KeyEvent,
+    ratatui::{self, layout::Direction},
+};
 use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::layout::Constraint,
 };
+use std::fs;
 
 #[tokio::main]
 async fn main() {
-    // let routes = vec![
-    //     Route {
-    //         path: "/home".into(),
-    //         component: element!(Counter).into_any(),
-    //         children: vec![Route {
-    //             path: "/:title".into(),
-    //             component: element!(Counter2).into_any(),
-    //             children: Vec::new().into(),
-    //         }]
-    //         .into(),
-    //     },
-    //     Route {
-    //         path: "/text-input".into(),
-    //         component: element!(MyTextInput).into_any(),
-    //         children: Vec::new().into(),
-    //     },
-    // ];
-
-    // Using the `routes!` macro to define routes
     let routes = routes! {
-        "/" => Counter {
-            "/counter/:title/:test" => Counter2,
-        },
-        "/text-input" => MyTextInput
+        "/" => HomePage,
+        "/counter" => CounterPage,
+        "/markdown" => MarkdownReader,
+        "/input" => InputPage,
     };
 
     element!(RouterProvider(
         routes:routes,
-        index_path:"/text-input",
+        index_path:"/",
     ))
     .into_any()
     .fullscreen()
@@ -48,106 +33,148 @@ async fn main() {
 }
 
 #[component]
-fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut state = hooks.use_state(|| 0);
-    hooks.use_future(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            state += 1;
+fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut navigate = hooks.use_navigate();
+
+    hooks.use_events(move |event| {
+        if let Event::Key(key_event) = event {
+            if key_event.kind == KeyEventKind::Press {
+                match key_event.code {
+                    KeyCode::Char('1') => navigate.push("/counter"),
+                    KeyCode::Char('2') => navigate.push("/markdown"),
+                    KeyCode::Char('3') => navigate.push("/input"),
+                    _ => {}
+                }
+            }
         }
     });
 
     element!(
-        View{
-            Fragment{
-                $Line::styled(
-                    format!("Counter: {state}"),
-                    Style::default().fg(ratatui::style::Color::Green).bold(),
-                )
-                .centered()
-                .bold()
-                .underlined()
+        Fragment{
+            Border(
+                style:Style::default().blue(),
+                height:Constraint::Length(8),
+                top_title:Line::from("🏠 Home - 多页面路由示例").centered().bold(),
+            ){
+                $Line::from("1. 计数器页面 (Counter)")
+                $Line::from("2. Markdown 阅读器")
+                $Line::from("3. 文本输入页面")
             }
-            Outlet
         }
     )
 }
 
 #[component]
-fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut value = hooks.use_state(String::new);
-    let mut is_focus = hooks.use_state(|| true);
-    let mut should_exit = hooks.use_state(|| false);
-    let mut system_ctx = hooks.use_context_mut::<SystemContext>();
-
-    let mut navigate = hooks.use_navigate();
-
-    if should_exit.get() {
-        system_ctx.exit();
-    }
-
-    hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
-                is_focus.set(false);
-            }
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
-                is_focus.set(true);
-                navigate.push("/counter/hello world params/111");
-            }
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q') {
-                should_exit.set(true);
-            }
-        }
-    });
-
-    element!(Border(
-        height:Constraint::Length(5),
-        style:if is_focus.get() {
-            Style::default().green()
-        } else {
-            Style::default()
-        },
-
-    ) {
-        TextArea(
-            value: value.read().to_string(),
-            is_focus:is_focus.get(),
-            on_change: move |new_value: String| {
-                value.set(new_value);
-            },
-            multiline: true,
-            cursor_style: if is_focus.get() {
-                Style::default().on_green()
-             } else {
-                Style::default()
-            },
-            placeholder: Some("Type something...".to_string()),
-            placeholder_style:  if is_focus.get() {
-                Style::default().green()
-             } else {
-                Style::default().dim()
-            },
-        )
-    })
-}
-
-#[component]
-fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut state = hooks.use_state(|| 0);
-
     let mut navigate = hooks.use_navigate();
-    // let title = hooks.use_route_state::<String>();
-    // let title = &*title.unwrap();
-    let title = hooks.use_params().get("title").cloned().unwrap_or_default();
-    let test = hooks.use_params().get("test").cloned().unwrap_or_default();
-
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             state += 1;
         }
     });
+    hooks.use_events(move |event| {
+        if let Event::Key(key_event) = event {
+            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
+                navigate.back();
+            }
+        }
+    });
+    element!(
+        Border(
+            style:Style::default().green(),
+            height:Constraint::Length(5),
+            top_title:Line::from("计数器页面 (ESC 返回)").centered(),
+        ){
+            $Line::styled(
+                format!("Counter: {state}"),
+                Style::default().fg(ratatui::style::Color::Green).bold(),
+            ).centered().bold().underlined()
+        }
+    )
+}
+
+#[component]
+fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    // 读取 README.md 内容
+    let lines = hooks.use_memo(
+        || {
+            let content = fs::read_to_string("README.md")
+                .unwrap_or_else(|_| "无法读取 README.md".to_string());
+            content.lines().map(|l| l.to_string()).collect::<Vec<_>>()
+        },
+        (),
+    );
+    let mut navigate = hooks.use_navigate();
+
+    let scroll_view_state = hooks.use_state(ScrollViewState::default);
+    hooks.use_local_events(move |event| match event {
+        Event::Key(KeyEvent {
+            kind: KeyEventKind::Press,
+            code: KeyCode::Esc,
+            ..
+        }) => {
+            navigate.back();
+        }
+        _ => {
+            scroll_view_state.write().handle_event(&event);
+        }
+    });
+
+    // 简单 markdown 渲染：标题高亮，其余普通文本
+    let rendered: Vec<Line> = lines
+        .into_iter()
+        .map(|line| {
+            if line.starts_with("# ") {
+                Line::styled(line, Style::default().yellow().bold())
+            } else if line.starts_with("## ") {
+                Line::styled(line, Style::default().green().bold())
+            } else if line.starts_with("### ") {
+                Line::styled(line, Style::default().cyan())
+            } else {
+                Line::from(line)
+            }
+        })
+        .collect();
+
+    // 渲染每一行为 AnyElement
+    let rendered_elements: Vec<AnyElement> = rendered
+        .into_iter()
+        .map(|line| {
+            element!(View(height:Constraint::Length(1)){
+                $line
+            })
+            .into_any()
+        })
+        .collect();
+
+    element!(
+        View(
+            flex_direction:ratatui::layout::Direction::Vertical,
+            gap:1,
+        ){
+            Border(
+                border_style:Style::default().blue(),
+                top_title:Some(Line::from("Markdown 阅读器 (ESC 返回)").centered()),
+                bottom_title:Some(Line::from("上下/翻页滚动，Ctrl+C 退出").centered()),
+            ){
+                ScrollView(
+                    flex_direction:Direction::Vertical,
+                    scroll_view_state: scroll_view_state.get(),
+                ){
+                    #(rendered_elements)
+                }
+            }
+        }
+    )
+}
+
+#[component]
+fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut value = hooks.use_state(String::new);
+
+    let mut navigate = hooks.use_navigate();
 
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event {
@@ -156,14 +183,23 @@ fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             }
         }
     });
-
     element!(
-        $Line::styled(
-            format!("{title}: {state} -- {test}"),
-            Style::default().fg(ratatui::style::Color::Yellow).bold(),
-        )
-        .centered()
-        .bold()
-        .underlined()
+        Border(
+            style:Style::default().cyan(),
+            height:Constraint::Length(6),
+            top_title:Line::from("文本输入页面 (ESC 返回)").centered(),
+        ){
+            TextArea(
+                value: value.read().to_string(),
+                is_focus: true,
+                on_change: move |new_value: String| {
+                    value.set(new_value);
+                },
+                multiline: true,
+                cursor_style: Style::default().on_cyan(),
+                placeholder: Some("请输入内容...".to_string()),
+                placeholder_style: Style::default().cyan(),
+            )
+        }
     )
 }

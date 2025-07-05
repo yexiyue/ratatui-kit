@@ -13,8 +13,6 @@ use ratatui_kit::{
 pub struct CounterAndTextInput {
     pub count: i32,
     pub value: String,
-    pub is_focus: bool,
-    pub should_exit: bool,
 }
 
 impl Default for CounterAndTextInput {
@@ -22,27 +20,22 @@ impl Default for CounterAndTextInput {
         Self {
             count: 0,
             value: String::new(),
-            is_focus: true,
-            should_exit: false,
         }
     }
 }
 
 #[tokio::main]
 async fn main() {
-    // console_subscriber::init();
-
-    // Using the `routes!` macro to define routes
     let routes = routes! {
-        "/" => Counter {
-            "/counter/:title/:test" => Counter2,
-        },
-        "/text-input" => MyTextInput
+        "/" => HomePage,
+        "/counter" => CounterPage,
+        "/input" => InputPage,
+
     };
 
     element!(RouterProvider(
         routes:routes,
-        index_path:"/text-input",
+        index_path:"/",
     ))
     .into_any()
     .fullscreen()
@@ -51,165 +44,101 @@ async fn main() {
 }
 
 #[component]
-fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let store = &COUNTER_AND_TEXT_INPUT_STORE;
-    let mut state = use_stores!(store.count);
+    let (count, value) = use_stores!(store.count, store.value);
+    let mut navigate = hooks.use_navigate();
+    hooks.use_events(move |event| {
+        if let Event::Key(key_event) = event {
+            if key_event.kind == KeyEventKind::Press {
+                match key_event.code {
+                    KeyCode::Char('1') => navigate.push("/counter"),
+                    KeyCode::Char('2') => navigate.push("/input"),
 
-    hooks.use_future(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            state += 1;
+                    _ => {}
+                }
+            }
         }
     });
-
     element!(
-        View{
-            Fragment{
-                $Line::styled(
-                    format!("Counter: {state}"),
-                    Style::default().fg(ratatui::style::Color::Green).bold(),
-                )
-                .centered()
-                .bold()
-                .underlined()
-            }
-            Outlet
+        Border(
+            style:Style::default().blue(),
+            height:Constraint::Length(10),
+            gap:1,
+            top_title:Line::from("🏠 Store 全局状态仪表盘").centered().bold(),
+        ){
+            $Line::from(format!("全局计数: {}", count.get()))
+            $Line::from(format!("全局输入: {}", value.read().as_str()))
+            $Line::from("1. 计数器页面 (Counter)")
+            $Line::from("2. 文本输入页面")
         }
     )
 }
 
 #[component]
-fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    // let mut value = hooks.use_state(String::new);
-    // let mut is_focus = hooks.use_state(|| true);
-    // let mut should_exit = hooks.use_state(|| false);
-
+fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let store = &COUNTER_AND_TEXT_INPUT_STORE;
-    let (mut value, mut is_focus, mut should_exit) =
-        use_stores!(store.value, store.is_focus, store.should_exit);
-
-    let mut system_ctx = hooks.use_context_mut::<SystemContext>();
-
+    let mut count = use_stores!(store.count);
+    let value = use_stores!(store.value);
     let mut navigate = hooks.use_navigate();
-
-    if should_exit.get() {
-        system_ctx.exit();
-    }
-
-    hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
-                is_focus.set(false);
-            }
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
-                is_focus.set(true);
-                navigate.push("/counter/hello world params/111");
-            }
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q') {
-                should_exit.set(true);
-            }
-        }
-    });
-
-    element!(Border(
-        height:Constraint::Length(5),
-        style:if is_focus.get() {
-            Style::default().green()
-        } else {
-            Style::default()
-        },
-
-    ) {
-        TextArea(
-            value: value.read().to_string(),
-            is_focus:is_focus.get(),
-            on_change: move |new_value: String| {
-                value.set(new_value);
-            },
-            multiline: true,
-            cursor_style: if is_focus.get() {
-                Style::default().on_green()
-             } else {
-                Style::default()
-            },
-            placeholder: Some("Type something...".to_string()),
-            placeholder_style:  if is_focus.get() {
-                Style::default().green()
-             } else {
-                Style::default().dim()
-            },
-        )
-    })
-}
-
-#[component]
-fn Counter2(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut state = hooks.use_state(|| 0);
-
-    let mut navigate = hooks.use_navigate();
-    // let title = hooks.use_route_state::<String>();
-    // let title = &*title.unwrap();
-    let title = hooks.use_params().get("title").cloned().unwrap_or_default();
-    let test = hooks.use_params().get("test").cloned().unwrap_or_default();
-
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            state += 1;
+            count += 1;
         }
     });
-
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event {
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
-                navigate.push("/text-input");
+                navigate.back();
             }
         }
     });
-
     element!(
-        $Line::styled(
-            format!("{title}: {state} -- {test}"),
-            Style::default().fg(ratatui::style::Color::Yellow).bold(),
-        )
-        .centered()
-        .bold()
-        .underlined()
+        Border(
+            style:Style::default().green(),
+            height:Constraint::Length(6),
+            top_title:Line::from("计数器页面 (ESC 返回)").centered(),
+        ){
+            $Line::from(format!("全局输入: {}", value.read().as_str()))
+            $Line::styled(
+                format!("Counter: {}", count.get()),
+                Style::default().fg(ratatui::style::Color::Green).bold(),
+            ).centered().bold().underlined()
+        }
     )
 }
 
 #[component]
-fn Counter3(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut state = hooks.use_state(|| 0);
-
+fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let store = &COUNTER_AND_TEXT_INPUT_STORE;
+    let (mut value, count) = use_stores!(store.value, store.count);
     let mut navigate = hooks.use_navigate();
-
-    hooks.use_future(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            state += 1;
-        }
-    });
-
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
-                navigate.replace("/counter/counter2/test");
-            }
-
             if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
-                navigate.push("/counter/counter2/test");
+                navigate.back();
             }
         }
     });
-
     element!(
-        $Line::styled(
-            format!("Counter3 -- {state}"),
-            Style::default().fg(ratatui::style::Color::Yellow).bold(),
-        )
-        .centered()
-        .bold()
-        .underlined()
+        Border(
+            style:Style::default().cyan(),
+            height:Constraint::Length(7),
+            top_title:Line::from("文本输入页面 (ESC 返回)").centered(),
+        ){
+            $Line::from(format!("全局计数: {}", count.get()))
+            TextArea(
+                value: value.read().to_string(),
+                is_focus:true,
+                on_change: move |new_value: String| {
+                    value.set(new_value);
+                },
+                multiline: true,
+                cursor_style: Style::default().on_cyan(),
+                placeholder: Some("请输入内容...".to_string()),
+                placeholder_style: Style::default().cyan(),
+            )
+        }
     )
 }

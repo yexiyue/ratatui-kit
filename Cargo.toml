@@ -11,3 +11,5 @@ edition = "2024"
 tokio = { version = "1.45.1", features = ["full", "tracing"] }
 ratatui-kit = { path = "packages/ratatui-kit", features = ["full"] }
 console-subscriber = { version = "0.4.1" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

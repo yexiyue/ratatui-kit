@@ -2,16 +2,19 @@ use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
+        TerminalOptions, Viewport,
         layout::Constraint,
         style::{Style, Stylize},
+        text::Line,
     },
 };
 
 #[tokio::main]
 async fn main() {
     element!(MyTextInput)
-        .into_any()
-        .fullscreen()
+        .render_loop(TerminalOptions {
+            viewport: Viewport::Inline(4),
+        })
         .await
         .expect("Failed to run the application");
 }
@@ -19,9 +22,11 @@ async fn main() {
 #[component]
 fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut value = hooks.use_state(String::new);
-    let mut is_focus = hooks.use_state(|| true);
+
     let mut should_exit = hooks.use_state(|| false);
+
     let mut system_ctx = hooks.use_context_mut::<SystemContext>();
+    let insert_before = hooks.use_insert_before();
 
     if should_exit.get() {
         system_ctx.exit();
@@ -29,44 +34,45 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
-                is_focus.set(false);
-            }
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Enter {
-                is_focus.set(true);
-            }
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Char('q') {
-                should_exit.set(true);
+            if key_event.kind == KeyEventKind::Press {
+                match key_event.code {
+                    KeyCode::Char('q') => {
+                        should_exit.set(true);
+                    }
+                    KeyCode::Enter => {
+                        if !value.read().is_empty() {
+                            insert_before
+                                .render_before(Line::from(format!("message: {value}")), 1)
+                                .finish();
+
+                            value.set(String::new());
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
     });
 
     element!(Border(
-        height:Constraint::Length(5),
-        style:if is_focus.get() {
-            Style::default().green()
-        } else {
-            Style::default()
-        },
+        height: Constraint::Length(4),
+        style: Style::default().green(),
+        bottom_title: Line::styled(
+            "Press 'Enter' to submit, 'q' to exit",
+            Style::default().yellow(),
+        ).centered(),
     ) {
         TextArea(
             value: value.read().to_string(),
-            is_focus:is_focus.get(),
+            is_focus: true,
             on_change: move |new_value: String| {
                 value.set(new_value);
             },
-            multiline: true,
-            cursor_style: if is_focus.get() {
-                Style::default().on_green()
-             } else {
-                Style::default()
-            },
+            multiline: false,
+            cursor_style: Style::default().on_green(),
             placeholder: Some("Type something...".to_string()),
-            placeholder_style:  if is_focus.get() {
-                Style::default().green()
-             } else {
-                Style::default().dim()
-            },
+            placeholder_style: Style::default().green(),
         )
+
     })
 }

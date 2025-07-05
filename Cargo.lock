@@ -1123,6 +1123,8 @@ version = "0.3.4"
 dependencies = [
  "console-subscriber",
  "ratatui-kit",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

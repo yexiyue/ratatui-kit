@@ -2,13 +2,15 @@ use ratatui::{
     style::{Style, Stylize},
     text::Line,
 };
-use ratatui_kit::prelude::*;
-use ratatui_kit::ratatui;
+use ratatui_kit::ratatui::{
+    self,
+    layout::{Constraint, Flex},
+};
+use ratatui_kit::{prelude::*, ratatui::layout::Direction};
 
 #[tokio::main]
 async fn main() {
     element!(Counter)
-        .into_any()
         .fullscreen()
         .await
         .expect("Failed to run the application");
@@ -25,12 +27,18 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     });
 
     element!(
-        $Line::styled(
-            format!("Counter: {state}"),
-            Style::default().fg(ratatui::style::Color::Green).bold(),
-        )
-        .centered()
-        .bold()
-        .underlined()
+        Border(
+            flex_direction: Direction::Vertical,
+            justify_content: Flex::Center,
+        ){
+            View(height:Constraint::Length(1)){
+                $Line::styled(
+                    format!("Counter: {state}"),
+                    Style::default().fg(ratatui::style::Color::Green).bold(),
+                )
+                .centered()
+                .bold()
+            }
+        }
     )
 }
