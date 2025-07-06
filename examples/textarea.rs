@@ -36,7 +36,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         if let Event::Key(key_event) = event {
             if key_event.kind == KeyEventKind::Press {
                 match key_event.code {
-                    KeyCode::Char('q') => {
+                    KeyCode::Esc => {
                         should_exit.set(true);
                     }
                     KeyCode::Enter => {
@@ -58,7 +58,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         height: Constraint::Length(4),
         style: Style::default().green(),
         bottom_title: Line::styled(
-            "Press 'Enter' to submit, 'q' to exit",
+            "Press 'Enter' to submit, 'Esc' to exit",
             Style::default().yellow(),
         ).centered(),
     ) {

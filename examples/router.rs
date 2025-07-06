@@ -26,7 +26,6 @@ async fn main() {
         routes:routes,
         index_path:"/",
     ))
-    .into_any()
     .fullscreen()
     .await
     .expect("Failed to run the application");

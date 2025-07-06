@@ -88,7 +88,7 @@ impl Component for TextArea {
         inner.set_style(props.style);
 
         if let Some(line_number_style) = &props.line_number_style {
-            inner.set_line_number_style(line_number_style.clone());
+            inner.set_line_number_style(*line_number_style);
         }
 
         if let Some(placeholder) = &props.placeholder {

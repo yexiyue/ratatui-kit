@@ -9,19 +9,10 @@ use ratatui_kit::{
     ratatui::layout::Constraint,
 };
 
-#[derive(Store)]
+#[derive(Store, Default)]
 pub struct CounterAndTextInput {
     pub count: i32,
     pub value: String,
-}
-
-impl Default for CounterAndTextInput {
-    fn default() -> Self {
-        Self {
-            count: 0,
-            value: String::new(),
-        }
-    }
 }
 
 #[tokio::main]
@@ -37,7 +28,6 @@ async fn main() {
         routes:routes,
         index_path:"/",
     ))
-    .into_any()
     .fullscreen()
     .await
     .expect("Failed to run the application");
