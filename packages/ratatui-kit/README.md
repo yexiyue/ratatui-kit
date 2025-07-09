@@ -2,8 +2,6 @@
 
 Ratatui Kit 是一个基于 [ratatui](https://github.com/ratatui-org/ratatui) 的 Rust 终端 UI 组件化开发框架，灵感来源于 React 生态，专注于高效、可组合、易维护的终端 UI 构建体验。
 
----
-
 ## 特性
 
 - **声明式组件开发**：支持类似 React 的组件、props、hooks、context、路由等机制
@@ -13,8 +11,6 @@ Ratatui Kit 是一个基于 [ratatui](https://github.com/ratatui-org/ratatui) �
 - **异步渲染**：天然支持 tokio 异步生态，适合实时终端应用
 - **与 ratatui 深度集成**：可无缝调用 ratatui 的全部能力
 - **易扩展**：支持自定义组件、宏和 hooks
-
----
 
 ## 安装
 
@@ -30,13 +26,9 @@ cargo add ratatui-kit
 ratatui-kit = { version = "*", features = ["router", "store"] }
 ```
 
----
-
 ## 快速上手
 
 参考[快速入门](https://yexiyue.github.io/ratatui-kit-website/docs/quick-start/)文档，体验从 0 到 1 的完整开发流程。
-
----
 
 ## 文档与示例
 
@@ -46,13 +38,9 @@ ratatui-kit = { version = "*", features = ["router", "store"] }
 - [路由](https://yexiyue.github.io/ratatui-kit-website/docs/router/)
 - [更多示例](https://yexiyue.github.io/ratatui-kit-website/example/)
 
----
-
 ## 贡献与交流
 
 欢迎 issue 和 PR！如有建议或 bug，请提交到 [GitHub Issues](https://github.com/yourname/ratatui-kit/issues)。
-
----
 
 ## License
 
