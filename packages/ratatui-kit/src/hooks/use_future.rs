@@ -11,6 +11,7 @@ mod private {
 }
 
 pub trait UseFuture: private::Sealed {
+    /// 注册异步副作用任务，适合定时器、网络请求、异步轮询等场景。
     fn use_future<F>(&mut self, f: F)
     where
         F: Future<Output = ()> + Send + 'static;

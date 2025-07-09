@@ -8,6 +8,7 @@ mod private {
 }
 
 pub trait UseMemo: private::Sealed {
+    /// 依赖缓存，只有依赖变化时才重新计算，适合性能优化。
     fn use_memo<F, D, T>(&mut self, f: F, deps: D) -> T
     where
         F: FnOnce() -> T,

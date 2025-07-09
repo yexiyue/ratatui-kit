@@ -12,10 +12,12 @@ mod private {
 }
 
 pub trait UseEvents: private::Sealed {
+    /// 注册全局事件监听器，适合快捷键、全局输入等场景。
     fn use_events<F>(&mut self, f: F)
     where
         F: FnMut(Event) + Send + 'static;
 
+    /// 注册仅作用于当前组件的事件监听器，适合局部交互。
     fn use_local_events<F>(&mut self, f: F)
     where
         F: FnMut(Event) + Send + 'static;

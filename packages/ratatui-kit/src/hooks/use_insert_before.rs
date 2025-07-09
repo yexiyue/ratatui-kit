@@ -69,6 +69,7 @@ impl InsertBeforeHandler {
 }
 
 pub trait UseInsertBefore: private::Sealed {
+    /// 在终端渲染区域前插入内容。
     fn use_insert_before(&mut self) -> InsertBeforeHandler;
 }
 

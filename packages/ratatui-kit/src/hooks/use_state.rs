@@ -16,6 +16,7 @@ mod private {
 }
 
 pub trait UseState: private::Sealed {
+    /// 创建响应式状态，适合计数器、输入框等本地状态。
     fn use_state<T, F>(&mut self, init: F) -> State<T>
     where
         F: FnOnce() -> T,

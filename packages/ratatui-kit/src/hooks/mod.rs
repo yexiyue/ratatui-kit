@@ -1,3 +1,30 @@
+//! hooks 模块：为组件提供响应式状态、副作用、事件、上下文等能力，灵感来源于 React Hooks。
+//!
+//! ## 如何实现一个规范的自定义 hook
+//!
+//! 1. 定义一个实现 [`Hook`] trait 的结构体，管理自己的状态和生命周期。
+//! 2. 在 `poll_change`、`pre_component_update`、`post_component_update`、`pre_component_draw`、`post_component_draw` 等方法中实现副作用或状态逻辑。
+//! 3. 提供 trait（如 `pub trait UseXxx`）暴露给用户，trait 方法通过 `Hooks::use_hook` 注册/获取 hook 实例。
+//! 4. 推荐通过 `private::Sealed` 限制 trait 只对框架内部实现。
+//!
+//! ```rust
+//! // 1. 定义 hook 状态结构体
+//! pub struct MyHook { ... }
+//! impl Hook for MyHook { ... }
+//!
+//! // 2. 提供 trait API
+//! pub trait UseMyHook: private::Sealed {
+//!     fn use_my_hook(&mut self, ...) -> ...;
+//! }
+//! impl UseMyHook for Hooks<'_, '_> {
+//!     fn use_my_hook(&mut self, ...) -> ... {
+//!         self.use_hook(|| MyHook { ... })
+//!     }
+//! }
+//! ```
+//!
+//! 这样可保证 hook 生命周期、类型安全和复用性。
+
 #![allow(unused)]
 use crate::{
     context::ContextStack,
@@ -28,6 +55,13 @@ mod use_router;
 #[cfg(feature = "router")]
 pub use use_router::*;
 
+/// 所有自定义 hook 的 trait 基础，定义生命周期相关回调。
+///
+/// - `poll_change`：异步/响应式副作用轮询，适合 use_future/use_effect 等。
+/// - `pre_component_update/post_component_update`：组件更新前后钩子。
+/// - `pre_component_draw/post_component_draw`：组件渲染前后钩子。
+///
+/// 通常无需手动实现，除非自定义复杂 hook。
 pub trait Hook: Unpin + Send {
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
         Poll::Pending
@@ -91,6 +125,17 @@ impl Hook for Vec<Box<dyn AnyHook>> {
     }
 }
 
+/// hooks 管理器，负责组件内所有 hook 的注册、索引和生命周期。
+///
+/// - 通过 `use_hook` 注册/获取 hook 实例，保证顺序和类型安全。
+/// - 支持 context 注入、首次更新标记等。
+/// - 用户无需手动创建，框架自动管理。
+///
+/// # 示例
+/// ```rust
+/// let mut state = hooks.use_state(|| 0);
+/// let ctx = hooks.use_context::<MyType>();
+/// ```
 pub struct Hooks<'a, 'b: 'a> {
     hooks: &'a mut Vec<Box<dyn AnyHook>>,
     first_update: bool,

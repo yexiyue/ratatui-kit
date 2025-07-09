@@ -12,7 +12,6 @@ use ratatui_kit::{
 #[tokio::main]
 async fn main() {
     element!(JsonEditor)
-        .into_any()
         .fullscreen()
         .await
         .expect("Failed to run the application");

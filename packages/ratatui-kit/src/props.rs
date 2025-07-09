@@ -1,6 +1,12 @@
 use ratatui_kit_macros::Props;
 
+/// 组件属性 trait，所有可作为组件 props 的类型都需实现此 trait。
+///
+/// - 需实现 Send + Sync。
+/// - 推荐使用 `#[derive(Props)]` 自动实现。
+///
 /// # Safety
+/// 实现者需保证类型安全和线程安全。
 pub unsafe trait Props: Send + Sync {}
 
 // 用于处理原始指针释放的trait
@@ -102,4 +108,7 @@ impl Drop for AnyProps<'_> {
 }
 
 #[derive(Debug, Clone, Default, Props)]
+/// 空属性类型，表示组件不需要任何 props。
+///
+/// 可用于无参数组件或默认占位。
 pub struct NoProps;

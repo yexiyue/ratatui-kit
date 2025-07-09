@@ -1,3 +1,17 @@
+//! ScrollView 组件：可滚动视图容器，支持横向/纵向滚动条，适合长列表、文档阅读等场景。
+//!
+//! ## 用法示例
+//! ```rust
+//! let scroll_state = hooks.use_state(ScrollViewState::default);
+//! element!(ScrollView(
+//!     scroll_view_state: scroll_state.get(),
+//!     scroll_bars: ScrollBars::default(),
+//! ){
+//!     // 子内容
+//! })
+//! ```
+//! 通过 `scroll_view_state` 管理滚动位置，`scroll_bars` 控制滚动条样式和显示。
+
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{Hook, State, UseEffect, UseState};
 use ratatui::{
@@ -13,12 +27,17 @@ pub use scrollbars::{ScrollBars, ScrollbarVisibility};
 
 #[with_layout_style]
 #[derive(Default, Props)]
+/// ScrollView 组件属性。
 pub struct ScrollViewProps<'a> {
+    /// 子元素列表。
     pub children: Vec<AnyElement<'a>>,
+    /// 滚动条配置。
     pub scroll_bars: ScrollBars<'static>,
+    /// 滚动状态。
     pub scroll_view_state: ScrollViewState,
 }
 
+/// ScrollView 组件实现。
 pub struct ScrollView {
     scroll_bars: ScrollBars<'static>,
 }

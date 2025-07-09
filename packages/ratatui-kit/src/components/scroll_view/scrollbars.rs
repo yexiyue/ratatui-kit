@@ -1,3 +1,18 @@
+//! ScrollBars 组件：滚动视图的滚动条配置与渲染，支持横向/纵向滚动条、可见性控制、自定义样式。
+//!
+//! ## 用法示例
+//! ```rust
+//! element!(ScrollView(
+//!     scroll_bars: ScrollBars {
+//!         vertical_scrollbar_visibility: ScrollbarVisibility::Always,
+//!         horizontal_scrollbar_visibility: ScrollbarVisibility::Automatic,
+//!         ..Default::default()
+//!     },
+//!     // ...
+//! ))
+//! ```
+//! 可灵活控制滚动条的显示策略和样式，适合长列表、表格、文档等场景。
+
 use super::ScrollViewState;
 use ratatui::{
     buffer::Buffer,
@@ -7,6 +22,7 @@ use ratatui::{
 use ratatui_kit_macros::Props;
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
+/// 滚动条可见性枚举。
 pub enum ScrollbarVisibility {
     /// 仅在需要时渲染滚动条。
     #[default]
@@ -18,10 +34,15 @@ pub enum ScrollbarVisibility {
 }
 
 #[derive(Props, Clone, Hash)]
+/// 滚动条配置。
 pub struct ScrollBars<'a> {
+    /// 纵向滚动条可见性。
     pub vertical_scrollbar_visibility: ScrollbarVisibility,
+    /// 横向滚动条可见性。
     pub horizontal_scrollbar_visibility: ScrollbarVisibility,
+    /// 纵向滚动条样式。
     pub vertical_scrollbar: Scrollbar<'a>,
+    /// 横向滚动条样式。
     pub horizontal_scrollbar: Scrollbar<'a>,
 }
 

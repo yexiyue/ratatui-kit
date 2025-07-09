@@ -1,3 +1,16 @@
+/// 通用事件处理器类型，封装 FnMut 回调闭包，支持动态替换和默认空实现。
+///
+/// - 可用于组件 props 的事件回调（如 on_change、on_click 等）。
+/// - 支持通过 `Handler::from` 包装任意闭包。
+/// - `is_default()` 判断是否为默认空实现。
+/// - `take()` 获取并重置 handler。
+/// - 实现 Deref/DerefMut，可直接调用闭包。
+///
+/// # 示例
+/// ```rust
+/// let mut handler = Handler::from(|val| println!("changed: {}", val));
+/// handler("hello");
+/// ```
 use core::ops::{Deref, DerefMut};
 
 pub struct Handler<'a, T>(bool, Box<dyn FnMut(T) + Send + Sync + 'a>);

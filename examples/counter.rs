@@ -1,12 +1,12 @@
-use ratatui::{
-    style::{Style, Stylize},
-    text::Line,
+use ratatui_kit::{
+    prelude::*,
+    ratatui::layout::Direction,
+    ratatui::{
+        layout::{Constraint, Flex},
+        style::{Style, Stylize},
+        text::Line,
+    },
 };
-use ratatui_kit::ratatui::{
-    self,
-    layout::{Constraint, Flex},
-};
-use ratatui_kit::{prelude::*, ratatui::layout::Direction};
 
 #[tokio::main]
 async fn main() {
@@ -34,7 +34,7 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             View(height:Constraint::Length(1)){
                 $Line::styled(
                     format!("Counter: {state}"),
-                    Style::default().fg(ratatui::style::Color::Green).bold(),
+                    Style::default().green().bold(),
                 )
                 .centered()
                 .bold()

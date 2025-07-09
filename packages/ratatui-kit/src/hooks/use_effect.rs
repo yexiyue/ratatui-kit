@@ -9,11 +9,13 @@ mod private {
 }
 
 pub trait UseEffect: private::Sealed {
+    /// 注册同步副作用，依赖变化时自动执行，适合监听状态变化、同步校验等。
     fn use_effect<F, D>(&mut self, f: F, deps: D)
     where
         F: FnOnce(),
         D: Hash;
 
+    /// 注册异步副作用，依赖变化时自动执行，适合异步校验、异步请求等。
     fn use_async_effect<F, D>(&mut self, f: F, deps: D)
     where
         F: Future<Output = ()> + Send + 'static,
