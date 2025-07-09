@@ -14,8 +14,8 @@
 - [*] history 支持路由历史
 - [*] 路由宏
 - [*] 全局状态管理
-- [ ] examples
-- [ ] books (ratatui-kit-website)
+- [*] examples
+- [*] books (ratatui-kit-website)
 
 ### 0.4.0
 
