@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-07-09
+
+### 📚 Documentation
+
+- 完善文档
+- 更新文档
+
+### 🎨 Styling
+
+- Clippy
+- Fmt
+
 ## [0.3.5] - 2025-07-05
 
 ### 🚀 Features
@@ -13,6 +25,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - 修复adapter
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.3.4] - 2025-07-04
 
