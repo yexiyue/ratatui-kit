@@ -1,5 +1,7 @@
 # Ratatui Kit
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)![Crates.io Version](https://img.shields.io/crates/v/ratatui-kit)![Crates.io Total Downloads](https://img.shields.io/crates/d/ratatui-kit)![docs.rs](https://img.shields.io/docsrs/ratatui-kit)[![Static Badge](https://img.shields.io/badge/%E5%AE%98%E6%96%B9%E7%BD%91%E7%AB%99-blue)](https://yexiyue.github.io/ratatui-kit-website/)
+
 Ratatui Kit 是一个基于 [ratatui](https://github.com/ratatui-org/ratatui) 的 Rust 终端 UI 组件化开发框架，灵感来源于 React 生态，专注于高效、可组合、易维护的终端 UI 构建体验。
 
 ## 特性
