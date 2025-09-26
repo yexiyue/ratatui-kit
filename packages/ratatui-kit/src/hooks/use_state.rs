@@ -16,6 +16,7 @@ mod private {
 }
 
 pub trait UseState: private::Sealed {
+    /// 创建响应式状态，适合计数器、输入框等本地状态。
     fn use_state<T, F>(&mut self, init: F) -> State<T>
     where
         F: FnOnce() -> T,
@@ -149,7 +150,7 @@ impl<T: Send + Sync + Copy + 'static> State<T> {
 }
 
 impl<T: Send + Sync + 'static> State<T> {
-    pub fn try_read(&self) -> Option<StateRef<T>> {
+    pub fn try_read(&'_ self) -> Option<StateRef<'_, T>> {
         loop {
             match self.inner.try_read() {
                 Ok(inner) => return Some(StateRef { inner }),
@@ -166,12 +167,12 @@ impl<T: Send + Sync + 'static> State<T> {
         }
     }
 
-    pub fn read(&self) -> StateRef<T> {
+    pub fn read(&'_ self) -> StateRef<'_, T> {
         self.try_read()
             .expect("attempt to read state after owner was dropped")
     }
 
-    pub fn try_write(&self) -> Option<StateMutRef<T>> {
+    pub fn try_write(&'_ self) -> Option<StateMutRef<'_, T>> {
         self.inner
             .try_write()
             .map(|inner| StateMutRef {
@@ -181,7 +182,7 @@ impl<T: Send + Sync + 'static> State<T> {
             .ok()
     }
 
-    pub fn write(&self) -> StateMutRef<T> {
+    pub fn write(&'_ self) -> StateMutRef<'_, T> {
         self.try_write()
             .expect("attempt to write state after owner was dropped")
     }

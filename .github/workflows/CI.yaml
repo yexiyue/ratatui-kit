@@ -18,7 +18,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
-        run: cargo test --locked --all-features --workspace
+        run: cargo test --locked --all-features --workspace --lib --tests --examples
 
   rustfmt:
     name: Rustfmt

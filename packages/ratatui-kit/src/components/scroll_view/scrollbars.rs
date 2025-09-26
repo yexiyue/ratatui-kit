@@ -1,12 +1,28 @@
+//! ScrollBars 组件：滚动视图的滚动条配置与渲染，支持横向/纵向滚动条、可见性控制、自定义样式。
+//!
+//! ## 用法示例
+//! ```rust
+//! element!(ScrollView(
+//!     scroll_bars: ScrollBars {
+//!         vertical_scrollbar_visibility: ScrollbarVisibility::Always,
+//!         horizontal_scrollbar_visibility: ScrollbarVisibility::Automatic,
+//!         ..Default::default()
+//!     },
+//!     // ...
+//! ))
+//! ```
+//! 可灵活控制滚动条的显示策略和样式，适合长列表、表格、文档等场景。
+
 use super::ScrollViewState;
 use ratatui::{
     buffer::Buffer,
     layout::{Rect, Size},
-    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, StatefulWidgetRef},
+    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget},
 };
 use ratatui_kit_macros::Props;
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
+/// 滚动条可见性枚举。
 pub enum ScrollbarVisibility {
     /// 仅在需要时渲染滚动条。
     #[default]
@@ -18,10 +34,15 @@ pub enum ScrollbarVisibility {
 }
 
 #[derive(Props, Clone, Hash)]
+/// 滚动条配置。
 pub struct ScrollBars<'a> {
+    /// 纵向滚动条可见性。
     pub vertical_scrollbar_visibility: ScrollbarVisibility,
+    /// 横向滚动条可见性。
     pub horizontal_scrollbar_visibility: ScrollbarVisibility,
+    /// 纵向滚动条样式。
     pub vertical_scrollbar: Scrollbar<'a>,
+    /// 横向滚动条样式。
     pub horizontal_scrollbar: Scrollbar<'a>,
 }
 
@@ -179,22 +200,18 @@ impl ScrollBars<'_> {
 
         Rect::new(state.offset.x, state.offset.y, new_width, new_height)
     }
-}
 
-impl StatefulWidgetRef for ScrollBars<'_> {
-    type State = (ScrollViewState, Buffer);
-
-    fn render_ref(&self, area: Rect, buf: &mut Buffer, (state, scroll_buffer): &mut Self::State) {
+    pub fn render_ref(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        state: &mut ScrollViewState,
+        scroll_buffer: &Buffer,
+    ) {
         let (mut x, mut y) = state.offset.into();
         // 确保不会在任一方向上滚动超过缓冲区末尾
-        let max_x_offset = scroll_buffer
-            .area
-            .width
-            .saturating_sub(area.width.saturating_sub(1));
-        let max_y_offset = scroll_buffer
-            .area
-            .height
-            .saturating_sub(area.height.saturating_sub(1));
+        let max_x_offset = scroll_buffer.area.width.saturating_sub(area.width);
+        let max_y_offset = scroll_buffer.area.height.saturating_sub(area.height);
 
         x = x.min(max_x_offset);
         y = y.min(max_y_offset);

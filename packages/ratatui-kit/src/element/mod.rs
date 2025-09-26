@@ -46,7 +46,7 @@ where
         ComponentHelper::<T>::boxed()
     }
 
-    fn props_mut(&mut self) -> AnyProps {
+    fn props_mut(&'_ mut self) -> AnyProps<'_> {
         AnyProps::borrowed(&mut self.props)
     }
 
@@ -75,7 +75,7 @@ where
         ComponentHelper::<T>::boxed()
     }
 
-    fn props_mut(&mut self) -> AnyProps {
+    fn props_mut(&'_ mut self) -> AnyProps<'_> {
         AnyProps::borrowed(&mut self.props)
     }
 

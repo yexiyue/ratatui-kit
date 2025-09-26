@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2025-09-26
+
+### 🚀 Features
+
+- Add use terminal size
+
+### 🐛 Bug Fixes
+
+- Badges
+
+### 📚 Documentation
+
+- Add badges
+
+## [0.4.0] - 2025-07-09
+
+### 📚 Documentation
+
+- 完善文档
+- 更新文档
+
+### 🎨 Styling
+
+- Clippy
+- Fmt
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
+
+## [0.3.5] - 2025-07-05
+
+### 🚀 Features
+
+- 优化textarea
+- Insert_before添加render_before方法
+- 优化example
+
+### 🐛 Bug Fixes
+
+- 修复adapter
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
+
 ## [0.3.4] - 2025-07-04
 
 ### 🚀 Features
@@ -11,6 +57,10 @@ All notable changes to this project will be documented in this file.
 ### 🎨 Styling
 
 - Clippy
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.3.3] - 2025-07-03
 

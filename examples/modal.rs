@@ -8,12 +8,10 @@ use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     ratatui::widgets::Paragraph,
 };
-use serde_json;
 
 #[tokio::main]
 async fn main() {
     element!(JsonEditor)
-        .into_any()
         .fullscreen()
         .await
         .expect("Failed to run the application");
@@ -52,11 +50,7 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     });
 
     let info_line = if error.read().is_empty() {
-        Line::styled(
-            "JSON 格式正确",
-            Style::default().green(),
-        )
-        .centered()
+        Line::styled("JSON 格式正确", Style::default().green()).centered()
     } else {
         Line::styled(
             format!("JSON 错误: {}", error.read().as_str()),

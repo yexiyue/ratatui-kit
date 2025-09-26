@@ -111,7 +111,7 @@ impl<T> StoreState<T>
 where
     T: Send + Sync + 'static,
 {
-    pub fn try_read(&self) -> Option<StoreStateRef<T>> {
+    pub fn try_read(&'_ self) -> Option<StoreStateRef<'_, T>> {
         loop {
             match self.inner.try_read() {
                 Ok(inner) => return Some(StoreStateRef { inner }),
@@ -128,12 +128,12 @@ where
         }
     }
 
-    pub fn read(&self) -> StoreStateRef<T> {
+    pub fn read(&'_ self) -> StoreStateRef<'_, T> {
         self.try_read()
             .expect("attempt to read state after owner was dropped")
     }
 
-    pub fn try_write(&self) -> Option<StoreStateMut<T>> {
+    pub fn try_write(&'_ self) -> Option<StoreStateMut<'_, T>> {
         self.inner
             .try_write()
             .map(|inner| StoreStateMut {
@@ -143,7 +143,7 @@ where
             .ok()
     }
 
-    pub fn write(&self) -> StoreStateMut<T> {
+    pub fn write(&'_ self) -> StoreStateMut<'_, T> {
         self.try_write()
             .expect("attempt to write state after owner was dropped")
     }

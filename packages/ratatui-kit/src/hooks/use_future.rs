@@ -11,6 +11,7 @@ mod private {
 }
 
 pub trait UseFuture: private::Sealed {
+    /// 注册异步副作用任务，适合定时器、网络请求、异步轮询等场景。
     fn use_future<F>(&mut self, f: F)
     where
         F: Future<Output = ()> + Send + 'static;
@@ -36,11 +37,10 @@ impl Hook for UseFutureImpl {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> std::task::Poll<()> {
-        if let Some(future) = self.f.as_mut() {
-            if future.as_mut().poll(cx).is_ready() {
+        if let Some(future) = self.f.as_mut()
+            && future.as_mut().poll(cx).is_ready() {
                 self.f = None; // 清除已完成的 future
             }
-        }
         Poll::Pending
     }
 }

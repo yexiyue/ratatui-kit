@@ -1,7 +1,20 @@
+//! ScrollViewState：滚动视图的状态管理结构，记录偏移量、尺寸、页大小等。
+//!
+//! 常与 ScrollView 组件配合使用，支持键盘/鼠标事件驱动的滚动。
+//!
+//! ## 用法示例
+//! ```rust
+//! let scroll_state = hooks.use_state(ScrollViewState::default);
+//! element!(ScrollView(scroll_view_state: scroll_state.get()) { ... })
+//! // 在事件处理器中调用 scroll_state.write().handle_event(&event)
+//! ```
+//! 支持上下左右/翻页/鼠标滚轮等多种滚动方式。
+
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::{Position, Size};
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
+/// 滚动视图状态。
 pub struct ScrollViewState {
     /// 偏移量是滚动视图需要移动的行数和列数。
     pub(crate) offset: Position,

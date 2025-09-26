@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-kit-macros"
-version = "0.3.2"
+version = "0.4.1"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/yexiyue/ratatui-kit"

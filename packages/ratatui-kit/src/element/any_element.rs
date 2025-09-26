@@ -60,7 +60,7 @@ impl<'a> ElementExt for AnyElement<'a> {
         self.helper.copy()
     }
 
-    fn props_mut(&mut self) -> AnyProps {
+    fn props_mut(&'_ mut self) -> AnyProps<'_> {
         self.props.borrow()
     }
 
@@ -86,7 +86,7 @@ impl<'a> ElementExt for &mut AnyElement<'a> {
         self.helper.copy()
     }
 
-    fn props_mut(&mut self) -> AnyProps {
+    fn props_mut(&'_ mut self) -> AnyProps<'_> {
         self.props.borrow()
     }
 

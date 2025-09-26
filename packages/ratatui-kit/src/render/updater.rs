@@ -48,11 +48,11 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
         &self.key
     }
 
-    pub fn get_context<T: Any>(&self) -> Option<Ref<T>> {
+    pub fn get_context<T: Any>(&'_ self) -> Option<Ref<'_, T>> {
         self.component_context_stack.get_context()
     }
 
-    pub fn get_context_mut<T: Any>(&self) -> Option<RefMut<T>> {
+    pub fn get_context_mut<T: Any>(&'_ self) -> Option<RefMut<'_, T>> {
         self.component_context_stack.get_context_mut()
     }
 

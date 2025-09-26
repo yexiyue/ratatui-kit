@@ -14,6 +14,50 @@ mod instantiated_component;
 pub use instantiated_component::{Components, InstantiatedComponent};
 use ratatui::layout::{Direction, Layout};
 
+/// 组件系统核心 trait，所有自定义 UI 组件都需实现。
+///
+/// - 通过关联类型 `Props` 定义属性类型，支持生命周期。
+/// - `new` 创建组件实例。
+/// - `update` 响应 props/hook 变化，适合副作用、事件注册等。
+/// - `draw` 渲染组件内容。
+/// - `calc_children_areas` 默认 flex 布局计算子组件区域，可重写自定义布局。
+/// - `poll_change` 支持异步/响应式副作用。
+/// - `render_ref` 低级渲染接口，通常无需重写。
+///
+/// # 手动实现 Component 示例
+///
+/// ```rust
+/// use ratatui_kit::prelude::*;
+/// use ratatui::{style::Style, text::Line};
+///
+/// pub struct MyCounter;
+///
+/// impl Component for MyCounter {
+///     type Props<'a> = NoProps;
+///     fn new(_props: &Self::Props<'_>) -> Self {
+///         Self
+///     }
+///     fn update(
+///         &mut self,
+///         _props: &mut Self::Props<'_>,
+///         mut hooks: Hooks,
+///         _updater: &mut ComponentUpdater,
+///     ) {
+///         let mut state = hooks.use_state(|| 0);
+///         hooks.use_events(move |event| {
+///             // 事件处理逻辑
+///         });
+///         // ...
+///     }
+///     fn draw(&mut self, drawer: &mut ComponentDrawer<'_, '_>) {
+///         let area = drawer.area;
+///         let buf = drawer.buffer_mut();
+///         Line::styled(format!("Counter: {}", 42), Style::default()).render(area, buf);
+///     }
+/// }
+/// ```
+///
+/// > 一般用户无需手动实现，推荐使用 `#[component]` 宏自动生成。
 pub trait Component: Any + Send + Sync + Unpin {
     type Props<'a>: Props
     where

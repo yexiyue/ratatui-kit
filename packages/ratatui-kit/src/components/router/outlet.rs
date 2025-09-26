@@ -1,11 +1,16 @@
+//! Outlet 组件：路由嵌套出口，根据当前路径动态渲染匹配的子路由组件。
+//!
+//! 通常与 RouterProvider、Routes 等配合使用，实现多级页面嵌套和动态参数解析。
+//!
+//! 类似于 React Router 的 <Outlet />，用于在父路由中渲染匹配的子路由内容，支持递归嵌套和参数传递。
+
 use crate::{
     AnyElement, Context, Hooks, UseContext,
     prelude::{ContextProvider, RouteContext, Routes},
 };
 use ratatui_kit_macros::{component, element};
 
-// 定义 `Outlet` 组件，用于实现路由嵌套和路径匹配逻辑。
-// 该组件会根据当前路径匹配一个子路由，并更新上下文中的路径为未匹配部分。
+/// Outlet 组件实现。
 #[component]
 pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
     // 获取全局路由表和当前路径上下文
