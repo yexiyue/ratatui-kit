@@ -49,6 +49,8 @@ mod use_effect;
 pub use use_effect::*;
 mod use_insert_before;
 pub use use_insert_before::*;
+mod use_size;
+pub use use_size::*;
 
 #[cfg(feature = "router")]
 mod use_router;

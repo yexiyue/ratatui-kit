@@ -49,7 +49,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn borrow(&mut self) -> Context {
+    pub fn borrow(&'_ mut self) -> Context<'_> {
         match self {
             Context::Ref(context) => Context::Ref(*context),
             Context::Mut(context) => Context::Mut(*context),
@@ -86,25 +86,23 @@ impl<'a> ContextStack<'a> {
         };
     }
 
-    pub fn get_context<T: Any>(&self) -> Option<Ref<T>> {
+    pub fn get_context<T: Any>(&'_ self) -> Option<Ref<'_, T>> {
         for context in self.stack.iter().rev() {
-            if let Ok(context) = context.try_borrow() {
-                if let Ok(res) = Ref::filter_map(context, |context| context.downcast_ref::<T>()) {
+            if let Ok(context) = context.try_borrow()
+                && let Ok(res) = Ref::filter_map(context, |context| context.downcast_ref::<T>()) {
                     return Some(res);
                 }
-            }
         }
         None
     }
 
-    pub fn get_context_mut<T: Any>(&self) -> Option<RefMut<T>> {
+    pub fn get_context_mut<T: Any>(&'_ self) -> Option<RefMut<'_, T>> {
         for context in self.stack.iter().rev() {
-            if let Ok(context) = context.try_borrow_mut() {
-                if let Ok(res) = RefMut::filter_map(context, |context| context.downcast_mut::<T>())
+            if let Ok(context) = context.try_borrow_mut()
+                && let Ok(res) = RefMut::filter_map(context, |context| context.downcast_mut::<T>())
                 {
                     return Some(res);
                 }
-            }
         }
         None
     }

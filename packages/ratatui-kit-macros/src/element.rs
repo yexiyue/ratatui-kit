@@ -77,14 +77,13 @@ impl Parse for ParsedElement {
             .iter()
             .position(|item| matches!(item, PropsItem::Rest(_)));
 
-        if let Some(pos) = rest_position {
-            if pos != props.len() - 1 {
+        if let Some(pos) = rest_position
+            && pos != props.len() - 1 {
                 return Err(syn::Error::new(
                     props[pos].span(),
                     "the rest property must be the last item",
                 ));
             }
-        }
 
         let mut children = Vec::new();
 

@@ -13,14 +13,13 @@ impl Parse for ParsedProps {
         let fields = get_fields(&input)?;
 
         for field in fields.iter() {
-            if let Some(ident) = &field.ident {
-                if ident == "key" {
+            if let Some(ident) = &field.ident
+                && ident == "key" {
                     return Err(syn::Error::new_spanned(
                         field,
                         "the `key` property name is reserved",
                     ));
                 }
-            }
         }
 
         Ok(Self { def: input })

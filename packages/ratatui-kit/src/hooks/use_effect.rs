@@ -33,11 +33,10 @@ impl Hook for UseAsyncEffectImpl {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context,
     ) -> std::task::Poll<()> {
-        if let Some(future) = self.f.as_mut() {
-            if future.as_mut().poll(cx).is_ready() {
+        if let Some(future) = self.f.as_mut()
+            && future.as_mut().poll(cx).is_ready() {
                 self.f = None;
             }
-        }
         Poll::Pending
     }
 }
