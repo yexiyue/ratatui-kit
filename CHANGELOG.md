@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-09-26
+
+### 🐛 Bug Fixes
+
+- 修复ScrollView无限滚动问题 close #2
+- Clippy
+
 ## [0.4.1] - 2025-09-26
 
 ### 🚀 Features
@@ -15,6 +22,10 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Add badges
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.4.0] - 2025-07-09
 
