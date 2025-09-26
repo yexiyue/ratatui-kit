@@ -14,11 +14,11 @@
 //! ### 手动管理滚动状态
 //! ```rust
 //! let scroll_state = hooks.use_state(ScrollViewState::default);
-//! 
+//!
 //! hooks.use_local_events(move |event| {
 //!     scroll_state.write().handle_event(&event);
 //! });
-//! 
+//!
 //! element!(ScrollView(
 //!     scroll_view_state: scroll_state,
 //!     scroll_bars: ScrollBars::default(),
@@ -26,11 +26,11 @@
 //!     // 子内容
 //! })
 //! ```
-//! 
+//!
 //! ScrollView 支持两种使用方式：
 //! 1. 不传递 `scroll_view_state` 参数，组件会自动管理滚动状态
 //! 2. 传递由 `use_state` 创建的 `scroll_view_state` 参数，手动管理滚动状态
-//! 
+//!
 //! 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
 
 use std::sync::{Arc, RwLock};
@@ -107,10 +107,10 @@ impl Component for ScrollView {
 
         hooks.use_local_events({
             let scroll_view_state = self.scroll_view_state.clone();
-            let props_scroll_view_state = props.scroll_view_state.clone();
+            let props_scroll_view_state = props.scroll_view_state;
             move |event| {
                 if let Some(mut state) = props_scroll_view_state {
-                    state.set(scroll_view_state.read().unwrap().clone());
+                    state.set(*scroll_view_state.read().unwrap());
                 } else {
                     scroll_view_state.write().unwrap().handle_event(&event);
                     update_flag.set(!update_flag.get());
@@ -278,7 +278,7 @@ impl Hook for UseScrollImpl {
     fn post_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
         let buffer = drawer.scroll_buffer.take().unwrap();
         let scrollbars = self.scrollbars.read();
-        let mut scroll_view_state = self.scroll_view_state.read().unwrap().clone();
+        let mut scroll_view_state = *self.scroll_view_state.read().unwrap();
         scrollbars.render_ref(
             self.area.unwrap_or_default(),
             drawer.buffer_mut(),

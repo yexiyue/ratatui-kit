@@ -89,9 +89,10 @@ impl<'a> ContextStack<'a> {
     pub fn get_context<T: Any>(&'_ self) -> Option<Ref<'_, T>> {
         for context in self.stack.iter().rev() {
             if let Ok(context) = context.try_borrow()
-                && let Ok(res) = Ref::filter_map(context, |context| context.downcast_ref::<T>()) {
-                    return Some(res);
-                }
+                && let Ok(res) = Ref::filter_map(context, |context| context.downcast_ref::<T>())
+            {
+                return Some(res);
+            }
         }
         None
     }
@@ -100,9 +101,9 @@ impl<'a> ContextStack<'a> {
         for context in self.stack.iter().rev() {
             if let Ok(context) = context.try_borrow_mut()
                 && let Ok(res) = RefMut::filter_map(context, |context| context.downcast_mut::<T>())
-                {
-                    return Some(res);
-                }
+            {
+                return Some(res);
+            }
         }
         None
     }
