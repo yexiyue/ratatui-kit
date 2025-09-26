@@ -70,7 +70,7 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             ){
                 ScrollView(
                     flex_direction:Direction::Vertical,
-                    scroll_view_state: scroll_view_state.get(),
+                    scroll_view_state: scroll_view_state,
                 ){
                     #(rendered_elements)
                 }

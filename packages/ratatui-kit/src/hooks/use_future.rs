@@ -38,9 +38,10 @@ impl Hook for UseFutureImpl {
         cx: &mut std::task::Context,
     ) -> std::task::Poll<()> {
         if let Some(future) = self.f.as_mut()
-            && future.as_mut().poll(cx).is_ready() {
-                self.f = None; // 清除已完成的 future
-            }
+            && future.as_mut().poll(cx).is_ready()
+        {
+            self.f = None; // 清除已完成的 future
+        }
         Poll::Pending
     }
 }

@@ -36,6 +36,12 @@ pub struct UsePreviousSizeImpl {
     size: Rect,
 }
 
+impl Default for UsePreviousSizeImpl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UsePreviousSizeImpl {
     pub fn new() -> Self {
         UsePreviousSizeImpl {
