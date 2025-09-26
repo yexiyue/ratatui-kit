@@ -17,7 +17,7 @@ use super::ScrollViewState;
 use ratatui::{
     buffer::Buffer,
     layout::{Rect, Size},
-    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, StatefulWidgetRef},
+    widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget},
 };
 use ratatui_kit_macros::Props;
 
@@ -200,22 +200,18 @@ impl ScrollBars<'_> {
 
         Rect::new(state.offset.x, state.offset.y, new_width, new_height)
     }
-}
 
-impl StatefulWidgetRef for ScrollBars<'_> {
-    type State = (ScrollViewState, Buffer);
-
-    fn render_ref(&self, area: Rect, buf: &mut Buffer, (state, scroll_buffer): &mut Self::State) {
+    pub fn render_ref(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        state: &mut ScrollViewState,
+        scroll_buffer: &Buffer,
+    ) {
         let (mut x, mut y) = state.offset.into();
         // 确保不会在任一方向上滚动超过缓冲区末尾
-        let max_x_offset = scroll_buffer
-            .area
-            .width
-            .saturating_sub(area.width.saturating_sub(1));
-        let max_y_offset = scroll_buffer
-            .area
-            .height
-            .saturating_sub(area.height.saturating_sub(1));
+        let max_x_offset = scroll_buffer.area.width.saturating_sub(area.width);
+        let max_y_offset = scroll_buffer.area.height.saturating_sub(area.height);
 
         x = x.min(max_x_offset);
         y = y.min(max_y_offset);
