@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2025-09-26
+
+### 🚀 Features
+
+- Add use terminal size
+
+### 🐛 Bug Fixes
+
+- Badges
+
+### 📚 Documentation
+
+- Add badges
+
 ## [0.4.0] - 2025-07-09
 
 ### 📚 Documentation
@@ -13,6 +27,10 @@ All notable changes to this project will be documented in this file.
 
 - Clippy
 - Fmt
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.3.5] - 2025-07-05
 

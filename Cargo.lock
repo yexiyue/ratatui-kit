@@ -1105,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "any_key",
  "crossterm",
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit-examples"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "console-subscriber",
  "ratatui-kit",
@@ -1130,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit-macros"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "proc-macro2",
  "quote",
