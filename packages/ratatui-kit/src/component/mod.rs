@@ -73,9 +73,7 @@ pub trait Component: Any + Send + Sync + Unpin {
     ) {
     }
 
-    fn draw(&mut self, drawer: &mut ComponentDrawer<'_, '_>) {
-        self.render_ref(drawer.area, drawer.buffer_mut());
-    }
+    fn draw(&mut self, _drawer: &mut ComponentDrawer<'_, '_>) {}
 
     // 默认使用flex布局计算子组件的area
     fn calc_children_areas(
@@ -107,8 +105,6 @@ pub trait Component: Any + Send + Sync + Unpin {
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> std::task::Poll<()> {
         std::task::Poll::Pending
     }
-
-    fn render_ref(&self, _area: ratatui::layout::Rect, _buf: &mut ratatui::buffer::Buffer) {}
 }
 
 pub trait AnyComponent: Any + Send + Sync + Unpin {
@@ -124,8 +120,6 @@ pub trait AnyComponent: Any + Send + Sync + Unpin {
     ) -> Vec<ratatui::prelude::Rect>;
 
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()>;
-
-    fn render_ref(&self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer);
 }
 
 impl<C> ElementType for C
@@ -163,9 +157,5 @@ where
 
     fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()> {
         Component::poll_change(self, cx)
-    }
-
-    fn render_ref(&self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
-        Component::render_ref(self, area, buf);
     }
 }

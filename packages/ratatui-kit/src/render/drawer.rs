@@ -1,7 +1,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    widgets::{StatefulWidget, StatefulWidgetRef, Widget, WidgetRef},
+    widgets::{StatefulWidget, Widget},
 };
 
 pub struct ComponentDrawer<'a, 'b: 'a> {
@@ -31,10 +31,6 @@ impl<'a, 'b> ComponentDrawer<'a, 'b> {
         widget.render(area, self.buffer_mut());
     }
 
-    pub fn render_widget_ref<W: WidgetRef>(&mut self, widget: W, area: Rect) {
-        widget.render_ref(area, self.buffer_mut());
-    }
-
     pub fn render_stateful_widget<W: StatefulWidget>(
         &mut self,
         widget: W,
@@ -42,14 +38,5 @@ impl<'a, 'b> ComponentDrawer<'a, 'b> {
         state: &mut W::State,
     ) {
         widget.render(area, self.buffer_mut(), state);
-    }
-
-    pub fn render_stateful_widget_ref<W: StatefulWidgetRef>(
-        &mut self,
-        widget: W,
-        area: Rect,
-        state: &mut W::State,
-    ) {
-        widget.render_ref(area, self.buffer_mut(), state);
     }
 }
