@@ -91,10 +91,7 @@ impl Component for ScrollView {
         );
 
         hooks.use_hook(|| UseScrollImpl {
-            scroll_view_state: props
-                .scroll_view_state
-                .clone()
-                .unwrap_or(this_scroll_view_state),
+            scroll_view_state: props.scroll_view_state.unwrap_or(this_scroll_view_state),
             scrollbars,
             area: None,
         });
