@@ -33,8 +33,8 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     }
 
     hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
+        if let Event::Key(key_event) = event
+            && key_event.kind == KeyEventKind::Press {
                 match key_event.code {
                     KeyCode::Esc => {
                         should_exit.set(true);
@@ -51,7 +51,6 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     _ => {}
                 }
             }
-        }
     });
 
     element!(Border(

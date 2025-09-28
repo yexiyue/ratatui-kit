@@ -42,11 +42,10 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     // 事件处理：Tab 弹出 Modal
     hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Tab {
+        if let Event::Key(key_event) = event
+            && key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Tab {
                 open.set(!open.get());
             }
-        }
     });
 
     let info_line = if error.read().is_empty() {

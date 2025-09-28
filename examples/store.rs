@@ -39,8 +39,8 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let (count, value) = use_stores!(store.count, store.value);
     let mut navigate = hooks.use_navigate();
     hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press {
+        if let Event::Key(key_event) = event
+            && key_event.kind == KeyEventKind::Press {
                 match key_event.code {
                     KeyCode::Char('1') => navigate.push("/counter"),
                     KeyCode::Char('2') => navigate.push("/input"),
@@ -48,7 +48,6 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     _ => {}
                 }
             }
-        }
     });
     element!(
         Border(
@@ -78,11 +77,10 @@ fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         }
     });
     hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
+        if let Event::Key(key_event) = event
+            && key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
                 navigate.back();
             }
-        }
     });
     element!(
         Border(
@@ -105,11 +103,10 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let (mut value, count) = use_stores!(store.value, store.count);
     let mut navigate = hooks.use_navigate();
     hooks.use_events(move |event| {
-        if let Event::Key(key_event) = event {
-            if key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
+        if let Event::Key(key_event) = event
+            && key_event.kind == KeyEventKind::Press && key_event.code == KeyCode::Esc {
                 navigate.back();
             }
-        }
     });
     element!(
         Border(

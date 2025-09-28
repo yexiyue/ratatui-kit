@@ -59,16 +59,13 @@ impl Parse for Store {
                 path: Path { segments, .. },
                 ..
             }) = &field.ty
-            {
-                if let Some(i) = segments.last() {
-                    if i.ident == "StoreState" {
+                && let Some(i) = segments.last()
+                    && i.ident == "StoreState" {
                         return Err(syn::Error::new(
                             field.ty.span(),
                             "Store cannot have StoreState type, it will be automatically added by the macro",
                         ));
                     }
-                }
-            }
         }
 
         Ok(Store { store })
