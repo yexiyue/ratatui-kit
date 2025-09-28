@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-kit"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/yexiyue/ratatui-kit"
@@ -11,7 +11,7 @@ authors = ["yexiyue <yexiyue666@qq.com>"]
 futures = "0.3.31"
 generational-box = "0.6.2"
 any_key = "0.1.1"
-ratatui-kit-macros = { version = "0.5.0", path = "../ratatui-kit-macros" }
+ratatui-kit-macros = { version = "0.5.1", path = "../ratatui-kit-macros" }
 tui-textarea = { version = "0.7.0", optional = true, features = ["crossterm"] }
 crossterm = { version = "0.28.0", features = ["event-stream"] }
 regex = { version = "1.11.1", optional = true }

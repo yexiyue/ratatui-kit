@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2025-09-28
+
+### 🚀 Features
+
+- 移除unstable-widget-ref
+
+### 🎨 Styling
+
+- Clippy
+- Fmt
+
 ## [0.5.0] - 2025-09-28
 
 ### 🚀 Features
@@ -11,6 +22,10 @@ All notable changes to this project will be documented in this file.
 ### 🎨 Styling
 
 - Clippy
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.4.2] - 2025-09-26
 
