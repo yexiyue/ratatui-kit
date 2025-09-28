@@ -2,12 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2025-09-28
+
+### 🚀 Features
+
+- 支持StatefulWidget
+
+### 🎨 Styling
+
+- Clippy
+
 ## [0.4.2] - 2025-09-26
 
 ### 🐛 Bug Fixes
 
 - 修复ScrollView无限滚动问题 close #2
 - Clippy
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.4.1] - 2025-09-26
 
