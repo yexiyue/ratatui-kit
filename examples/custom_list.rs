@@ -20,8 +20,10 @@ async fn main() {
 fn SelectText(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let state = hooks.use_state(ListState::default);
 
-    hooks.use_events(move |event| if let Event::Key(key) = event
-        && key.kind == KeyEventKind::Press {
+    hooks.use_events(move |event| {
+        if let Event::Key(key) = event
+            && key.kind == KeyEventKind::Press
+        {
             match key.code {
                 KeyCode::Up => {
                     state.write().select_previous();
@@ -31,7 +33,8 @@ fn SelectText(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 }
                 _ => {}
             }
-        });
+        }
+    });
 
     let list_props = MyListProps { state };
 

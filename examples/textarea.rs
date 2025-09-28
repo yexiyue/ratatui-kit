@@ -34,23 +34,24 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event
-            && key_event.kind == KeyEventKind::Press {
-                match key_event.code {
-                    KeyCode::Esc => {
-                        should_exit.set(true);
-                    }
-                    KeyCode::Enter => {
-                        if !value.read().is_empty() {
-                            insert_before
-                                .render_before(Line::from(format!("message: {value}")), 1)
-                                .finish();
-
-                            value.set(String::new());
-                        }
-                    }
-                    _ => {}
+            && key_event.kind == KeyEventKind::Press
+        {
+            match key_event.code {
+                KeyCode::Esc => {
+                    should_exit.set(true);
                 }
+                KeyCode::Enter => {
+                    if !value.read().is_empty() {
+                        insert_before
+                            .render_before(Line::from(format!("message: {value}")), 1)
+                            .finish();
+
+                        value.set(String::new());
+                    }
+                }
+                _ => {}
             }
+        }
     });
 
     element!(Border(
