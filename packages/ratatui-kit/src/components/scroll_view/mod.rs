@@ -33,8 +33,6 @@
 //!
 //! 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
 
-use std::sync::{Arc, RwLock};
-
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{Hook, State, UseEffect, UseEvents, UseState};
 use ratatui::{
@@ -62,7 +60,6 @@ pub struct ScrollViewProps<'a> {
 /// ScrollView 组件实现。
 pub struct ScrollView {
     scroll_bars: ScrollBars<'static>,
-    scroll_view_state: Arc<RwLock<ScrollViewState>>,
 }
 
 impl Component for ScrollView {
@@ -71,7 +68,6 @@ impl Component for ScrollView {
     fn new(props: &Self::Props<'_>) -> Self {
         Self {
             scroll_bars: props.scroll_bars.clone(),
-            scroll_view_state: Arc::new(RwLock::new(ScrollViewState::default())),
         }
     }
 
@@ -85,7 +81,7 @@ impl Component for ScrollView {
 
         let scrollbars = hooks.use_state(|| props.scroll_bars.clone());
 
-        let mut update_flag = hooks.use_state(|| false);
+        let this_scroll_view_state = hooks.use_state(ScrollViewState::default);
 
         hooks.use_effect(
             || {
@@ -94,26 +90,20 @@ impl Component for ScrollView {
             props.scroll_bars.clone(),
         );
 
-        if let Some(state) = &props.scroll_view_state {
-            let state = state.get();
-            *self.scroll_view_state.write().unwrap() = state;
-        }
-
         hooks.use_hook(|| UseScrollImpl {
-            scroll_view_state: self.scroll_view_state.clone(),
+            scroll_view_state: props
+                .scroll_view_state
+                .clone()
+                .unwrap_or(this_scroll_view_state),
             scrollbars,
             area: None,
         });
 
         hooks.use_local_events({
-            let scroll_view_state = self.scroll_view_state.clone();
             let props_scroll_view_state = props.scroll_view_state;
             move |event| {
-                if let Some(mut state) = props_scroll_view_state {
-                    state.set(*scroll_view_state.read().unwrap());
-                } else {
-                    scroll_view_state.write().unwrap().handle_event(&event);
-                    update_flag.set(!update_flag.get());
+                if props_scroll_view_state.is_none() {
+                    this_scroll_view_state.write().handle_event(&event);
                 }
             }
         });
@@ -266,7 +256,7 @@ impl Component for ScrollView {
 }
 
 pub struct UseScrollImpl {
-    scroll_view_state: Arc<RwLock<ScrollViewState>>,
+    scroll_view_state: State<ScrollViewState>,
     scrollbars: State<ScrollBars<'static>>,
     area: Option<ratatui::layout::Rect>,
 }
@@ -278,13 +268,12 @@ impl Hook for UseScrollImpl {
     fn post_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
         let buffer = drawer.scroll_buffer.take().unwrap();
         let scrollbars = self.scrollbars.read();
-        let mut scroll_view_state = *self.scroll_view_state.read().unwrap();
+
         scrollbars.render_ref(
             self.area.unwrap_or_default(),
             drawer.buffer_mut(),
-            &mut scroll_view_state,
+            &mut self.scroll_view_state.write_no_update(),
             &buffer,
         );
-        *self.scroll_view_state.write().unwrap() = scroll_view_state;
     }
 }

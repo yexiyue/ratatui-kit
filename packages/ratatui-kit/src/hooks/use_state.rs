@@ -1,3 +1,25 @@
+//! 响应式状态管理 Hook 实现。
+//!
+//! 本模块为 ratatui-kit 提供了类似 React useState 的响应式状态管理能力，适用于计数器、输入框等本地状态。
+//!
+//! ## 主要类型
+//! - [`State<T>`]：响应式状态持有者，支持原子读写、变更通知、算术运算等。
+//! - [`StateRef<'a, T>`]：状态的只读引用。
+//! - [`StateMutRef<'a, T>`]：状态的可变引用，支持变更通知。
+//! - [`StateMutNoUpdate<'a, T>`]：状态的可变引用，不触发变更通知。
+//! - [`UseState`] trait：为 [`Hooks`] 提供 use_state 方法。
+//!
+//! ## 用法示例
+//! ```rust
+//! let mut hooks = ...;
+//! let counter = hooks.use_state(|| 0);
+//! counter.set(1);
+//! let value = counter.read();
+//! ```
+//!
+//! ## 线程安全
+//! 本模块所有状态类型均为 Send + Sync，可安全用于多线程场景。
+
 use super::{Hook, Hooks};
 use generational_box::{
     AnyStorage, BorrowError, BorrowMutError, GenerationalBox, Owner, SyncStorage,
@@ -16,7 +38,10 @@ mod private {
 }
 
 pub trait UseState: private::Sealed {
-    /// 创建响应式状态，适合计数器、输入框等本地状态。
+    /// 为 [`Hooks`] 提供 use_state 方法，创建响应式状态。
+    ///
+    /// - `init`：状态初始化闭包。
+    /// - 返回 [`State<T>`]。
     fn use_state<T, F>(&mut self, init: F) -> State<T>
     where
         F: FnOnce() -> T,
@@ -35,6 +60,7 @@ impl<T> UseStateImpl<T>
 where
     T: Unpin + Send + Sync + 'static,
 {
+    /// use_state 的内部实现，持有状态和存储。
     pub fn new(initial_value: T) -> Self {
         let storage = Owner::default();
         UseStateImpl {
@@ -88,6 +114,8 @@ struct StateValue<T> {
     is_changed: bool,
 }
 
+/// 状态的只读引用。
+/// 通过 [`State::read`] 或 [`State::try_read`] 获取。
 pub struct StateRef<'a, T: 'static> {
     inner: <SyncStorage as AnyStorage>::Ref<'a, StateValue<T>>,
 }
@@ -100,6 +128,8 @@ impl<T: 'static> Deref for StateRef<'_, T> {
     }
 }
 
+/// 状态的可变引用，支持变更通知。
+/// 通过 [`State::write`] 或 [`State::try_write`] 获取。
 pub struct StateMutRef<'a, T: 'static> {
     inner: <SyncStorage as AnyStorage>::Mut<'a, StateValue<T>>,
     is_deref_mut: bool,
@@ -131,6 +161,28 @@ impl<T: 'static> Drop for StateMutRef<'_, T> {
     }
 }
 
+/// 状态的可变引用，不触发变更通知。
+/// 通过 [`State::write_no_update`] 或 [`State::try_write_no_update`] 获取。
+pub struct StateMutNoUpdate<'a, T: 'static> {
+    inner: <SyncStorage as AnyStorage>::Mut<'a, StateValue<T>>,
+}
+
+impl<T: 'static> Deref for StateMutNoUpdate<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner.value
+    }
+}
+
+impl<T: 'static> DerefMut for StateMutNoUpdate<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner.value
+    }
+}
+
+/// 响应式状态持有者。
+/// 支持原子读写、变更通知、算术运算等。
 pub struct State<T: Send + Sync + 'static> {
     inner: GenerationalBox<StateValue<T>, SyncStorage>,
 }
@@ -150,6 +202,7 @@ impl<T: Send + Sync + Copy + 'static> State<T> {
 }
 
 impl<T: Send + Sync + 'static> State<T> {
+    /// 尝试获取只读引用，失败时返回 None。
     pub fn try_read(&'_ self) -> Option<StateRef<'_, T>> {
         loop {
             match self.inner.try_read() {
@@ -167,11 +220,13 @@ impl<T: Send + Sync + 'static> State<T> {
         }
     }
 
+    /// 获取只读引用，失败时 panic。
     pub fn read(&'_ self) -> StateRef<'_, T> {
         self.try_read()
             .expect("attempt to read state after owner was dropped")
     }
 
+    /// 尝试获取可变引用，支持变更通知，失败时返回 None。
     pub fn try_write(&'_ self) -> Option<StateMutRef<'_, T>> {
         self.inner
             .try_write()
@@ -182,13 +237,36 @@ impl<T: Send + Sync + 'static> State<T> {
             .ok()
     }
 
+    /// 获取可变引用，支持变更通知，失败时 panic。
     pub fn write(&'_ self) -> StateMutRef<'_, T> {
         self.try_write()
             .expect("attempt to write state after owner was dropped")
     }
 
+    /// 尝试获取可变引用，不触发变更通知，失败时返回 None。
+    pub fn try_write_no_update(&'_ self) -> Option<StateMutNoUpdate<'_, T>> {
+        self.inner
+            .try_write()
+            .map(|inner| StateMutNoUpdate { inner })
+            .ok()
+    }
+
+    /// 获取可变引用，不触发变更通知，失败时 panic。
+    pub fn write_no_update(&'_ self) -> StateMutNoUpdate<'_, T> {
+        self.try_write_no_update()
+            .expect("attempt to write state after owner was dropped")
+    }
+
+    /// 设置状态值，触发变更通知。
     pub fn set(&mut self, value: T) {
         if let Some(mut v) = self.try_write() {
+            *v = value;
+        }
+    }
+
+    /// 设置状态值，不触发变更通知。
+    pub fn set_no_update(&mut self, value: T) {
+        if let Some(mut v) = self.try_write_no_update() {
             *v = value;
         }
     }
