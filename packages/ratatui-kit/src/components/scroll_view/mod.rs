@@ -175,10 +175,10 @@ impl Component for ScrollView {
         let (width, height, justify_constraints, align_constraints) = {
             let mut area = drawer.area;
             if show_horizontal {
-                area.height -= 1;
+                area.height = area.height.saturating_sub(1);
             }
             if show_vertical {
-                area.width -= 1;
+                area.width = area.width.saturating_sub(1);
             }
             match layout_style.flex_direction {
                 Direction::Horizontal => {
