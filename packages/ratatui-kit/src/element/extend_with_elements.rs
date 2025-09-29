@@ -20,6 +20,12 @@ impl<'a> ExtendWithElements<AnyElement<'a>> for AnyElement<'a> {
     }
 }
 
+impl<'a> ExtendWithElements<AnyElement<'a>> for &mut AnyElement<'a> {
+    fn extend_with_elements<E: Extend<AnyElement<'a>>>(self, dest: &mut E) {
+        dest.extend([self.into()]);
+    }
+}
+
 impl<T, U, I> ExtendWithElements<T> for I
 where
     T: From<U>,
