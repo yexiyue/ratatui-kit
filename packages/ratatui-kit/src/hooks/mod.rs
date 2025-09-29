@@ -51,6 +51,8 @@ mod use_insert_before;
 pub use use_insert_before::*;
 mod use_size;
 pub use use_size::*;
+mod use_exit;
+pub use use_exit::*;
 
 #[cfg(feature = "router")]
 mod use_router;
