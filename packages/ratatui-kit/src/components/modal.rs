@@ -113,8 +113,8 @@ impl Component for Modal {
         }
 
         updater.set_layout_style(LayoutStyle {
-            width: Constraint::Percentage(0),
-            height: Constraint::Percentage(0),
+            width: Constraint::Length(0),
+            height: Constraint::Length(0),
             ..Default::default()
         });
     }

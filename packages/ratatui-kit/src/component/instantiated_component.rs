@@ -115,6 +115,13 @@ impl InstantiatedComponent {
         self.hooks.post_component_update(&mut updater);
         self.first_update = false;
         self.has_transparent_layout = updater.has_transparent_layout();
+
+        // 如果是透明布局，则继承第一个子组件的布局属性
+        if let Some(child) = self.children.iter().next()
+            && self.has_transparent_layout
+        {
+            self.layout_style = child.layout_style.clone();
+        }
     }
 
     pub fn draw(&mut self, drawer: &mut ComponentDrawer) {
@@ -133,6 +140,7 @@ impl InstantiatedComponent {
 
         // drawer.ares可能在组件绘制时改变
         self.component.draw(drawer);
+
         // 计算子组件的区域
         let children_areas =
             self.component
