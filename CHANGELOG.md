@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2] - 2025-09-30
+
+### 🚀 Features
+
+- 添加居中布局组件
+
+### 🐛 Bug Fixes
+
+- 修复panic信息被覆盖问题
+- 修复transparent 布局不生效bug
+
 ## [0.5.1] - 2025-09-28
 
 ### 🚀 Features
@@ -12,6 +23,10 @@ All notable changes to this project will be documented in this file.
 
 - Clippy
 - Fmt
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.5.0] - 2025-09-28
 
