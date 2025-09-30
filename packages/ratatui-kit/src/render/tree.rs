@@ -72,5 +72,7 @@ pub(crate) async fn render_loop<E: ElementExt>(
     terminal.events()?;
 
     tree.render_loop(&mut terminal).await?;
+
+    ratatui::restore();
     Ok(())
 }

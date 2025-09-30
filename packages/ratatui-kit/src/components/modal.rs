@@ -113,16 +113,18 @@ impl Component for Modal {
         }
 
         updater.set_layout_style(LayoutStyle {
-            width: Constraint::Percentage(0),
-            height: Constraint::Percentage(0),
+            width: Constraint::Length(0),
+            height: Constraint::Length(0),
             ..Default::default()
         });
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
         if self.open {
+            // 根据终端尺寸计算弹窗尺寸和位置
             let area = drawer.buffer_mut().area();
             let area = area.inner(self.margin).offset(self.offset);
+
             let block = Block::default().style(self.style);
             block.render(area, drawer.buffer_mut());
 
@@ -131,6 +133,7 @@ impl Component for Modal {
             let vertical = Layout::vertical([self.height]).flex(v).split(area)[0];
             let horizontal = Layout::horizontal([self.width]).flex(h).split(vertical)[0];
 
+            // 清空弹窗区域
             Clear.render(horizontal, drawer.buffer_mut());
             drawer.area = horizontal;
         }

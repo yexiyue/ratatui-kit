@@ -34,13 +34,14 @@ impl CrossTerminal {
 }
 
 // ================== 生命周期管理 ==================
-
-impl Drop for CrossTerminal {
-    // 析构函数：自动恢复终端原始状态
-    fn drop(&mut self) {
-        ratatui::restore();
-    }
-}
+// 不能在这里调用restore，因为render_loop中途可能会panic，导致提前drop，所以报错信息会被覆盖
+// 需要在render_loop结束后手动调用restore
+// impl Drop for CrossTerminal {
+//     // 析构函数：自动恢复终端原始状态
+//     fn drop(&mut self) {
+//         ratatui::restore();
+//     }
+// }
 
 // ================== 终端接口实现 ==================
 

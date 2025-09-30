@@ -1,6 +1,6 @@
 use ratatui::layout::{Constraint, Direction, Flex, Layout, Margin, Offset};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LayoutStyle {
     pub flex_direction: Direction,
     pub justify_content: Flex,
