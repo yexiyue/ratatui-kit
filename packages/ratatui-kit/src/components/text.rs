@@ -1,9 +1,7 @@
-use std::ops::{Deref, DerefMut};
-
-use ratatui::{style::Style, widgets::Paragraph};
-use ratatui_kit_macros::{Props, component};
-
 use crate::{AnyElement, element, prelude::Fragment};
+use ratatui::{layout::Position, style::Style, widgets::Paragraph};
+use ratatui_kit_macros::{Props, component};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, Default)]
 pub struct TextParagraph<'a> {
@@ -43,7 +41,8 @@ pub struct TextProps {
     pub text: TextParagraph<'static>,
     pub style: Style,
     pub alignment: ratatui::layout::Alignment,
-    pub wrap: bool,
+    pub scroll: Position,
+    pub wrap: Option<bool>,
 }
 
 #[component]
@@ -53,12 +52,14 @@ pub fn Text(props: &TextProps) -> impl Into<AnyElement<'static>> {
         .inner
         .clone()
         .style(props.style)
-        .alignment(props.alignment)
-        .wrap(if props.wrap {
-            ratatui::widgets::Wrap { trim: true }
-        } else {
-            ratatui::widgets::Wrap { trim: false }
-        });
+        .scroll(props.scroll.into())
+        .alignment(props.alignment);
+
+    let paragraph = if let Some(wrap) = props.wrap {
+        paragraph.wrap(ratatui::widgets::Wrap { trim: wrap })
+    } else {
+        paragraph
+    };
 
     element! {
         Fragment{

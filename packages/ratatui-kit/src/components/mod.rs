@@ -23,8 +23,13 @@ pub use context_provider::*;
 mod center;
 pub use center::*;
 
+// 文本组件，用于显示文本内容，支持样式、超链接等。
 mod text;
 pub use text::*;
+
+// 定位组件，支持绝对定位，适合复杂布局需求。
+mod positioned;
+pub use positioned::*;
 
 #[cfg(feature = "textarea")]
 // 多行文本输入组件，支持光标、占位符、行号等，适合编辑器、表单等场景。
