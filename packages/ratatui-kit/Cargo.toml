@@ -16,11 +16,13 @@ tui-textarea = { version = "0.7.0", optional = true, features = ["crossterm"] }
 crossterm = { version = "0.28.0", features = ["event-stream"] }
 regex = { version = "1.11.1", optional = true }
 ratatui = "0.29.0"
+tui-input = { version = "0.14.0", optional = true, features = ["ratatui"] }
 
 [features]
 default = []
 textarea = ["tui-textarea"]
 router = ["regex", "ratatui-kit-macros/router"]
 store = ["ratatui-kit-macros/store"]
+input = ["tui-input"]
 
-full = ["textarea", "router", "store", "ratatui-kit-macros/full"]
+full = ["textarea", "router", "store", "input", "ratatui-kit-macros/full"]
