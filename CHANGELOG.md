@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.3] - 2025-10-01
+
+### 🚀 Features
+
+- 添加固定位置组件，优化text组件参数
+- 添加input 组件
+
 ## [0.5.2] - 2025-09-30
 
 ### 🚀 Features
@@ -12,6 +19,10 @@ All notable changes to this project will be documented in this file.
 
 - 修复panic信息被覆盖问题
 - 修复transparent 布局不生效bug
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.5.1] - 2025-09-28
 
