@@ -14,6 +14,7 @@
 //! ```
 //! 适合编辑器、表单、聊天输入等场景。
 
+// todo 重构文本输入组件，支持自动换行
 use crate::{Component, Handler, Hooks, UseEvents};
 use ratatui::{style::Style, widgets::Widget};
 use ratatui_kit_macros::Props;

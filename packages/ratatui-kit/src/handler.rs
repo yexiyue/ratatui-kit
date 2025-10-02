@@ -13,11 +13,14 @@
 /// ```
 use core::ops::{Deref, DerefMut};
 
-pub struct Handler<'a, T>(bool, Box<dyn FnMut(T) + Send + Sync + 'a>);
+pub struct Handler<'a, T, V = ()>(bool, Box<dyn FnMut(T) -> V + Send + Sync + 'a>);
 
-impl<T> Handler<'_, T> {
+impl<T, V> Handler<'_, T, V>
+where
+    V: Default,
+{
     pub fn is_default(&self) -> bool {
-        !self.0
+        self.0
     }
 
     pub fn take(&mut self) -> Self {
@@ -25,30 +28,33 @@ impl<T> Handler<'_, T> {
     }
 }
 
-impl<'a, T> Default for Handler<'a, T> {
+impl<'a, T, V> Default for Handler<'a, T, V>
+where
+    V: Default,
+{
     fn default() -> Self {
-        Self(false, Box::new(|_| {}))
+        Self(true, Box::new(|_| V::default()))
     }
 }
 
-impl<'a, F, T> From<F> for Handler<'a, T>
+impl<'a, F, T, V> From<F> for Handler<'a, T, V>
 where
-    F: FnMut(T) + Send + Sync + 'a,
+    F: FnMut(T) -> V + Send + Sync + 'a,
 {
     fn from(f: F) -> Self {
         Self(false, Box::new(f))
     }
 }
 
-impl<'a, T> Deref for Handler<'a, T> {
-    type Target = Box<dyn FnMut(T) + Send + Sync + 'a>;
+impl<'a, T, V> Deref for Handler<'a, T, V> {
+    type Target = Box<dyn FnMut(T) -> V + Send + Sync + 'a>;
 
     fn deref(&self) -> &Self::Target {
         &self.1
     }
 }
 
-impl<'a, T> DerefMut for Handler<'a, T> {
+impl<'a, T, V> DerefMut for Handler<'a, T, V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.1
     }
