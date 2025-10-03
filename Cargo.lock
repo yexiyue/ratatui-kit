@@ -1105,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "any_key",
  "crossterm",
@@ -1120,7 +1120,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit-examples"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "console-subscriber",
  "ratatui-kit",

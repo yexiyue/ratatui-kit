@@ -2,12 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.4] - 2025-10-03
+
+### 🚀 Features
+
+- Handle支持返回参数
+
 ## [0.5.3] - 2025-10-01
 
 ### 🚀 Features
 
 - 添加固定位置组件，优化text组件参数
 - 添加input 组件
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.5.2] - 2025-09-30
 
