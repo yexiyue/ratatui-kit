@@ -38,6 +38,13 @@ pub use input::*;
 #[cfg(feature = "input")]
 pub use tui_input;
 
+#[cfg(feature = "tree")]
+pub mod tree_select;
+#[cfg(feature = "tree")]
+pub use tree_select::*;
+#[cfg(feature = "tree")]
+pub use tui_tree_widget;
+
 #[cfg(feature = "textarea")]
 // 多行文本输入组件，支持光标、占位符、行号等，适合编辑器、表单等场景。
 pub mod textarea;
