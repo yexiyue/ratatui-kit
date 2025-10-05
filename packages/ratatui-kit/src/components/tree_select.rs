@@ -1,4 +1,7 @@
-use ratatui::{style::Style, widgets::Scrollbar};
+use ratatui::{
+    style::Style,
+    widgets::{Block, Scrollbar},
+};
 use ratatui_kit::{Component, Props, State};
 use std::hash::Hash;
 use tui_tree_widget::{TreeItem, TreeState};
@@ -31,6 +34,8 @@ where
     pub node_open_symbol: &'static str,
     /// 显示在没有子节点的节点前面的符号
     pub node_no_children_symbol: &'static str,
+    /// 可选的边框块
+    pub block: Option<Block<'static>>,
 }
 
 impl<T> Default for TreeSelect<T>
@@ -48,6 +53,7 @@ where
             node_closed_symbol: "\u{25b6} ", // 向右箭头
             node_open_symbol: "\u{25bc} ",   // 向下箭头
             node_no_children_symbol: "  ",
+            block: None,
         }
     }
 }
@@ -68,7 +74,7 @@ where
 
     /// 绘制树形组件
     fn draw(&mut self, drawer: &mut ratatui_kit::ComponentDrawer<'_, '_>) {
-        let tree = tui_tree_widget::Tree::new(&self.items)
+        let mut tree = tui_tree_widget::Tree::new(&self.items)
             .unwrap()
             .style(self.style)
             .highlight_style(self.highlight_style)
@@ -77,6 +83,11 @@ where
             .node_open_symbol(self.node_open_symbol)
             .node_no_children_symbol(self.node_no_children_symbol)
             .experimental_scrollbar(self.scrollbar.clone());
+
+        if let Some(block) = &self.block {
+            tree = tree.block(block.clone());
+        }
+
         if let Some(state) = &mut self.state {
             // 渲染有状态的树形组件
             drawer.render_stateful_widget(tree, drawer.area, &mut state.write_no_update());
