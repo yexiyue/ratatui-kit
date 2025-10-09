@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     Handler, State, UseContext,
-    prelude::{Route, RouteContext, history::RouterHistory},
+    prelude::{Route, RouteContext, RouteState, history::RouterHistory},
 };
 
 mod private {
@@ -18,7 +18,9 @@ pub trait UseRouter<'a>: private::Sealed {
     /// 获取路由跳转器，可用于页面跳转、返回等。
     fn use_navigate(&mut self) -> Navigate;
     /// 获取当前路由状态，适合页面间状态传递。
-    fn use_route_state<T: Send + Sync + 'static>(&self) -> Option<Arc<T>>;
+    fn try_use_route_state<T: Send + Sync + 'static>(&self) -> Option<Arc<T>>;
+
+    fn use_route_state<T: Send + Sync + 'static>(&self) -> Arc<T>;
     /// 获取当前路由信息。
     fn use_route(&self) -> Ref<'a, Route>;
     /// 获取当前路由的可变引用。
@@ -33,14 +35,19 @@ impl<'a> UseRouter<'a> for crate::Hooks<'a, '_> {
         Navigate::new(*history)
     }
 
-    fn use_route_state<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+    fn try_use_route_state<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
         let route_context = self.use_context::<RouteContext>();
 
         route_context
             .state
             .as_ref()
             .cloned()
-            .and_then(|p| p.downcast::<T>().ok())
+            .and_then(|p| p.downcast::<T>())
+    }
+
+    fn use_route_state<T: Send + Sync + 'static>(&self) -> Arc<T> {
+        self.try_use_route_state::<T>()
+            .expect("route state not found or type mismatch")
     }
 
     fn use_route(&self) -> Ref<'a, Route> {
@@ -89,7 +96,7 @@ impl Navigate {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
         ctx.path = path.to_string();
-        ctx.state = Some(Arc::new(state));
+        ctx.state = Some(RouteState::new(state));
         history.push(ctx);
     }
 
@@ -111,7 +118,7 @@ impl Navigate {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
         ctx.path = path.to_string();
-        ctx.state = Some(Arc::new(state));
+        ctx.state = Some(RouteState::new(state));
         history.replace(ctx);
     }
 

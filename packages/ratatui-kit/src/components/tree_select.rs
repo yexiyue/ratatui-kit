@@ -72,6 +72,15 @@ where
         props.clone()
     }
 
+    fn update(
+        &mut self,
+        props: &mut Self::Props<'_>,
+        _hooks: crate::Hooks,
+        _updater: &mut crate::ComponentUpdater,
+    ) {
+        *self = props.clone();
+    }
+
     /// 绘制树形组件
     fn draw(&mut self, drawer: &mut ratatui_kit::ComponentDrawer<'_, '_>) {
         let mut tree = tui_tree_widget::Tree::new(&self.items)

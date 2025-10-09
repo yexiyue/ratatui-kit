@@ -72,5 +72,24 @@ unsafe impl Sync for Routes {}
 pub(crate) struct RouteContext {
     pub path: String,
     pub params: HashMap<String, String>,
-    pub state: Option<Arc<dyn Any + Send + Sync>>,
+    pub state: Option<RouteState>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RouteState(pub Arc<dyn Any + Send + Sync>);
+
+impl RouteState {
+    pub fn new<T>(state: T) -> Self
+    where
+        T: Any + Send + Sync + 'static,
+    {
+        RouteState(Arc::new(state))
+    }
+
+    pub fn downcast<T>(&self) -> Option<Arc<T>>
+    where
+        T: Any + Send + Sync + 'static,
+    {
+        self.0.clone().downcast().ok()
+    }
 }

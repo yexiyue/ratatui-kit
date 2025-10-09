@@ -52,7 +52,7 @@ pub fn Text(props: &TextProps) -> impl Into<AnyElement<'static>> {
         .inner
         .clone()
         .style(props.style)
-        .scroll(props.scroll.into())
+        .scroll((props.scroll.x, props.scroll.y))
         .alignment(props.alignment);
 
     let paragraph = if let Some(wrap) = props.wrap {

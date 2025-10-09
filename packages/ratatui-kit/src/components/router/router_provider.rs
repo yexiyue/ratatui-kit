@@ -14,7 +14,7 @@
 use crate::{
     AnyElement, Context, Hooks, UseState,
     components::router::history::RouterHistory,
-    prelude::{ContextProvider, Outlet, RouteContext, Routes},
+    prelude::{ContextProvider, Outlet, RouteContext, RouteState, Routes},
 };
 use ratatui_kit_macros::{Props, component, element};
 use std::collections::{HashMap, VecDeque};
@@ -28,6 +28,8 @@ pub struct RouterProviderProps {
     pub index_path: String,
     /// 路由历史最大长度。
     pub history_length: Option<usize>,
+    /// 可选的路由状态。
+    pub state: Option<RouteState>,
 }
 
 #[component]
@@ -41,7 +43,7 @@ pub fn RouterProvider<'a>(
         history: VecDeque::from(vec![RouteContext {
             params: HashMap::new(),
             path: props.index_path.clone(),
-            state: None,
+            state: props.state.clone(),
         }]),
     });
 
