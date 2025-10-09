@@ -21,3 +21,9 @@
 
 - [ ] hooks扩展(参考ahooks,考虑新加一个库或者是用futures)
 - [ ] themeStyle(主题样式)
+
+## 0.6.0
+
+- [ ] 重构全局store，现在全局store感觉用处不大
+- [ ] 重构textarea组件，考虑使用tui-input实现，并实现自动换行功能
+- [ ] 重构scrollview组件，现在逻辑有点混乱，缺少边框功能
