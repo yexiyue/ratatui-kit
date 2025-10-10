@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.6] - 2025-10-10
+
+### 🚀 Features
+
+- 添加use_on_drop hook
+
 ## [0.5.5] - 2025-10-09
 
 ### 🚀 Features
@@ -16,6 +22,10 @@ All notable changes to this project will be documented in this file.
 ### 💼 Other
 
 - Todo
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.5.4] - 2025-10-03
 
