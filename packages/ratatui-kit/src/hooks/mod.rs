@@ -53,6 +53,8 @@ mod use_size;
 pub use use_size::*;
 mod use_exit;
 pub use use_exit::*;
+mod use_on_drop;
+pub use use_on_drop::*;
 
 #[cfg(feature = "router")]
 mod use_router;
@@ -76,6 +78,8 @@ pub trait Hook: Unpin + Send {
 
     fn pre_component_draw(&mut self, _drawer: &mut ComponentDrawer) {}
     fn post_component_draw(&mut self, _drawer: &mut ComponentDrawer) {}
+
+    fn on_drop(&mut self) {}
 }
 
 pub(crate) trait AnyHook: Hook {
@@ -125,6 +129,12 @@ impl Hook for Vec<Box<dyn AnyHook>> {
     fn post_component_draw(&mut self, _updater: &mut ComponentDrawer) {
         for hook in self.iter_mut() {
             hook.post_component_draw(_updater);
+        }
+    }
+
+    fn on_drop(&mut self) {
+        for hook in self.iter_mut() {
+            hook.on_drop();
         }
     }
 }

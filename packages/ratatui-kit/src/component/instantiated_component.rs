@@ -174,3 +174,9 @@ impl InstantiatedComponent {
         poll_fn(|cx| self_mut.as_mut().poll_change(cx)).await;
     }
 }
+
+impl Drop for InstantiatedComponent {
+    fn drop(&mut self) {
+        self.hooks.on_drop();
+    }
+}

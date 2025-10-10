@@ -27,3 +27,4 @@
 - [ ] 重构全局store，现在全局store感觉用处不大
 - [ ] 重构textarea组件，考虑使用tui-input实现，并实现自动换行功能
 - [ ] 重构scrollview组件，现在逻辑有点混乱，缺少边框功能
+- [ ] 添加ErrorBoundary组件
