@@ -35,6 +35,7 @@
 
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{Hook, State, UseEffect, UseEvents, UseState};
+use ratatui::widgets::Block;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
@@ -55,11 +56,16 @@ pub struct ScrollViewProps<'a> {
     pub scroll_bars: ScrollBars<'static>,
     /// 滚动状态。
     pub scroll_view_state: Option<State<ScrollViewState>>,
+
+    pub block: Option<Block<'static>>,
+
+    pub disabled: bool,
 }
 
 /// ScrollView 组件实现。
 pub struct ScrollView {
     scroll_bars: ScrollBars<'static>,
+    block: Option<Block<'static>>,
 }
 
 impl Component for ScrollView {
@@ -68,6 +74,7 @@ impl Component for ScrollView {
     fn new(props: &Self::Props<'_>) -> Self {
         Self {
             scroll_bars: props.scroll_bars.clone(),
+            block: props.block.clone(),
         }
     }
 
@@ -83,6 +90,9 @@ impl Component for ScrollView {
 
         let this_scroll_view_state = hooks.use_state(ScrollViewState::default);
 
+        let disabled = props.disabled;
+        self.block = props.block.clone();
+
         hooks.use_effect(
             || {
                 *scrollbars.write() = props.scroll_bars.clone();
@@ -94,12 +104,13 @@ impl Component for ScrollView {
             scroll_view_state: props.scroll_view_state.unwrap_or(this_scroll_view_state),
             scrollbars,
             area: None,
+            has_block: props.block.is_some(),
         });
 
         hooks.use_local_events({
             let props_scroll_view_state = props.scroll_view_state;
             move |event| {
-                if props_scroll_view_state.is_none() {
+                if props_scroll_view_state.is_none() && !disabled {
                     this_scroll_view_state.write().handle_event(&event);
                 }
             }
@@ -250,17 +261,33 @@ impl Component for ScrollView {
 
         new_areas
     }
+
+    fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
+        if let Some(block) = &self.block {
+            drawer.render_widget(block, drawer.area);
+        }
+    }
 }
 
 pub struct UseScrollImpl {
     scroll_view_state: State<ScrollViewState>,
     scrollbars: State<ScrollBars<'static>>,
     area: Option<ratatui::layout::Rect>,
+    has_block: bool,
 }
 
 impl Hook for UseScrollImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.area = Some(drawer.area);
+        self.area = Some(if self.has_block {
+            Rect {
+                x: drawer.area.x + 1,
+                y: drawer.area.y + 1,
+                width: drawer.area.width.saturating_sub(1),
+                height: drawer.area.height.saturating_sub(1),
+            }
+        } else {
+            drawer.area
+        });
     }
     fn post_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
         let buffer = drawer.scroll_buffer.take().unwrap();

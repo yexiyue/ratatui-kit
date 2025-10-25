@@ -26,6 +26,7 @@ impl Hook for UseOnDropImpl {
 }
 
 impl UseOnDrop for crate::Hooks<'_, '_> {
+    /// 在组件销毁时执行回调。注意不要在回调中使用State。
     fn use_on_drop<F>(&mut self, f: F)
     where
         F: FnMut() + Send + 'static,

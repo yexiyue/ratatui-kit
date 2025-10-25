@@ -2,7 +2,7 @@ use ratatui::{
     style::{Style, Stylize},
     text::Line,
 };
-use ratatui_kit::ratatui::{self, layout::Constraint};
+use ratatui_kit::ratatui::{self, layout::Constraint, widgets::Block};
 use ratatui_kit::{prelude::*, ratatui::layout::Direction};
 use std::fs;
 
@@ -63,17 +63,14 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             flex_direction:ratatui::layout::Direction::Vertical,
             gap:1,
         ){
-            Border(
-                border_style:Style::default().blue(),
-                top_title:Some(Line::from("Markdown 文件阅读器 (ScrollView 示例)").centered()),
-                bottom_title:Some(Line::from("上下/翻页滚动，Ctrl+C 退出").centered()),
+           ScrollView(
+                flex_direction: Direction::Vertical,
+                scroll_view_state: scroll_view_state,
+                block: Block::bordered()
+                    .title(Line::from("Markdown 文件阅读器 (ScrollView 示例) 上下/翻页滚动，Ctrl+C 退出").centered())
+                    .border_style(Style::default().blue()),
             ){
-                ScrollView(
-                    flex_direction:Direction::Vertical,
-                    scroll_view_state: scroll_view_state,
-                ){
-                    #(rendered_elements)
-                }
+                #(rendered_elements)
             }
         }
     )
