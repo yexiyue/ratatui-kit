@@ -2,11 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.7] - 2025-10-25
+
+### 🚀 Features
+
+- ScrollView支持边框
+
+### ⚙️ Miscellaneous Tasks
+
+- Update todo
+
 ## [0.5.6] - 2025-10-10
 
 ### 🚀 Features
 
 - 添加use_on_drop hook
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.5.5] - 2025-10-09
 
