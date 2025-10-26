@@ -264,7 +264,9 @@ impl Component for ScrollView {
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
         if let Some(block) = &self.block {
+            let inner_area = block.inner(drawer.area);
             drawer.render_widget(block, drawer.area);
+            drawer.area = inner_area;
         }
     }
 }
@@ -283,7 +285,7 @@ impl Hook for UseScrollImpl {
                 x: drawer.area.x + 1,
                 y: drawer.area.y + 1,
                 width: drawer.area.width.saturating_sub(1),
-                height: drawer.area.height.saturating_sub(1),
+                height: drawer.area.height.saturating_sub(2),
             }
         } else {
             drawer.area
