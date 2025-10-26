@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.8] - 2025-10-26
+
+### 🐛 Bug Fixes
+
+- 修复ScrollView绘制时区域计算，确保内部内容正确显示
+
 ## [0.5.7] - 2025-10-25
 
 ### 🚀 Features
@@ -11,6 +17,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Update todo
+- Release
 
 ## [0.5.6] - 2025-10-10
 
