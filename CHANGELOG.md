@@ -2,11 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.9] - 2025-10-30
+
+### 🐛 Bug Fixes
+
+- 修复输入组件光标位置计算问题
+
 ## [0.5.8] - 2025-10-26
 
 ### 🐛 Bug Fixes
 
 - 修复ScrollView绘制时区域计算，确保内部内容正确显示
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 
 ## [0.5.7] - 2025-10-25
 
