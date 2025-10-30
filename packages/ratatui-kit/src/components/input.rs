@@ -19,7 +19,7 @@ pub struct InputProps {
 pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let size = hooks.use_previous_size();
     let input = &props.input;
-    let scroll = input.visual_scroll(size.width as usize);
+    let scroll = input.visual_scroll(size.width.saturating_sub(1) as usize);
     let text = if input.value().is_empty() {
         props.placeholder.clone()
     } else {
@@ -34,8 +34,8 @@ pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'stat
         Fragment{
             #(if !props.hide_cursor{
                 element!(Positioned(
-                    x: position.0.min(size.width),
-                    y: position.1.min(size.height),
+                    x: position.0.min(size.x + size.width.saturating_sub(1)),
+                    y: position.1.min(size.y + size.height),
                     width: 1u16,
                     height: 1u16,
                 ){
@@ -54,6 +54,5 @@ pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'stat
             },
             scroll:(0, scroll as u16),
         )
-
     })
 }
