@@ -1,0 +1,44 @@
+---
+title: Ratatui Kit
+description: 更高效、更清洁、更简单的 Ratatui 终端开发框架
+template: splash # Remove or comment out this line to display the site sidebar on this page.
+hero:
+  tagline: 融合 React 组件化理念与 Hooks 系统，为 Ratatui 提供现代化的终端 UI 开发体验
+  image:
+    file: ../../assets/ratatui-kit.png
+  actions:
+    - text: 快速开始
+      link: /ratatui-kit-website/guides/quick-start/
+      icon: right-arrow
+    - text: 点个 Star 支持我们
+      link: https://github.com/yexiyue/ratatui-kit
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## 核心特性
+
+<CardGrid stagger>
+	<Card title="组件化" icon="puzzle">
+		采用组件化设计，让你像使用 React 一样构建终端应用
+    </Card>
+	<Card title="Hooks 系统" icon="setting">
+		提供丰富的 Hooks，轻松处理终端应用中的常见场景
+	</Card>
+	<Card title="路由系统" icon="random">
+		内置路由系统，便捷管理终端应用的各个页面
+	</Card>
+	<Card title="状态管理" icon="star">
+		提供全局状态管理，有效组织和共享应用数据
+	</Card>
+	<Card title="异步支持" icon="rocket">
+		原生支持 tokio 异步生态，轻松构建高性能终端应用
+	</Card>
+	<Card title="生态兼容" icon="slack">
+		与 Ratatui 生态无缝集成，充分复用现有组件资源
+	</Card>
+</CardGrid>
+
+
