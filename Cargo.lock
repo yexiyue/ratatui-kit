@@ -1522,7 +1522,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-kit"
-version = "0.5.9"
+version = "0.6.0"
 dependencies = [
  "any_key",
  "crossterm",
