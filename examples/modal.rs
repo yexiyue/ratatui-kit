@@ -2,6 +2,7 @@ use ratatui::{
     style::{Style, Stylize},
     text::Line,
 };
+use ratatui_kit::prelude::tui_input::backend::crossterm::EventHandler;
 use ratatui_kit::prelude::*;
 use ratatui_kit::ratatui;
 use ratatui_kit::{
@@ -19,14 +20,16 @@ async fn main() {
 
 #[component]
 fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut json_text = hooks.use_state(|| String::from("{\n  \"key\": \"value\"\n}"));
+    // 注:TextArea 组件随 ratatui 0.30 迁移暂时下线(tui-textarea 尚无 0.30 兼容版),
+    // 这里改用单行 Input 演示;Modal + 实时 JSON 校验逻辑保持不变。
+    let json_text = hooks.use_state(|| tui_input::Input::new("{ \"key\": \"value\" }".to_string()));
     let mut open = hooks.use_state(|| false);
     let mut formatted = hooks.use_state(String::new);
     let mut error = hooks.use_state(String::new);
 
     // 实时解析 JSON
     hooks.use_effect(
-        move || match serde_json::from_str::<serde_json::Value>(&json_text.read()) {
+        move || match serde_json::from_str::<serde_json::Value>(json_text.read().value()) {
             Ok(val) => {
                 let pretty = serde_json::to_string_pretty(&val).unwrap_or_default();
                 formatted.set(pretty);
@@ -37,16 +40,19 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 error.set(e.to_string());
             }
         },
-        [json_text.read().clone()],
+        [json_text.read().value().to_string()],
     );
 
-    // 事件处理：Tab 弹出 Modal
+    // 事件处理：Tab 弹出 Modal,其余按键交给输入框
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
-            && key_event.code == KeyCode::Tab
         {
-            open.set(!open.get());
+            if key_event.code == KeyCode::Tab {
+                open.set(!open.get());
+            } else {
+                json_text.write().handle_event(&event);
+            }
         }
     });
 
@@ -80,19 +86,12 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     top_title:Some(info_line),
                     bottom_title:Some(Line::from("按 Tab 查看格式化/校验结果，Ctrl+C 退出").centered()),
                 ){
-                    TextArea(
-                        value: json_text.read().to_string(),
-                        is_focus: true,
-                        on_change: move |new_value: String| {
-                            json_text.set(new_value);
-                        },
-                        disable_keys: vec![Key::Tab],
-                        multiline: true,
+                    Input(
+                        input: json_text.read().clone(),
                         cursor_style: Style::default().on_blue(),
-                        placeholder: Some("请输入 JSON...".to_string()),
+                        placeholder: "请输入 JSON...".to_string(),
                         placeholder_style: Style::default().blue(),
-                        style: Style::default(),
-                        line_number_style: Some(Style::default().dim())
+                        hide_cursor: false,
                     )
                 }
             }

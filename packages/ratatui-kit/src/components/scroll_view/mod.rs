@@ -33,9 +33,9 @@
 //!
 //! 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
 
+use crate::components::SendBlock;
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{Hook, State, UseEffect, UseEvents, UseState};
-use ratatui::widgets::Block;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
@@ -57,7 +57,8 @@ pub struct ScrollViewProps<'a> {
     /// 滚动状态。
     pub scroll_view_state: Option<State<ScrollViewState>>,
 
-    pub block: Option<Block<'static>>,
+    /// 可选边框块(SendBlock 包装,见其文档)。
+    pub block: SendBlock,
 
     pub disabled: bool,
 }
@@ -65,7 +66,7 @@ pub struct ScrollViewProps<'a> {
 /// ScrollView 组件实现。
 pub struct ScrollView {
     scroll_bars: ScrollBars<'static>,
-    block: Option<Block<'static>>,
+    block: SendBlock,
 }
 
 impl Component for ScrollView {
@@ -263,7 +264,7 @@ impl Component for ScrollView {
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
-        if let Some(block) = &self.block {
+        if let Some(block) = self.block.as_ref() {
             let inner_area = block.inner(drawer.area);
             drawer.render_widget(block, drawer.area);
             drawer.area = inner_area;

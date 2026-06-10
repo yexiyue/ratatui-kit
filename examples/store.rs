@@ -5,6 +5,7 @@ use ratatui::{
 use ratatui_kit::ratatui;
 use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
+    prelude::tui_input::backend::crossterm::EventHandler,
     prelude::*,
     ratatui::layout::Constraint,
 };
@@ -104,13 +105,19 @@ fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let store = &COUNTER_AND_TEXT_INPUT_STORE;
     let (mut value, count) = use_stores!(store.value, store.count);
+    // 注:TextArea 暂时下线,改用单行 Input;输入实时同步到 store 的 String 字段。
+    let input = hooks.use_state(tui_input::Input::default);
     let mut navigate = hooks.use_navigate();
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
-            && key_event.code == KeyCode::Esc
         {
-            navigate.back();
+            if key_event.code == KeyCode::Esc {
+                navigate.back();
+            } else {
+                input.write().handle_event(&event);
+                value.set(input.read().value().to_string());
+            }
         }
     });
     element!(
@@ -120,16 +127,12 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             top_title:Line::from("文本输入页面 (ESC 返回)").centered(),
         ){
             $Line::from(format!("全局计数: {}", count.get()))
-            TextArea(
-                value: value.read().to_string(),
-                is_focus:true,
-                on_change: move |new_value: String| {
-                    value.set(new_value);
-                },
-                multiline: true,
+            Input(
+                input: input.read().clone(),
                 cursor_style: Style::default().on_cyan(),
-                placeholder: Some("请输入内容...".to_string()),
+                placeholder: "请输入内容...".to_string(),
                 placeholder_style: Style::default().cyan(),
+                hide_cursor: false,
             )
         }
     )

@@ -1,7 +1,4 @@
-use ratatui::{
-    style::{Style, Stylize},
-    text::Line,
-};
+use ratatui::{style::Style, text::Line};
 use ratatui_kit::ratatui::{self, layout::Constraint, widgets::Block};
 use ratatui_kit::{prelude::*, ratatui::layout::Direction};
 use std::fs;

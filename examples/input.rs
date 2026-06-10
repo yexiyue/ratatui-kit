@@ -1,12 +1,7 @@
 use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::{tui_input::backend::crossterm::EventHandler, *},
-    ratatui::{
-        TerminalOptions, Viewport,
-        layout::Constraint,
-        style::{Style, Stylize},
-        text::Line,
-    },
+    ratatui::{TerminalOptions, Viewport, layout::Constraint, style::Style, text::Line},
 };
 
 #[tokio::main]

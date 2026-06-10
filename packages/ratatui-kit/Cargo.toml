@@ -8,27 +8,28 @@ description = "A framework for building interactive terminal user interfaces wit
 authors = ["yexiyue <yexiyue666@qq.com>"]
 
 [dependencies]
-futures = "0.3.31"
-generational-box = "0.6.2"
+futures = "0.3.32"
+generational-box = "0.7.9"
 any_key = "0.1.1"
 ratatui-kit-macros = { version = "0.5.1", path = "../ratatui-kit-macros" }
-tui-textarea = { version = "0.7.0", optional = true, features = ["crossterm"] }
-crossterm = { version = "0.28.0", features = ["event-stream"] }
-regex = { version = "1.11.1", optional = true }
-ratatui = "0.29.0"
-tui-input = { version = "0.14.0", optional = true, features = ["ratatui"] }
-tui-tree-widget = { version = "0.23.1", optional = true }
+crossterm = { version = "0.29.0", features = ["event-stream"] }
+regex = { version = "1.12.4", optional = true }
+ratatui = "0.30.1"
+tui-input = { version = "0.15.3", optional = true, features = ["ratatui"] }
+tui-tree-widget = { version = "0.24.0", optional = true }
 
 [features]
 default = []
-textarea = ["tui-textarea"]
+# 注:`textarea` feature 暂时下线——其底层 `tui-textarea` 截至本次升级仍无支持
+# ratatui 0.30 的版本(最新 0.7.0 钉死 ratatui ^0.29),会与 0.30 栈冲突。
+# 组件源码隔离保留在 `src/components/textarea.rs`(未接入模块树),待 tui-textarea
+# 发布 0.30 兼容版后,恢复下方 feature/依赖/example 并重新接入即可。
 router = ["regex", "ratatui-kit-macros/router"]
 store = ["ratatui-kit-macros/store"]
 input = ["tui-input"]
 tree = ["tui-tree-widget"]
 
 full = [
-    "textarea",
     "router",
     "store",
     "input",

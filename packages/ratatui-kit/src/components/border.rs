@@ -34,7 +34,7 @@ pub struct BorderProps<'a> {
     /// 显示哪些边。
     pub borders: ratatui::widgets::Borders,
     /// 边框字符集。
-    pub border_set: border::Set,
+    pub border_set: border::Set<'static>,
     /// 整体样式。
     pub style: ratatui::style::Style,
     /// 子元素列表。
@@ -72,7 +72,7 @@ pub struct Border {
     pub padding: Padding,
     pub border_style: ratatui::style::Style,
     pub borders: ratatui::widgets::Borders,
-    pub border_set: border::Set,
+    pub border_set: border::Set<'static>,
     pub style: ratatui::style::Style,
     pub top_title: Option<Line<'static>>,
     pub bottom_title: Option<Line<'static>>,

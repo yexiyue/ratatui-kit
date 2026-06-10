@@ -1,25 +1,41 @@
-use crate::Component;
+use crate::{Component, Props};
 use ratatui::widgets::Widget;
-use ratatui_kit_macros::Props;
 
-#[derive(Props)]
+// 0.30 起 `List`/`Paragraph`/`Table`/`Gauge` 等 widget 内含 `Option<Block>`,而 `Block`
+// 因新增阴影效果(`Arc<dyn CellEffect>`)不再 Send + Sync。但 ratatui-kit 的 `Props`/
+// `Component` 要求 Send + Sync(组件 `wait()` 经 `BoxFuture` 轮询)。
+//
+// 适配器在此放宽:不再要求被适配 widget 自身 Send + Sync,改为对适配器及其 props 以
+// `unsafe impl` 断言 Send + Sync。这与框架对 `AnyProps` 的既有处理(`unsafe impl Send/Sync`)
+// 一致——组件树只在单线程渲染路径中访问,widget 不跨线程并发使用,断言成立。
+// 好处:任意 ratatui widget 仍可经 `$expr` 直接嵌入元素树,保持 0.29 的使用体验。
+
 pub struct WidgetAdapterProps<T>
 where
-    T: Widget + Sync + Send + 'static,
+    T: Widget + 'static,
 {
     pub inner: T,
 }
 
+// Safety: 见本文件顶部说明。
+unsafe impl<T: Widget + 'static> Send for WidgetAdapterProps<T> {}
+unsafe impl<T: Widget + 'static> Sync for WidgetAdapterProps<T> {}
+unsafe impl<T: Widget + 'static> Props for WidgetAdapterProps<T> {}
+
 pub struct WidgetAdapter<T>
 where
-    T: Widget + Sync + Send + 'static,
+    T: Widget + 'static,
 {
     inner: T,
 }
 
+// Safety: 见本文件顶部说明。
+unsafe impl<T: Widget + 'static> Send for WidgetAdapter<T> {}
+unsafe impl<T: Widget + 'static> Sync for WidgetAdapter<T> {}
+
 impl<T> Component for WidgetAdapter<T>
 where
-    T: Widget + Sync + Send + 'static + Unpin + Clone,
+    T: Widget + 'static + Unpin + Clone,
 {
     type Props<'a> = WidgetAdapterProps<T>;
 

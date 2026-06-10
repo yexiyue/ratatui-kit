@@ -27,6 +27,10 @@ pub use center::*;
 pub mod text;
 pub use text::*;
 
+// Block 的 Send + Sync 包装(ratatui 0.30 起 Block 因内含阴影效果不再 Send+Sync)。
+pub mod send_block;
+pub use send_block::*;
+
 // 定位组件，支持绝对定位，适合复杂布局需求。
 pub mod positioned;
 pub use positioned::*;
@@ -45,11 +49,8 @@ pub use tree_select::*;
 #[cfg(feature = "tree")]
 pub use tui_tree_widget;
 
-#[cfg(feature = "textarea")]
-// 多行文本输入组件，支持光标、占位符、行号等，适合编辑器、表单等场景。
-pub mod textarea;
-#[cfg(feature = "textarea")]
-pub use textarea::*;
+// 注:`textarea` 组件暂时下线(其底层 tui-textarea 尚无 ratatui 0.30 兼容版)。
+// 源码隔离保留在 `textarea.rs`(未声明为模块),待依赖支持 0.30 后恢复接入。
 
 #[cfg(feature = "router")]
 // 路由组件，支持页面跳转、参数、嵌套路由等，适合多页面终端应用。

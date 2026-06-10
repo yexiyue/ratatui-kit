@@ -8,6 +8,7 @@ use ratatui_kit::{
 };
 use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
+    prelude::tui_input::backend::crossterm::EventHandler,
     prelude::*,
     ratatui::layout::Constraint,
 };
@@ -172,16 +173,21 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
 #[component]
 fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut value = hooks.use_state(String::new);
+    // 注:TextArea 组件随 ratatui 0.30 迁移暂时下线(tui-textarea 尚无 0.30 兼容版),
+    // 这里改用单行 Input 组件演示文本输入。
+    let value = hooks.use_state(tui_input::Input::default);
 
     let mut navigate = hooks.use_navigate();
 
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
-            && key_event.code == KeyCode::Esc
         {
-            navigate.back();
+            if key_event.code == KeyCode::Esc {
+                navigate.back();
+            } else {
+                value.write().handle_event(&event);
+            }
         }
     });
     element!(
@@ -190,16 +196,12 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             height:Constraint::Length(6),
             top_title:Line::from("文本输入页面 (ESC 返回)").centered(),
         ){
-            TextArea(
-                value: value.read().to_string(),
-                is_focus: true,
-                on_change: move |new_value: String| {
-                    value.set(new_value);
-                },
-                multiline: true,
+            Input(
+                input: value.read().clone(),
                 cursor_style: Style::default().on_cyan(),
-                placeholder: Some("请输入内容...".to_string()),
+                placeholder: "请输入内容...".to_string(),
                 placeholder_style: Style::default().cyan(),
+                hide_cursor: false,
             )
         }
     )

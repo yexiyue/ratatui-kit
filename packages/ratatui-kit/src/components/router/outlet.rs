@@ -67,8 +67,12 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
         } else if r.path == "/" {
             // 如果路由路径是根路径 "/"，则不在此处处理（留给最后兜底匹配）
             false
-        } else if path.starts_with(&r.path) {
-            // 如果当前路径以静态路径开头，则更新上下文路径为剩余部分
+        } else if path.starts_with(&r.path)
+            && matches!(path[r.path.len()..].chars().next(), None | Some('/'))
+        {
+            // 静态前缀匹配必须落在「段边界」:剩余部分为空(精确匹配)或以 '/' 开头
+            // (继续嵌套匹配)。否则 "/book-source-login" 会被先注册的 "/book-source"
+            // 误匹配(剩余 "-login" 不是新段),渲染成错误页面、表现为「导航无反应」。
             route_context.path = path[r.path.len()..].to_string();
             true
         } else {
