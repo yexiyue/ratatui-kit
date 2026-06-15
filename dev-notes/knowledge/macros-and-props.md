@@ -2,7 +2,7 @@
 
 ## 概览
 
-本主题覆盖 `ratatui-kit-macros` 的五个过程宏（`element!` / `#[component]` / `#[derive(Props)]` / `routes!` / `#[derive(Store)]` / `#[with_layout_style]`）的非显然约定，以及 props 类型擦除（`AnyProps`）的 unsafe 不变量、`extern crate self` 技巧、ratatui 0.30 的 `SendBlock` 包装。改宏库、写新组件 props、或排查「宏展开路径/类型擦除」相关报错前先读本文件。
+本主题覆盖 `ratatui-kit-macros` 的过程宏（`element!` / `#[component]` / `#[derive(Props)]` / `routes!` / `#[with_layout_style]`）的非显然约定，以及 props 类型擦除（`AnyProps`）的 unsafe 不变量、`extern crate self` 技巧、ratatui 0.30 后 `Block` props 的处理方式。改宏库、写新组件 props、或排查「宏展开路径/类型擦除」相关报错前先读本文件。
 
 ## 过程宏约定
 
@@ -65,23 +65,23 @@ element!(View { for (i, x) in items.iter().enumerate() { Row(label: x, key: i) }
 
 **相关文件**：`packages/ratatui-kit-macros/src/element.rs`（`PropsItem::to_tokens` 的 `.into()`）、`packages/ratatui-kit/src/components/border.rs`（`top_title`/`bottom_title: Option<Line>`，examples 已用裸值写法）
 
-### Props 必须 Send + Sync，无 props 用 NoProps
+### Props 是安全标记 trait，无 props 用 NoProps
 
-props 必须实现 `Props`（`unsafe trait`，要求 `Send + Sync`），通过 `#[derive(Props)]` 生成。无 props 的组件用现成的 `NoProps`。
+props 必须实现 `Props`，通过 `#[derive(Props)]` 生成。PR 6 去掉了框架级 `Send + Sync` 要求后，`Props` 已从 `unsafe trait` 改为安全 trait；无 props 的组件用现成的 `NoProps`。
 
-**正确做法**：新 Props 结构体的所有字段都得 `Send + Sync`，再 `#[derive(Props)]`。
+**正确做法**：新 Props 结构体直接 `#[derive(Props)]`。若组件需要布局属性，再叠加 `#[with_layout_style]`。
 
 **相关文件**：`packages/ratatui-kit/src/props.rs`
 
-### ratatui 0.30：Block 不再 Send+Sync，props 持有 Block 必须用 SendBlock
+### ratatui 0.30：Block 可直接作为 props 字段
 
-ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦除句柄）而**不再 `Send + Sync`**。但 Props/Component 都要求 `Send + Sync`（组件 `wait()` 经 `BoxFuture`(Send) 轮询）。因此 props 里要承载 `Block` 时，用 `SendBlock`（`Option<Block<'static>>` 的 `Send + Sync` 包装）而非裸 `Block`。
+ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦除句柄）而**不再 `Send + Sync`**。PR 6 已去掉框架内部组件/Hook/Props 的 `Send + Sync` 强制要求，因此旧的 `SendBlock` 包装已删除，props 字段可以直接使用 `Option<Block<'static>>`。
 
-**正确做法**：props 边框字段写 `block: SendBlock`。`SendBlock` 实现了 `Deref<Target = Option<Block>>` + `From<Block>` / `From<Option<Block>>`，配合 `element!` 自动 `.into()`，书写与原 `Option<Block<'static>>` 完全一致（如 `block: Block::bordered()...`），`.is_some()`/`.as_ref()` 照常可用。
+**正确做法**：props 边框字段写 `block: Option<Block<'static>>`。配合 `element!` 自动 `.into()`，调用方仍可写裸 `Block`（如 `block: Block::bordered()...`）、`Some(block)` 或 `None`。
 
-**不要做**：在 props/组件字段里直接放裸 `Block<'static>`——会因不满足 `Send + Sync` 编译失败。
+**不要做**：恢复 `SendBlock` 或为 `Block` 增加新的 Send/Sync 包装；当前运行时是单线程渲染，裸 `Block` 已是目标形态。
 
-**相关文件**：`packages/ratatui-kit/src/components/send_block.rs`、`packages/ratatui-kit/src/props.rs`
+**相关文件**：`packages/ratatui-kit/src/components/scroll_view/mod.rs`、`packages/ratatui-kit/src/components/tree_select.rs`、`packages/ratatui-kit/src/props.rs`
 
 ### AnyProps 的 unsafe downcast 依赖协调阶段已校验 TypeId
 

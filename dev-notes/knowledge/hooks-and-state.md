@@ -2,7 +2,7 @@
 
 ## 概览
 
-本主题覆盖 ratatui-kit 的 Hooks 系统约束（**调用顺序必须稳定**）、自定义 Hook 的 `Sealed` trait 标准写法、以及两套状态体系（局部 `use_state` vs 全局 `store`）的语义差异与 `Copy`/运算符重载行为。写新 Hook、改 `hooks/`、动 `store/` 前先读本文件。
+本主题覆盖 ratatui-kit 的 Hooks 系统约束（**调用顺序必须稳定**）、自定义 Hook 的 `Sealed` trait 标准写法、以及两套状态体系（局部 `use_state` vs 全局 `Atom`）的语义差异与 `Copy`/运算符重载行为。写新 Hook、改 `hooks/`、动 `atom/` 前先读本文件。
 
 ## Hooks 系统
 
@@ -31,39 +31,41 @@
 
 ### 内置 Hook 清单
 
-`use_state` `use_future` `use_events` `use_context` `use_memo` `use_effect` `use_insert_before` `use_size` `use_exit` `use_on_drop`；特性门控的 `use_router`/`use_navigate`（`router`，同一文件内）、`use_store`/`use_stores!`（`store`）。`use_navigate` 定义在 `use_router.rs` 内，不是单独文件。
+`use_state` `use_future` `use_events` `use_context` `use_memo` `use_effect` `use_insert_before` `use_size` `use_exit` `use_on_drop`；特性门控的 `use_router`/`use_navigate`（`router`，同一文件内）、`use_atom`（`atom`）。`use_navigate` 定义在 `use_router.rs` 内，不是单独文件。
 
 **相关文件**：`packages/ratatui-kit/src/hooks/`
 
 ## 两套状态体系
 
-### 局部 use_state vs 全局 store：生命周期与作用域不同
+### 局部 use_state vs 全局 Atom：生命周期与作用域不同
 
-| | `use_state` | store（`store` feature） |
+| | `use_state` | Atom（`atom` feature） |
 |---|---|---|
 | Owner | 每组件独立 `Owner`，随组件卸载释放 | 进程级 `LazyLock<Owner>`，全程存活 |
-| 句柄类型 | `State<T>` | `StoreState<T>` |
-| 声明方式 | `let s = hooks.use_state(\|\| 0);` | `#[derive(Store)]` 生成 `XXX_STORE` 静态量 |
-| 订阅方式 | 直接持有 | `use_stores!(store.field, ...)` 订阅字段 |
+| 句柄类型 | `State<T>` | `AtomState<T>` |
+| 声明方式 | `let s = hooks.use_state(\|\| 0);` | `static COUNT: Atom<i32> = Atom::new(|| 0);` |
+| 订阅方式 | 直接持有 | `hooks.use_atom(&COUNT)` 订阅单个原子 |
 
-两者底层都是 `generational-box`，句柄都实现了 `Copy`（可随意按值传进闭包/子组件，无需 clone）。
+两者底层都是 `generational-box`，句柄都实现了 `Copy`（可随意按值传进闭包/子组件，无需 clone）。`Atom<T>` 本身是全局声明入口，`AtomState<T>` 是读写句柄。
 
-**正确做法**：组件私有、随卸载消失的状态用 `use_state`；跨组件/进程级共享用 store。store 模块在 `store` feature 后。
+**正确做法**：组件私有、随卸载消失的状态用 `use_state`；跨组件/进程级共享用 `Atom`。`atom` 模块在 `atom` feature 后。
 
-**相关文件**：`packages/ratatui-kit/src/hooks/use_state.rs`、`packages/ratatui-kit/src/store/mod.rs`、`packages/ratatui-kit/src/store/use_store.rs`
+**相关文件**：`packages/ratatui-kit/src/hooks/use_state.rs`、`packages/ratatui-kit/src/atom/mod.rs`、`packages/ratatui-kit/src/atom/use_atom.rs`
 
-### State/StoreState 重载了算术运算符——`+=` 等会触发变更通知
+### State/AtomState 重载了算术运算符——`+=` 等会触发变更通知
 
-`State<T>` 对 `T: Copy` 实现了 `Add/Sub/Mul/Div` 及对应 `*Assign`（`StoreState` 同理）。`count += 1` 这类写法既更新值又唤醒 Waker 触发重绘。
+`State<T>` 对 `T: Copy` 实现了 `Add/Sub/Mul/Div` 及对应 `*Assign`（`AtomState` 同理）。`count += 1` 这类写法既更新值又唤醒 Waker 触发重绘。两者的运算符实现由 `reactive_ops.rs` 的同一个宏生成。
 
 **正确做法**：用 `state += 1` / `state.set(v)` / `state.write()` 修改，让变更走唤醒通道。读用 `state.get()`（`Copy` 值）或 `state.read()`（借用）。
 
 **不要做**：绕过句柄方法直接操作底层 `generational-box` 存储——会跳过 Waker 唤醒，画面不刷新。
 
-**相关文件**：`packages/ratatui-kit/src/hooks/use_state.rs`（`impl ops::AddAssign ...` 等）
+**相关文件**：`packages/ratatui-kit/src/hooks/use_state.rs`、`packages/ratatui-kit/src/atom/mod.rs`、`packages/ratatui-kit/src/reactive_ops.rs`
 
-### 全局 store 重构在计划中——动 store 模块前先对齐方向
+### use_atom 会跟随传入的 Atom，并负责退订
 
-todo.md 0.6.0 段记有「重构全局 store，现在全局 store 感觉用处不大」。改 `store/` 模块前先确认是否撞上这次重构的设计方向，避免白做。
+`Hooks::use_hook` 只在首帧运行初始化闭包，因此带外部参数的 Hook 需要在每帧主动同步参数。`use_atom(&ATOM)` 每帧都会把 hook 内部句柄校准到当前传入的 atom；当 atom 改变或组件卸载时，会移除旧 atom 上以组件 key 注册的 waker，避免旧 atom 继续唤醒已切走/已卸载的组件。
 
-**相关文件**：`todo.md`、`packages/ratatui-kit/src/store/mod.rs`
+**正确做法**：自定义 Hook 若依赖 props/参数，不要只把参数写进 `use_hook(|| ...)` 的初始化闭包；后续帧也要更新 hook 内部状态，并清理旧订阅/资源。
+
+**相关文件**：`packages/ratatui-kit/src/atom/use_atom.rs`

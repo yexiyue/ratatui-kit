@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Rust 2024 Cargo workspace for a ratatui-based terminal UI framework. The main library lives in `packages/ratatui-kit/`; its modules are split by runtime concern: `components/`, `hooks/`, `render/`, `element/`, `terminal/`, `store/`, and `context.rs`. Procedural macros live in `packages/ratatui-kit-macros/src/` and provide `element!`, `#[component]`, `#[derive(Props)]`, router, store, and layout helpers. The root crate `ratatui-kit-examples` only hosts runnable examples in `examples/`. Compile-fail/pass UI tests live under `packages/ratatui-kit/tests/ui/`. Design proposals and active specs are under `openspec/changes/`; project knowledge notes are under `dev-notes/knowledge/`.
+This is a Rust 2024 Cargo workspace for a ratatui-based terminal UI framework. The main library lives in `packages/ratatui-kit/`; its modules are split by runtime concern: `components/`, `hooks/`, `render/`, `element/`, `terminal/`, `atom/`, and `context.rs`. Procedural macros live in `packages/ratatui-kit-macros/src/` and provide `element!`, `#[component]`, `#[derive(Props)]`, router, and layout helpers. The root crate `ratatui-kit-examples` only hosts runnable examples in `examples/`. Compile-fail/pass UI tests live under `packages/ratatui-kit/tests/ui/`. Design proposals and active specs are under `openspec/changes/`; project knowledge notes are under `dev-notes/knowledge/`.
 
 ## Build, Test, and Development Commands
 
@@ -14,7 +14,7 @@ This is a Rust 2024 Cargo workspace for a ratatui-based terminal UI framework. T
 
 ## Coding Style & Naming Conventions
 
-Use `rustfmt` with `tab_spaces = 4`. Keep code idiomatic Rust and edition 2024 compatible. Public API names use Rust conventions: `CamelCase` types/traits, `snake_case` functions/modules, and feature names such as `router`, `store`, `input`, `tree`, and `full`. Comments, docs, and commit subjects in this repository are often Chinese; keep new text consistent with nearby files. When adding component props, prefer existing `Props`/`#[with_layout_style]` patterns and use `SendBlock` instead of raw ratatui `Block` in props.
+Use `rustfmt` with `tab_spaces = 4`. Keep code idiomatic Rust and edition 2024 compatible. Public API names use Rust conventions: `CamelCase` types/traits, `snake_case` functions/modules, and feature names such as `router`, `atom`, `input`, `tree`, and `full`. Comments, docs, and commit subjects in this repository are often Chinese; keep new text consistent with nearby files. When adding component props, prefer existing `Props`/`#[with_layout_style]` patterns; raw ratatui `Block<'static>` is allowed in props after the framework-level `Send + Sync` removal.
 
 ## Testing Guidelines
 

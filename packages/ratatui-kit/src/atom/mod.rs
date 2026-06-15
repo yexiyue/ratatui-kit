@@ -44,6 +44,16 @@ where
             }),
         }
     }
+
+    fn same_storage(&self, other: &Self) -> bool {
+        self.inner.ptr_eq(&other.inner)
+    }
+
+    fn remove_waker(&self, key: &ElementKey) {
+        if let Ok(mut value) = self.inner.try_write() {
+            value.wakers.remove(key);
+        }
+    }
 }
 
 /// 全局响应式原子（类 Jotai/Recoil）。

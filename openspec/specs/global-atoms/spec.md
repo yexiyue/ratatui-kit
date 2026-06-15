@@ -13,7 +13,7 @@ TBD - created by archiving change redesign-store. Update Purpose after archive.
 
 ### Requirement: use_atom 订阅并返回可跨线程句柄
 
-`use_atom(&'static Atom<T>)` SHALL 注册本组件的 waker 到该 atom，并返回一个 `Copy + Send` 的响应式句柄（复用 `StoreState<T>`）。写入该句柄 SHALL 仅唤醒订阅了**该 atom** 的组件（细粒度）。
+`use_atom(&'static Atom<T>)` SHALL 注册本组件的 waker 到该 atom，并返回一个 `Copy + Send` 的响应式句柄（`AtomState<T>`）。写入该句柄 SHALL 仅唤醒订阅了**该 atom** 的组件（细粒度）。
 
 #### Scenario: 细粒度重渲
 - **WHEN** 组件 A 订阅 `COUNT`、组件 B 订阅 `NAME`，随后写 `COUNT`
@@ -39,11 +39,10 @@ TBD - created by archiving change redesign-store. Update Purpose after archive.
 - **WHEN** 检索 `derive(Store)`/`use_stores!`/`StoreState::new` 的对外用法
 - **THEN** 框架不再导出 `#[derive(Store)]`/`use_stores!`；全局状态示例改用 `Atom`
 
-### Requirement: State 与 StoreState 运算符不重复
+### Requirement: State 与 AtomState 运算符不重复
 
-`State<T>` 与 `StoreState<T>` 的算术运算符重载（`Add/Sub/Mul/Div` 及 `*Assign`）SHALL 由单一 `macro_rules!` 生成，二者 MUST NOT 各自手抄一遍。
+`State<T>` 与 `AtomState<T>` 的算术运算符重载（`Add/Sub/Mul/Div` 及 `*Assign`）SHALL 由单一 `macro_rules!` 生成，二者 MUST NOT 各自手抄一遍。
 
 #### Scenario: 运算符单一来源
 - **WHEN** 审视运算符 impl
-- **THEN** `State` 与 `StoreState` 经同一宏展开，无重复代码块
-
+- **THEN** `State` 与 `AtomState` 经同一宏展开，无重复代码块

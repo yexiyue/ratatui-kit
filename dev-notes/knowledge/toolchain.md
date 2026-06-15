@@ -17,7 +17,7 @@ cargo fmt --all --check                       # rustfmt.toml: tab_spaces=4
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-features --workspace --examples
 ```
 
-**正确做法**：本地验证一律带 `--all-features`。主库默认 **不启用任何 feature**，缺了它 `router`/`store`/`input`/`tree` 门控的模块根本不参与编译，clippy/test 会「假绿」。
+**正确做法**：本地验证一律带 `--all-features`。主库默认 **不启用任何 feature**，缺了它 `router`/`atom`/`input`/`tree` 门控的模块根本不参与编译，clippy/test 会「假绿」。
 
 **不要做**：用裸 `cargo build` / `cargo clippy` 验证改动——会漏掉所有特性门控模块的报错。
 
@@ -38,14 +38,14 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 | feature | 解锁内容 | 额外依赖 |
 |---|---|---|
 | `router` | `RouterProvider`/`Outlet`、`routes!`、`use_router`/`use_navigate` | `regex` |
-| `store` | `StoreState`、`#[derive(Store)]`、`use_stores!` | — |
+| `atom` | `Atom`、`AtomState`、`use_atom` | — |
 | `input` | `Input` 组件 | `tui-input` |
 | `tree` | `TreeSelect` 组件 | `tui-tree-widget` |
 | `full` | 上述全部 | — |
 
-宏库 `ratatui-kit-macros` 有**独立**的 `router`/`store` feature，由主库同名 feature 透传（见主库 `Cargo.toml` 的 `ratatui-kit-macros/router` 写法）。改宏库里 router/store 相关代码时，主库侧的透传也要同步。
+宏库 `ratatui-kit-macros` 有**独立**的 `router` feature，由主库同名 feature 透传（见主库 `Cargo.toml` 的 `ratatui-kit-macros/router` 写法）。全局状态已改为纯主库 `atom` feature，不再有 store 宏或宏库透传。
 
-**正确做法**：改 `src/components/router/`、`src/store/`、`src/components/input.rs` 等模块时，用 `--all-features` 或 `--features <name>` 编译；新增门控模块要在 `lib.rs` / `components/mod.rs` 加 `#[cfg(feature = "...")]`，并在 `full` 聚合里登记。
+**正确做法**：改 `src/components/router/`、`src/atom/`、`src/components/input.rs` 等模块时，用 `--all-features` 或 `--features <name>` 编译；新增门控模块要在 `lib.rs` / `components/mod.rs` 加 `#[cfg(feature = "...")]`，并在 `full` 聚合里登记。
 
 **相关文件**：`packages/ratatui-kit/Cargo.toml`、`packages/ratatui-kit/src/lib.rs`、`packages/ratatui-kit/src/components/mod.rs`
 
@@ -65,7 +65,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 
 **已有的针对性测试**（`add-test-suite` 起逐步补齐，跑在 `cargo test --tests/--lib` 下）：
 
-- **运行时单测**（各模块 `#[cfg(test)] mod tests`）：`element/key.rs`（ElementKey 不碰撞/Hash/Eq）、`multimap.rs`、`hooks/use_state.rs` 与 `store/mod.rs`（运算符重载/Copy/读写）、`components/router/{history,mod}.rs`（history 越界、`Route::match_path` 段边界与参数提取）。可在模块内经 `UseStateImpl::new`/`StoreState::new`/`Route::new` 构造被测对象。
+- **运行时单测**（各模块 `#[cfg(test)] mod tests`）：`element/key.rs`（ElementKey 不碰撞/Hash/Eq）、`multimap.rs`、`hooks/use_state.rs` 与 `atom/`（运算符重载/Copy/读写、Atom 惰性初始化、use_atom 订阅清理）、`components/router/{history,mod}.rs`（history 越界、`Route::match_path` 段边界与参数提取）。可在模块内经 `UseStateImpl::new`/`AtomState::new`/`Route::new` 构造被测对象。
 - **宏 UI 测试**（`packages/ratatui-kit/tests/ui.rs` + `tests/ui/{pass,fail}/`，trybuild）：pass 验证新 DSL 编译通过；fail 的 `.stderr` **只断言本库经 `syn::Error` 产出的稳定文案**（旧 `$`/`#()` 迁移报错、`widget`/`stateful` 参数错误、`#[component]` 非法参名），不绑定 rustc 类型错误。trybuild UI 测试须放 `ratatui-kit` crate（展开的 `::ratatui_kit::` 路径需运行时 crate 在场）。
 
 - **组件渲染测试**（`src/render/harness.rs`，`#[cfg(test)]`）：`render_to_buffer(el, w, h)` 单次离屏渲染——no-op 终端跑 `update`（经对象安全的 `UpdaterTerminal` trait，无需真实 TTY）+ `ratatui::Terminal<TestBackend>` 跑 `draw` → 断言 `Buffer`。终端抽象对象安全化由 `render-test-harness` 落地：`ComponentUpdater` 持 `&mut dyn UpdaterTerminal`，`Tree` 暴露 `update_once`/`draw_root`；`Terminal<T>` 泛型保留（多后端），`UpdaterTerminal::events` 固定 crossterm Event。

@@ -37,9 +37,9 @@ loop { render(); if should_exit || ctrl_c break; select(component.wait(), termin
 
 `render()` 先自顶向下 `update`（跑组件函数体、跑 hooks、协调子树），再 `terminal.draw` 自顶向下 `draw`。然后 `select` 在「组件树有变化」与「终端有事件」之间阻塞，任一就绪即重渲染。
 
-「组件树有变化」由 `poll_change` 聚合：组件 / 子节点 / hooks 三路任一 `Ready` 即唤醒。响应式状态（`use_state` 的 `State<T>`、全局 `StoreState<T>`，均基于 `generational-box`）在写入时唤醒存好的 `Waker`，打破 `select` 阻塞触发下一帧。
+「组件树有变化」由 `poll_change` 聚合：组件 / 子节点 / hooks 三路任一 `Ready` 即唤醒。响应式状态（`use_state` 的 `State<T>`、全局 `AtomState<T>`，均基于 `generational-box`）在写入时唤醒存好的 `Waker`，打破 `select` 阻塞触发下一帧。
 
-**正确做法**：要让 UI 响应某个变化，必须让它经过一个会唤醒 Waker 的通道——`State`/`StoreState` 写入、`use_future` 完成、终端事件。自定义 Hook 若持有需驱动重绘的状态，要实现 `poll_change` 并在变更时唤醒 waker（参见 `hooks-and-state.md`）。
+**正确做法**：要让 UI 响应某个变化，必须让它经过一个会唤醒 Waker 的通道——`State`/`AtomState` 写入、`use_future` 完成、终端事件。自定义 Hook 若持有需驱动重绘的状态，要实现 `poll_change` 并在变更时唤醒 waker（参见 `hooks-and-state.md`）。
 
 **不要做**：在组件外用普通变量/`static mut` 存 UI 状态再期望它自动重绘——没有 Waker 唤醒，`select` 不会醒，画面卡住直到下一个无关事件。
 
