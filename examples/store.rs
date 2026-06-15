@@ -58,10 +58,10 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             gap:1,
             top_title:Line::from("🏠 Store 全局状态仪表盘").centered().bold(),
         ){
-            $Line::from(format!("全局计数: {}", count.get()))
-            $Line::from(format!("全局输入: {}", value.read().as_str()))
-            $Line::from("1. 计数器页面 (Counter)")
-            $Line::from("2. 文本输入页面")
+            Text(text: format!("全局计数: {}", count.get()))
+            Text(text: format!("全局输入: {}", value.read().as_str()))
+            Text(text: "1. 计数器页面 (Counter)")
+            Text(text: "2. 文本输入页面")
         }
     )
 }
@@ -92,11 +92,11 @@ fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             height:Constraint::Length(6),
             top_title:Line::from("计数器页面 (ESC 返回)").centered(),
         ){
-            $Line::from(format!("全局输入: {}", value.read().as_str()))
-            $Line::styled(
+            Text(text: format!("全局输入: {}", value.read().as_str()))
+            Text(text: Line::styled(
                 format!("Counter: {}", count.get()),
                 Style::default().fg(ratatui::style::Color::Green).bold(),
-            ).centered().bold().underlined()
+            ).centered().bold().underlined())
         }
     )
 }
@@ -126,7 +126,7 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             height:Constraint::Length(7),
             top_title:Line::from("文本输入页面 (ESC 返回)").centered(),
         ){
-            $Line::from(format!("全局计数: {}", count.get()))
+            Text(text: format!("全局计数: {}", count.get()))
             Input(
                 input: input.read().clone(),
                 cursor_style: Style::default().on_cyan(),

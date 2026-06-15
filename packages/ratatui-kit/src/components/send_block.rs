@@ -18,9 +18,11 @@ use std::ops::{Deref, DerefMut};
 #[derive(Default, Clone, Debug)]
 pub struct SendBlock(pub Option<Block<'static>>);
 
-// Safety: 见模块文档。ratatui-kit/上层应用构造的 `Block` 不挂自定义阴影效果
-// (`Effect` 为 `Overlay`/`Symbol`,不含 `Arc<dyn CellEffect>`),内部 `Block` 实际即为
-// `Send + Sync`;且组件树仅在单线程渲染路径中访问,断言成立。
+// Safety: 类型层面 `Block` 因内含 `Arc<dyn CellEffect>`(无 Send+Sync 超 trait)而**无条件**
+// 非 Send+Sync——类型系统无法看出某个具体实例是否真的挂了阴影效果,故无法仅靠类型放行。
+// 本断言的依据是**使用方式**:组件树只在单线程渲染路径中访问,`Block` 不跨线程并发使用;
+// 且 ratatui-kit/上层应用构造的 `Block` 通常不挂自定义阴影(`Effect::Overlay`/`Symbol`),
+// 即便挂了,单线程访问下断言依旧成立。这与框架对 `AnyProps` 的 `unsafe impl Send/Sync` 同源。
 unsafe impl Send for SendBlock {}
 unsafe impl Sync for SendBlock {}
 

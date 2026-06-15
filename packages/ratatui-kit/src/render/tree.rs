@@ -22,7 +22,7 @@ impl<'a> Tree<'a> {
     pub(crate) fn new(mut props: AnyProps<'a>, helper: Box<dyn ComponentHelperExt>) -> Self {
         Tree {
             root_component: InstantiatedComponent::new(
-                ElementKey::new("_root_tree_"),
+                ElementKey::user("_root_tree_"),
                 props.borrow(),
                 helper,
             ),

@@ -63,6 +63,9 @@ impl<T> Component for StatefulWidgetAdapter<T>
 where
     T: StatefulWidget + 'static + Unpin + Clone,
     T::State: Sized + Sync + Send + 'static + Unpin,
+    // 0.30 起 `List`/`Table` 等实现了 `StatefulWidget for &T` 且 State 类型一致,
+    // 借此约束即可在 draw 里按引用渲染。
+    for<'a> &'a T: StatefulWidget<State = T::State>,
 {
     type Props<'a> = StatefulWidgetAdapterProps<T>;
 
@@ -84,10 +87,8 @@ where
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
-        drawer.render_stateful_widget(
-            self.inner.clone(),
-            drawer.area,
-            &mut self.state.write_no_update(),
-        );
+        // 按引用渲染,免去每帧一次 clone。render_stateful_widget 泛型固定 W: StatefulWidget,
+        // 故 `&List` 不会触发 Widget/StatefulWidget 的 render 方法歧义(E0034)。
+        drawer.render_stateful_widget(&self.inner, drawer.area, &mut self.state.write_no_update());
     }
 }

@@ -44,17 +44,6 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         })
         .collect();
 
-    // 渲染每一行为 AnyElement
-    let rendered_elements: Vec<AnyElement> = rendered
-        .into_iter()
-        .map(|line| {
-            element!(View(height:Constraint::Length(1)){
-                $line
-            })
-            .into_any()
-        })
-        .collect();
-
     element!(
         View(
             flex_direction:ratatui::layout::Direction::Vertical,
@@ -67,7 +56,12 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     .title(Line::from("Markdown 文件阅读器 (ScrollView 示例) 上下/翻页滚动，Ctrl+C 退出").centered())
                     .border_style(Style::default().blue()),
             ){
-                #(rendered_elements)
+                // 一等 for:每行内联渲染,免去 rendered_elements 中间 Vec 与 .into_any()。
+                for (i, line) in rendered.into_iter().enumerate() {
+                    View(height: Constraint::Length(1), key: i) {
+                        Text(text: line)
+                    }
+                }
             }
         }
     )

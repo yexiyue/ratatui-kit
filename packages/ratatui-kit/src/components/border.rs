@@ -39,9 +39,9 @@ pub struct BorderProps<'a> {
     pub style: ratatui::style::Style,
     /// 子元素列表。
     pub children: Vec<AnyElement<'a>>,
-    /// 顶部标题。
+    /// 顶部标题。可直接传 `Line`(经宏 `.into()` + std `From<T> for Option<T>` 自动 `Some`)或 `Option<Line>`。
     pub top_title: Option<Line<'static>>,
-    /// 底部标题。
+    /// 底部标题。可直接传 `Line`(自动 `Some`)或 `Option<Line>`。
     pub bottom_title: Option<Line<'static>>,
 }
 

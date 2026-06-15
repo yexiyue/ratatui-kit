@@ -83,8 +83,8 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             View{
                 Border(
                     border_style:Style::default().blue(),
-                    top_title:Some(info_line),
-                    bottom_title:Some(Line::from("按 Tab 查看格式化/校验结果，Ctrl+C 退出").centered()),
+                    top_title:info_line,
+                    bottom_title:Line::from("按 Tab 查看格式化/校验结果，Ctrl+C 退出").centered(),
                 ){
                     Input(
                         input: json_text.read().clone(),
@@ -102,7 +102,7 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 style:Style::default().dim(),
             ){
                 Border(
-                    top_title:Some(Line::from("格式化/校验结果").centered().yellow()),
+                    top_title:Line::from("格式化/校验结果").centered().yellow(),
                     padding:ratatui::widgets::Padding::new(2,2,1,1),
                 ) {
                     View(height:ratatui::layout::Constraint::Length(1),){

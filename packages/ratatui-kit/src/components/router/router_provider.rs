@@ -26,9 +26,9 @@ pub struct RouterProviderProps {
     pub routes: Routes,
     /// 默认首页路径。
     pub index_path: String,
-    /// 路由历史最大长度。
+    /// 路由历史最大长度。可直接传 `usize`(自动 `Some`)或 `Option<usize>`。
     pub history_length: Option<usize>,
-    /// 可选的路由状态。
+    /// 可选的路由状态。可直接传 `RouteState`(自动 `Some`)或 `Option<RouteState>`。
     pub state: Option<RouteState>,
 }
 
