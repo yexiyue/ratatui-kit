@@ -17,7 +17,7 @@ cargo add ratatui-kit
 如需使用路由、全局状态等高级功能，可在 `Cargo.toml` 中启用对应特性：
 
 ```toml
-ratatui-kit = { version = "*", features = ["router", "store"] }
+ratatui-kit = { version = "*", features = ["router", "atom"] }
 ```
 
 ## 创建第一个组件
@@ -60,18 +60,18 @@ element!(
         justify_content: Flex::Center,
     ){
         View(height: Constraint::Length(1)){
-            $Line::styled(
+            Text(text: Line::styled(
                 format!("Counter: {state}"),
                 Style::default().green().bold(),
             )
             .centered()
-            .bold()
+            .bold())
         }
     }
 )
 ```
 
-> 注意：在 `element!` 宏中，ratatui 的原生 widget 需用 `$` 前缀。
+> 注意：纯文本优先使用内置 `Text` 组件；需要嵌入 ratatui 原生 widget 时使用 `widget(...)` 或 `stateful(...)`。
 
 ### 4. 启动应用
 

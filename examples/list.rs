@@ -54,7 +54,7 @@ fn StatefulList(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             flex_direction: Direction::Vertical,
             justify_content: Flex::Center,
         ){
-            $(list.clone(),state)
+            stateful(list.clone(), state)
         }
     )
 }

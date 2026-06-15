@@ -13,7 +13,7 @@ mod private {
     impl Sealed for crate::hooks::Hooks<'_, '_> {}
 }
 
-type FnBox = Box<dyn FnOnce(&mut Buffer) + Send>;
+type FnBox = Box<dyn FnOnce(&mut Buffer)>;
 
 #[derive(Clone, Default)]
 pub struct InsertBeforeHandler {
@@ -47,14 +47,14 @@ impl Hook for InsertBeforeHandler {
 impl InsertBeforeHandler {
     pub fn insert_before<F>(&self, height: u16, callback: F) -> &Self
     where
-        F: FnOnce(&mut Buffer) + Send + 'static,
+        F: FnOnce(&mut Buffer) + 'static,
     {
         let mut queue = self.queue.lock().unwrap();
         queue.push_back((height, Box::new(callback)));
         self
     }
 
-    pub fn render_before<T: Widget + Send + 'static>(&self, widget: T, height: u16) -> &Self {
+    pub fn render_before<T: Widget + 'static>(&self, widget: T, height: u16) -> &Self {
         self.insert_before(height, move |buf| {
             widget.render(buf.area, buf);
         });

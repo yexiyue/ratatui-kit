@@ -1,24 +1,39 @@
 use quote::{ToTokens, quote};
-use syn::{Expr, Token, parse::Parse};
+use syn::{Expr, Ident, Token, parse::Parse};
 use uuid::Uuid;
 
 pub enum ParsedAdapter {
-    Widget(syn::Expr),
-    StatefulWidget(syn::Expr, syn::Ident),
+    Widget(Expr),
+    StatefulWidget(Expr, Expr),
 }
 
 impl Parse for ParsedAdapter {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        if input.peek(syn::token::Paren) {
-            let content;
-            syn::parenthesized!(content in input);
-            let expr: Expr = content.parse()?;
-            content.parse::<Token![,]>()?;
-            let state_ident: syn::Ident = content.parse()?;
-            Ok(ParsedAdapter::StatefulWidget(expr, state_ident))
-        } else {
-            let expr: Expr = input.parse()?;
-            Ok(ParsedAdapter::Widget(expr))
+        let adapter_name: Ident = input.parse()?;
+        let content;
+        syn::parenthesized!(content in input);
+
+        match adapter_name.to_string().as_str() {
+            "widget" => {
+                let expr: Expr = content.parse()?;
+                if !content.is_empty() {
+                    return Err(content.error("`widget(...)` expects exactly one expression"));
+                }
+                Ok(ParsedAdapter::Widget(expr))
+            }
+            "stateful" => {
+                let expr: Expr = content.parse()?;
+                content.parse::<Token![,]>()?;
+                let state: Expr = content.parse()?;
+                if !content.is_empty() {
+                    return Err(content.error("`stateful(...)` expects exactly `widget, state`"));
+                }
+                Ok(ParsedAdapter::StatefulWidget(expr, state))
+            }
+            _ => Err(syn::Error::new(
+                adapter_name.span(),
+                "expected `widget(...)` or `stateful(widget, state)`",
+            )),
         }
     }
 }
@@ -31,7 +46,7 @@ impl ToTokens for ParsedAdapter {
                 tokens.extend(quote! {
                     {
                         let mut _element=::ratatui_kit::Element::<::ratatui_kit::components::WidgetAdapter<_>>{
-                            key: ::ratatui_kit::ElementKey::new(#decl_key),
+                            key: ::ratatui_kit::ElementKey::decl(#decl_key),
                             props: ::ratatui_kit::components::WidgetAdapterProps{
                                 inner: #expr
                             },
@@ -40,14 +55,14 @@ impl ToTokens for ParsedAdapter {
                     }
                 });
             }
-            ParsedAdapter::StatefulWidget(expr, state_ident) => {
+            ParsedAdapter::StatefulWidget(expr, state) => {
                 tokens.extend(quote! {
                     {
                         let mut _element=::ratatui_kit::Element::<::ratatui_kit::components::StatefulWidgetAdapter<_>>{
-                            key: ::ratatui_kit::ElementKey::new(#decl_key),
+                            key: ::ratatui_kit::ElementKey::decl(#decl_key),
                             props: ::ratatui_kit::components::StatefulWidgetAdapterProps{
                                 inner: #expr,
-                                state: #state_ident
+                                state: #state
                             },
                         };
                         _element

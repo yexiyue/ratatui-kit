@@ -148,3 +148,53 @@ where
         }
     }
 }
+
+/// update 路径所需终端能力的**对象安全**投影。
+///
+/// `ComponentUpdater` 持 `&mut dyn UpdaterTerminal` 而非具体 `Terminal<CrossTerminal>`——
+/// 因 `update_component` 经 `dyn` 分发,`ComponentUpdater` 必须非泛型,故把终端能力擦除成
+/// 对象安全 trait。这使 update 能在无头测试里用 no-op 终端驱动(渲染 harness)。仅暴露 update
+/// 真正用到的两项:
+/// - `insert_before`:闭包 box 化(`TerminalImpl::insert_before` 泛型闭包不对象安全);
+/// - `events`:固定 `crossterm::event::Event`(`use_events`/`CrossTerminal` 本就 crossterm-only)。
+///
+/// 多后端仍由泛型 `Terminal<T>` 承载:任何 `T::Event = crossterm Event` 的后端都自动满足本 trait。
+pub trait UpdaterTerminal {
+    fn insert_before(
+        &mut self,
+        height: u16,
+        draw_fn: Box<dyn FnOnce(&mut Buffer)>,
+    ) -> io::Result<()>;
+    fn events(&mut self) -> io::Result<TerminalEvents<crossterm::event::Event>>;
+}
+
+impl<T> UpdaterTerminal for Terminal<T>
+where
+    T: TerminalImpl<Event = crossterm::event::Event>,
+{
+    fn insert_before(
+        &mut self,
+        height: u16,
+        draw_fn: Box<dyn FnOnce(&mut Buffer)>,
+    ) -> io::Result<()> {
+        // 转发到 Terminal 的固有泛型 insert_before（Box<dyn FnOnce> 本身即 FnOnce）。
+        Terminal::insert_before(self, height, draw_fn)
+    }
+
+    fn events(&mut self) -> io::Result<TerminalEvents<crossterm::event::Event>> {
+        Terminal::events(self)
+    }
+}
+
+#[cfg(test)]
+impl<T> TerminalEvents<T> {
+    /// 空事件流（无 pending、不唤醒），供测试 no-op 终端使用。
+    pub(crate) fn empty() -> Self {
+        TerminalEvents {
+            inner: Arc::new(Mutex::new(TerminalEventsInner {
+                pending: VecDeque::new(),
+                waker: None,
+            })),
+        }
+    }
+}

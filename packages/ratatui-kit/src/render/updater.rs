@@ -10,13 +10,15 @@ use crate::{
     element::ElementExt,
     layout_style::LayoutStyle,
     multimap::AppendOnlyMultimap,
-    terminal::Terminal,
+    terminal::UpdaterTerminal,
 };
 
 pub struct ComponentUpdater<'a, 'c: 'a> {
     key: ElementKey,
     component_context_stack: &'a mut ContextStack<'c>,
-    terminal: &'a mut Terminal,
+    // 对象安全的终端投影:update 路径只需 insert_before/events 两项能力,
+    // 不绑定具体 `Terminal<CrossTerminal>`,从而可在无头测试里用 no-op 终端驱动。
+    terminal: &'a mut dyn UpdaterTerminal,
     components: &'a mut Components,
     transparent_layout: bool,
     layout_style: &'a mut LayoutStyle,
@@ -26,7 +28,7 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
     pub(crate) fn new(
         key: ElementKey,
         component_context_stack: &'a mut ContextStack<'c>,
-        terminal: &'a mut Terminal,
+        terminal: &'a mut dyn UpdaterTerminal,
         components: &'a mut Components,
         layout_style: &'a mut LayoutStyle,
     ) -> ComponentUpdater<'a, 'c> {
@@ -56,7 +58,7 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
         self.component_context_stack.get_context_mut()
     }
 
-    pub fn terminal(&mut self) -> &mut Terminal {
+    pub fn terminal(&mut self) -> &mut dyn UpdaterTerminal {
         self.terminal
     }
 

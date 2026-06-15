@@ -1,0 +1,110 @@
+//! 组件渲染测试 harness：把一个元素的组件树**单次离屏渲染**到 ratatui `TestBackend` 的
+//! `Buffer`，用于断言组件输出。
+//!
+//! 关键：`update` 经对象安全的 `&mut dyn UpdaterTerminal` 驱动，故可用 no-op 终端（无真实
+//! TTY）跑 update；draw 则用 `ratatui::Terminal<TestBackend>` 取 `Frame`。只覆盖一次渲染的
+//! 静态输出，不轮询 future/事件。
+
+use crate::{
+    AnyElement, ComponentDrawer, ElementExt,
+    render::tree::Tree,
+    terminal::{TerminalEvents, UpdaterTerminal},
+};
+use ratatui::buffer::Buffer;
+use std::io;
+
+/// no-op 终端：`insert_before` 空操作、`events` 返回空流。仅供驱动 update。
+struct NoopTerminal;
+
+impl UpdaterTerminal for NoopTerminal {
+    fn insert_before(
+        &mut self,
+        _height: u16,
+        _draw_fn: Box<dyn FnOnce(&mut Buffer)>,
+    ) -> io::Result<()> {
+        Ok(())
+    }
+
+    fn events(&mut self) -> io::Result<TerminalEvents<crossterm::event::Event>> {
+        Ok(TerminalEvents::empty())
+    }
+}
+
+/// 单次离屏渲染：建树 → no-op 跑 update → `TestBackend` 跑 draw → 返回 `Buffer` 克隆。
+fn render_to_buffer(el: impl Into<AnyElement<'static>>, width: u16, height: u16) -> Buffer {
+    let mut el = el.into();
+    let helper = el.helper();
+    let mut tree = Tree::new(el.props_mut(), helper);
+
+    let mut noop = NoopTerminal;
+    tree.update_once(&mut noop);
+
+    let mut terminal =
+        ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height)).unwrap();
+    terminal
+        .draw(|frame| {
+            let area = frame.area();
+            let mut drawer = ComponentDrawer::new(frame, area);
+            tree.draw_root(&mut drawer);
+        })
+        .unwrap();
+
+    terminal.backend().buffer().clone()
+}
+
+/// 把 Buffer 第 `y` 行拼成字符串，便于断言。
+fn row(buf: &Buffer, y: u16) -> String {
+    (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect()
+}
+
+/// 在整个 Buffer 里找某字符的首个位置（列, 行）。
+fn find(buf: &Buffer, ch: &str) -> Option<(u16, u16)> {
+    (0..buf.area.height)
+        .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
+        .find(|&(x, y)| buf[(x, y)].symbol() == ch)
+}
+
+#[test]
+fn text_renders_content() {
+    use crate::components::Text;
+    let buf = render_to_buffer(crate::element!(Text(text: "hi")), 6, 1);
+    assert!(row(&buf, 0).starts_with("hi"), "实际: {:?}", row(&buf, 0));
+}
+
+#[test]
+fn border_draws_box_around_child() {
+    use crate::components::{Border, Text};
+    let buf = render_to_buffer(crate::element!(Border { Text(text: "x") }), 5, 3);
+    // 左上角为边框字符（非空格）。
+    assert_ne!(buf[(0, 0)].symbol(), " ", "左上角应是边框字符");
+    // 内容落在边框内（第 1 行）。
+    assert!(
+        row(&buf, 1).contains('x'),
+        "内容应在边框内: {:?}",
+        row(&buf, 1)
+    );
+}
+
+#[test]
+fn view_renders_children() {
+    use crate::components::{Text, View};
+    let buf = render_to_buffer(crate::element!(View { Text(text: "ab") }), 6, 1);
+    assert!(row(&buf, 0).contains("ab"), "实际: {:?}", row(&buf, 0));
+}
+
+#[test]
+fn center_offsets_content_from_origin() {
+    use crate::components::{Center, Text};
+    use ratatui::layout::Constraint;
+    // Center 需显式尺寸界定居中区域。
+    let buf = render_to_buffer(
+        crate::element!(Center(width: Constraint::Length(1), height: Constraint::Length(1)) {
+            Text(text: "x")
+        }),
+        9,
+        3,
+    );
+    let (x, _y) = find(&buf, "x").expect("应渲染 x");
+    // 居中 → 不在左上原点列。
+    assert!(x > 0, "居中后 x 应不在第 0 列, 实际列 {x}");
+}

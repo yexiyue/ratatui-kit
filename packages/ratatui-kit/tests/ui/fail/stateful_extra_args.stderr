@@ -1,0 +1,5 @@
+error: `stateful(...)` expects exactly `widget, state`
+ --> tests/ui/fail/stateful_extra_args.rs:8:36
+  |
+8 |         stateful(Line::from("a"), b, c)
+  |                                    ^

@@ -32,12 +32,12 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             justify_content: Flex::Center,
         ){
             View(height:Constraint::Length(1)){
-                $Line::styled(
+                Text(text: Line::styled(
                     format!("Counter: {state}"),
                     Style::default().green().bold(),
                 )
                 .centered()
-                .bold()
+                .bold())
             }
         }
     )

@@ -1,0 +1,5 @@
+error: `#(expr)` child syntax was removed; use `{ expr }`
+ --> tests/ui/fail/old_hash_syntax.rs:7:9
+  |
+7 |         #(value)
+  |         ^

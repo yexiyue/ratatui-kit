@@ -72,3 +72,37 @@ where
         self.items.iter_mut().filter_map(|item| item.as_mut())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pop_front_is_fifo_per_key() {
+        let mut m = AppendOnlyMultimap::default();
+        m.push_back("k", 1);
+        m.push_back("k", 2);
+        m.push_back("j", 3);
+        let mut r: RemoveOnlyMultimap<_, _> = m.into();
+
+        // 同 key 按插入顺序(FIFO)取出——协调阶段「同 key 复用上一帧节点」依赖此序。
+        assert_eq!(r.pop_front(&"k"), Some(1));
+        assert_eq!(r.pop_front(&"k"), Some(2));
+        assert_eq!(r.pop_front(&"k"), None);
+        assert_eq!(r.pop_front(&"j"), Some(3));
+        // 不存在的 key → None。
+        assert_eq!(r.pop_front(&"missing"), None);
+    }
+
+    #[test]
+    fn iter_yields_only_unremoved() {
+        let mut m = AppendOnlyMultimap::default();
+        m.push_back("a", 10);
+        m.push_back("a", 20);
+        let mut r: RemoveOnlyMultimap<_, _> = m.into();
+        r.pop_front(&"a"); // 取走 10
+
+        let rest: Vec<_> = r.iter().copied().collect();
+        assert_eq!(rest, vec![20]);
+    }
+}

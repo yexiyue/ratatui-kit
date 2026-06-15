@@ -22,14 +22,21 @@ pub struct PositionedProps<'a> {
     pub children: Vec<AnyElement<'a>>,
 }
 
-impl Component for Positioned {
-    type Props<'a> = PositionedProps<'a>;
-
-    fn new(props: &Self::Props<'_>) -> Self {
+impl Positioned {
+    /// 从 props 派生自身状态的单一构造源（区域/清除标志只写一处，避免 new/update 漂移）。
+    fn from_props(props: &PositionedProps<'_>) -> Self {
         Self {
             area: Rect::new(props.x, props.y, props.width, props.height),
             clear: props.clear,
         }
+    }
+}
+
+impl Component for Positioned {
+    type Props<'a> = PositionedProps<'a>;
+
+    fn new(props: &Self::Props<'_>) -> Self {
+        Self::from_props(props)
     }
 
     fn update(
@@ -38,11 +45,8 @@ impl Component for Positioned {
         _hooks: crate::Hooks,
         updater: &mut crate::ComponentUpdater,
     ) {
-        *self = Self {
-            area: Rect::new(props.x, props.y, props.width, props.height),
-            clear: props.clear,
-        };
-
+        *self = Self::from_props(props);
+        // 子节点与布局收尾保持显式。
         updater.update_children(&mut props.children, None);
         updater.set_layout_style(LayoutStyle {
             width: Constraint::Length(0),

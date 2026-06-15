@@ -34,7 +34,7 @@ impl ToTokens for ParsedProps {
         let (impl_generics, type_generics, where_clause) = def.generics.split_for_impl();
 
         tokens.extend(quote! {
-            unsafe impl #impl_generics ::ratatui_kit::Props for #name #type_generics #where_clause {}
+            impl #impl_generics ::ratatui_kit::Props for #name #type_generics #where_clause {}
         });
     }
 }

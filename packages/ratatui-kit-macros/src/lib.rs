@@ -5,25 +5,31 @@
 //! - `#[derive(Props)]`：为组件属性自动生成 Props trait 实现。
 //! - `element!`：声明式 UI 宏，极大提升终端 UI 组件开发效率。
 //!   - 语法风格类似 React JSX，但为 Rust 语法友好设计。
-//!   - 支持嵌套、props、children、条件渲染、列表渲染。
-//!   - 条件渲染、列表渲染、动态子组件等均需写在 `#(...expr)` 语法块中，表达式可返回 Option/Vec/impl Iterator。
-//!   - 通过 `$` 前缀可兼容任何实现 WidgetRef 的 ratatui 原生组件或自定义组件，便于无缝集成 ratatui 能力。
+//!   - 支持嵌套、props、children、一等控制流渲染。
+//!   - **一等控制流**：子节点块内可直接写 `if/else`、`if let`、`for`、`match`，分支体即子节点；
+//!     各分支独立 extend，可返回不同元素类型，无需 `.into_any()`。
+//!   - `{ expr }` 可内嵌任意返回 Option/Vec/impl Iterator/Element 的 Rust 表达式。
+//!   - `widget(expr)` / `stateful(widget, state)` 可兼容 ratatui 原生组件（逃生舱）。
 //!   - 适用于声明式构建终端 UI 组件树。
 //!
 //! ## element! 宏语法
 //!
-//! 例如，声明式构建一个带条件渲染和 ratatui 原生组件的 UI：
+//! 例如，声明式构建一个带一等控制流和 ratatui 原生组件的 UI：
 //!
-//! ```rust
+//! ```rust,ignore
 //! element!(Panel(title: "Demo") {
-//!     #(if show_title { element!(Title("Hello")) }),
-//!     #(for item in items { element!(ListItem(item)) }),
-//!     $Block::default().borders(Borders::ALL),
+//!     if show_title {
+//!         Title(text: "Hello")
+//!     }
+//!     for item in items {
+//!         ListItem(label: item, key: item.id)
+//!     }
+//!     widget(Block::default().borders(Borders::ALL))
 //! })
 //! ```
 //!
-//! - 所有条件渲染、列表渲染、动态子组件都需包裹在 `#(...)` 表达式中，且条件渲染/循环渲染的子组件也需用 element! 宏包裹。
-//! - 通过 `$` 前缀可直接集成 ratatui 原生组件。
+//! - 控制流分支体直接写子元素；动态/复杂表达式仍可用 `{ expr }`。
+//! - 通过 `widget(...)` / `stateful(...)` 可直接集成 ratatui 原生组件。
 //! - 语法风格类似 JSX，但为 Rust 语法友好设计。
 //! - 适用于声明式构建终端 UI 组件树。
 
@@ -41,8 +47,6 @@ mod element;
 mod props;
 #[cfg(feature = "router")]
 mod router;
-#[cfg(feature = "store")]
-mod store;
 mod utils;
 mod with_layout_style;
 
@@ -52,22 +56,30 @@ pub fn derive_props(item: TokenStream) -> TokenStream {
     props.to_token_stream().into()
 }
 
-/// 声明式 UI 宏，类似 JSX，支持嵌套、props、children、条件渲染、列表渲染等，极大提升终端 UI 组件开发效率。
+/// 声明式 UI 宏，类似 JSX，支持嵌套、props、children、控制流渲染等，极大提升终端 UI 组件开发效率。
 ///
 /// - 语法风格类似 React JSX，但为 Rust 语法友好设计。
-/// - 支持 `if/else` 条件渲染、`#(for ...)` 列表渲染、props 传递、children 嵌套。
-/// - 通过 `$` 前缀可兼容任何实现 WidgetRef 的 ratatui 原生组件或自定义组件，便于无缝集成 ratatui 能力。
+/// - **一等控制流**：子节点块内可直接写 `if/else`、`if let`、`for`、`match`，分支体即子节点。
+///   各分支独立 extend，故可返回不同元素类型，无需 `.into_any()` 统一类型。
+/// - `{ expr }` 可内嵌任意返回 `Option`/`Vec`/`Iterator`/`Element` 的 Rust 表达式。
+/// - `widget(expr)` / `stateful(widget, state)` 可兼容 ratatui 原生组件（逃生舱）。
 /// - 适用于声明式构建终端 UI 组件树。
 ///
 /// ## element! 宏语法
 ///
-/// 例如，声明式构建一个带条件渲染和 ratatui 原生组件的 UI：
+/// 例如，声明式构建一个带一等控制流和 ratatui 原生组件的 UI：
 ///
-/// ```rust
+/// ```rust,ignore
 /// element!(Panel(title: "Demo") {
-///     #(if show_title { element!(Title("Hello")) }),
-///     #(for item in items { element!(ListItem(item)) }),
-///     $Block::default().borders(Borders::ALL),
+///     if show_title {
+///         Title(text: "Hello")
+///     } else {
+///         Title(text: "Hidden")
+///     }
+///     for item in items {
+///         ListItem(label: item, key: item.id)
+///     }
+///     widget(Block::default().borders(Borders::ALL))
 /// })
 /// ```
 #[proc_macro]
@@ -88,20 +100,6 @@ pub fn component(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn routes(input: TokenStream) -> TokenStream {
     let routes = syn::parse_macro_input!(input as router::Routes);
     routes.to_token_stream().into()
-}
-
-#[cfg(feature = "store")]
-#[proc_macro]
-pub fn use_stores(input: TokenStream) -> TokenStream {
-    let stores = syn::parse_macro_input!(input as store::UseStores);
-    stores.to_token_stream().into()
-}
-
-#[cfg(feature = "store")]
-#[proc_macro_derive(Store)]
-pub fn derive_store(item: TokenStream) -> TokenStream {
-    let store = syn::parse_macro_input!(item as store::Store);
-    store.to_token_stream().into()
 }
 
 /// 为属性结构体自动生成布局相关方法。

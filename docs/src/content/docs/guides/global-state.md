@@ -5,50 +5,65 @@ sidebar:
 ---
 
 
-Ratatui Kit 内置了全局状态管理机制，帮助你在终端应用中高效地共享和管理跨组件的状态。无论是计数器、表单输入，还是更复杂的全局数据，都能轻松实现响应式更新。下面为你详细介绍全局状态的用法和注意事项。
+Ratatui Kit 内置 Atom 全局原子，帮助你在终端应用中共享跨组件状态。Atom 是进程级状态：可以在组件内订阅，也可以在组件外或后台任务里直接读写。
 
 ## 定义全局状态
 
-定义全局状态非常简单，只需为你的结构体派生 `Store` 宏即可：
+Atom 使用模块级 `static` 声明，不需要结构体或派生宏：
 
 ```rust
-#[derive(Store, Default)]
-pub struct CounterAndTextInput {
-    pub count: i32,
-    pub value: String,
-}
+static COUNT: Atom<i32> = Atom::new(|| 0);
+static VALUE: Atom<String> = Atom::new(String::new);
 ```
 
-这样会自动生成一个 `CounterAndTextInputStore` 类型和一个 static `COUNTER_AND_TEXT_INPUT_STORE` 实例，方便全局访问。
+`Atom::new` 接收无捕获初始化函数，首次读取、写入或 `use_atom` 时才会惰性创建底层状态。
 
 ## 在组件中使用全局状态
 
-如果只用一个全局状态，直接通过 `hooks.use_store` 绑定即可：
+在组件内用 `hooks.use_atom(&ATOM)` 订阅全局原子。返回的 `AtomState<T>` 是 `Copy` 句柄，可以像本地 `State<T>` 一样读写：
 
 ```rust
-pub trait UseStore: private::Sealed {
-    fn use_store<T>(&mut self, state: StoreState<T>) -> StoreState<T>
-    where
-        T: Unpin + Send + Sync + 'static;
+#[component]
+fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut count = hooks.use_atom(&COUNT);
+
+    hooks.use_future(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            count += 1;
+        }
+    });
+
+    element!(Text(text: format!("Counter: {}", count.get())))
 }
 ```
 
-`use_store` 接收并返回一个 `StoreState<T>`，会自动将状态与当前组件绑定，实现状态变更时自动刷新组件。
+写入 `AtomState` 会唤醒订阅了同一个 Atom 的组件，实现细粒度刷新。
 
-如需同时使用多个全局状态，可以用 `use_stores!` 宏，支持批量绑定：
+## 组件外读写
+
+组件外可以通过 `Atom::get` / `Atom::set` 直接操作全局状态：
 
 ```rust
-let store = &COUNTER_AND_TEXT_INPUT_STORE;
-let (count, value) = use_stores!(store.count, store.value);
+COUNT.set(10);
+let current = COUNT.get();
 ```
 
-这样你就可以在组件中像使用本地状态一样，方便地读写全局状态。
+如果需要把句柄移入后台任务，也可以先取得 `AtomState`：
+
+```rust
+let mut count = COUNT.state();
+tokio::spawn(async move {
+    count += 1;
+});
+```
 
 ## 注意事项
 
-- `StoreState` 和 `State` 的实现原理基本一致，区别在于全局状态需要与组件绑定，才能实现自动刷新。未绑定时可读写，但不会自动更新组件。
-- 使用 `Store` 派生宏时，结构体不能有类型参数，且必须实现 `Default` trait（用于初始化 static store）。
+- `Atom<T>` 适合跨组件、跨页面或后台任务共享的状态；组件私有状态仍优先用 `use_state`。
+- `hooks.use_atom(&ATOM)` 会注册当前组件的 waker。未订阅时仍可读写，但不会主动刷新任何组件。
+- `AtomState<T>` 与 `State<T>` 都支持 `+=`、`-=` 等运算符重载，写入会触发变更通知。
 
 ## 示例与更多资料
 
-你可以参考[全局状态示例](https://yexiyue.github.io/ratatui-kit-website/example/store/)获取完整代码和更多用法。如果在实际开发中遇到问题，欢迎查阅文档或在社区交流你的经验！
+你可以参考[全局状态示例](https://yexiyue.github.io/ratatui-kit-website/example/store/)获取完整代码和更多用法。

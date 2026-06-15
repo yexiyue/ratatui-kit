@@ -10,11 +10,10 @@ use ratatui_kit::{
     ratatui::layout::Constraint,
 };
 
-#[derive(Store, Default)]
-pub struct CounterAndTextInput {
-    pub count: i32,
-    pub value: String,
-}
+// 全局响应式原子（类 Jotai/Recoil）：模块级声明，零宏零结构。
+// 跨页面共享，任何组件 use_atom 订阅，写入仅唤醒订阅者。
+static COUNT: Atom<i32> = Atom::new(|| 0);
+static VALUE: Atom<String> = Atom::new(String::new);
 
 #[tokio::main]
 async fn main() {
@@ -36,8 +35,8 @@ async fn main() {
 
 #[component]
 fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let store = &COUNTER_AND_TEXT_INPUT_STORE;
-    let (count, value) = use_stores!(store.count, store.value);
+    let count = hooks.use_atom(&COUNT);
+    let value = hooks.use_atom(&VALUE);
     let mut navigate = hooks.use_navigate();
     hooks.use_events(move |event| {
         if let Event::Key(key_event) = event
@@ -56,21 +55,20 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             style:Style::default().blue(),
             height:Constraint::Length(10),
             gap:1,
-            top_title:Line::from("🏠 Store 全局状态仪表盘").centered().bold(),
+            top_title:Line::from("🏠 Atom 全局状态仪表盘").centered().bold(),
         ){
-            $Line::from(format!("全局计数: {}", count.get()))
-            $Line::from(format!("全局输入: {}", value.read().as_str()))
-            $Line::from("1. 计数器页面 (Counter)")
-            $Line::from("2. 文本输入页面")
+            Text(text: format!("全局计数: {}", count.get()))
+            Text(text: format!("全局输入: {}", value.read().as_str()))
+            Text(text: "1. 计数器页面 (Counter)")
+            Text(text: "2. 文本输入页面")
         }
     )
 }
 
 #[component]
 fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let store = &COUNTER_AND_TEXT_INPUT_STORE;
-    let mut count = use_stores!(store.count);
-    let value = use_stores!(store.value);
+    let mut count = hooks.use_atom(&COUNT);
+    let value = hooks.use_atom(&VALUE);
     let mut navigate = hooks.use_navigate();
     hooks.use_future(async move {
         loop {
@@ -92,20 +90,20 @@ fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             height:Constraint::Length(6),
             top_title:Line::from("计数器页面 (ESC 返回)").centered(),
         ){
-            $Line::from(format!("全局输入: {}", value.read().as_str()))
-            $Line::styled(
+            Text(text: format!("全局输入: {}", value.read().as_str()))
+            Text(text: Line::styled(
                 format!("Counter: {}", count.get()),
                 Style::default().fg(ratatui::style::Color::Green).bold(),
-            ).centered().bold().underlined()
+            ).centered().bold().underlined())
         }
     )
 }
 
 #[component]
 fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let store = &COUNTER_AND_TEXT_INPUT_STORE;
-    let (mut value, count) = use_stores!(store.value, store.count);
-    // 注:TextArea 暂时下线,改用单行 Input;输入实时同步到 store 的 String 字段。
+    let mut value = hooks.use_atom(&VALUE);
+    let count = hooks.use_atom(&COUNT);
+    // 注:TextArea 暂时下线,改用单行 Input;输入实时同步到全局 VALUE 原子。
     let input = hooks.use_state(tui_input::Input::default);
     let mut navigate = hooks.use_navigate();
     hooks.use_events(move |event| {
@@ -126,7 +124,7 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             height:Constraint::Length(7),
             top_title:Line::from("文本输入页面 (ESC 返回)").centered(),
         ){
-            $Line::from(format!("全局计数: {}", count.get()))
+            Text(text: format!("全局计数: {}", count.get()))
             Input(
                 input: input.read().clone(),
                 cursor_style: Style::default().on_cyan(),

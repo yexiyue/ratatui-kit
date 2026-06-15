@@ -2,8 +2,4 @@
 .idea
 .vscode
 .DS_Store
-
-# agent / 工具产物(本地)
-.claude/
-CLAUDE.md
-openspec/
+.codex/
