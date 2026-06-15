@@ -53,7 +53,11 @@ impl<'a> Tree<'a> {
             if self.system_context.should_exit() || terminal.received_ctrl_c() {
                 break;
             }
-            select(self.root_component.wait().boxed(), terminal.wait().boxed()).await;
+            select(
+                self.root_component.wait().boxed_local(),
+                terminal.wait().boxed_local(),
+            )
+            .await;
             if terminal.received_ctrl_c() {
                 break;
             }

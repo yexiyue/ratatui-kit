@@ -2,12 +2,8 @@ use ratatui_kit_macros::Props;
 
 /// 组件属性 trait，所有可作为组件 props 的类型都需实现此 trait。
 ///
-/// - 需实现 Send + Sync。
 /// - 推荐使用 `#[derive(Props)]` 自动实现。
-///
-/// # Safety
-/// 实现者需保证类型安全和线程安全。
-pub unsafe trait Props: Send + Sync {}
+pub trait Props {}
 
 // 用于处理原始指针释放的trait
 // 通过类型擦除实现对未知类型的内存释放
@@ -41,9 +37,6 @@ pub struct AnyProps<'a> {
     drop: Option<Box<dyn DropRaw + 'a>>,
     _marker: std::marker::PhantomData<&'a mut ()>,
 }
-
-unsafe impl Send for AnyProps<'_> {}
-unsafe impl Sync for AnyProps<'_> {}
 
 impl<'a> AnyProps<'a> {
     // 创建拥有所有权的AnyProps实例

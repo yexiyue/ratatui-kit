@@ -58,7 +58,7 @@ use ratatui::layout::{Direction, Layout};
 /// ```
 ///
 /// > 一般用户无需手动实现，推荐使用 `#[component]` 宏自动生成。
-pub trait Component: Any + Send + Sync + Unpin {
+pub trait Component: Any + Unpin {
     type Props<'a>: Props
     where
         Self: 'a;
@@ -107,7 +107,7 @@ pub trait Component: Any + Send + Sync + Unpin {
     }
 }
 
-pub trait AnyComponent: Any + Send + Sync + Unpin {
+pub trait AnyComponent: Any + Unpin {
     fn update(&mut self, props: AnyProps, hooks: Hooks, updater: &mut ComponentUpdater);
 
     fn draw(&mut self, drawer: &mut ComponentDrawer);

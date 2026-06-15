@@ -4,7 +4,7 @@ use crate::{hooks::Hooks, props::AnyProps, render::ComponentUpdater};
 
 use super::{AnyComponent, Component};
 
-pub trait ComponentHelperExt: Any + Send + Sync {
+pub trait ComponentHelperExt: Any {
     fn new_component(&self, props: AnyProps) -> Box<dyn AnyComponent>;
 
     fn update_component(

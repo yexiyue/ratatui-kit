@@ -1,5 +1,7 @@
-use ratatui::{style::Style, widgets::Scrollbar};
-use ratatui_kit::components::SendBlock;
+use ratatui::{
+    style::Style,
+    widgets::{Block, Scrollbar},
+};
 use ratatui_kit::{Component, Props, State};
 use std::hash::Hash;
 use tui_tree_widget::{TreeItem, TreeState};
@@ -32,8 +34,8 @@ where
     pub node_open_symbol: &'static str,
     /// 显示在没有子节点的节点前面的符号
     pub node_no_children_symbol: &'static str,
-    /// 可选的边框块(SendBlock 包装,见其文档)
-    pub block: SendBlock,
+    /// 可选的边框块。
+    pub block: Option<Block<'static>>,
 }
 
 impl<T> Default for TreeSelect<T>
@@ -51,7 +53,7 @@ where
             node_closed_symbol: "\u{25b6} ", // 向右箭头
             node_open_symbol: "\u{25bc} ",   // 向下箭头
             node_no_children_symbol: "  ",
-            block: SendBlock::default(),
+            block: None,
         }
     }
 }

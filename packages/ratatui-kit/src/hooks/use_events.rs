@@ -15,18 +15,18 @@ pub trait UseEvents: private::Sealed {
     /// 注册全局事件监听器，适合快捷键、全局输入等场景。
     fn use_events<F>(&mut self, f: F)
     where
-        F: FnMut(Event) + Send + 'static;
+        F: FnMut(Event) + 'static;
 
     /// 注册仅作用于当前组件的事件监听器，适合局部交互。
     fn use_local_events<F>(&mut self, f: F)
     where
-        F: FnMut(Event) + Send + 'static;
+        F: FnMut(Event) + 'static;
 }
 
 impl UseEvents for Hooks<'_, '_> {
     fn use_events<F>(&mut self, f: F)
     where
-        F: FnMut(Event) + Send + 'static,
+        F: FnMut(Event) + 'static,
     {
         let h = self.use_hook(move || UseEventsImpl {
             events: None,
@@ -39,7 +39,7 @@ impl UseEvents for Hooks<'_, '_> {
 
     fn use_local_events<F>(&mut self, f: F)
     where
-        F: FnMut(Event) + Send + 'static,
+        F: FnMut(Event) + 'static,
     {
         let h = self.use_hook(move || UseEventsImpl {
             events: None,
@@ -52,7 +52,7 @@ impl UseEvents for Hooks<'_, '_> {
 }
 
 struct UseEventsImpl {
-    f: Option<Box<dyn FnMut(Event) + Send>>,
+    f: Option<Box<dyn FnMut(Event)>>,
     events: Option<TerminalEvents<Event>>,
     in_component: bool,
     component_area: Rect,

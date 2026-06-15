@@ -68,7 +68,7 @@ pub use use_router::*;
 /// - `pre_component_draw/post_component_draw`：组件渲染前后钩子。
 ///
 /// 通常无需手动实现，除非自定义复杂 hook。
-pub trait Hook: Unpin + Send {
+pub trait Hook: Unpin {
     fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
         Poll::Pending
     }

@@ -27,10 +27,6 @@ pub use center::*;
 pub mod text;
 pub use text::*;
 
-// Block 的 Send + Sync 包装(ratatui 0.30 起 Block 因内含阴影效果不再 Send+Sync)。
-pub mod send_block;
-pub use send_block::*;
-
 // 定位组件，支持绝对定位，适合复杂布局需求。
 pub mod positioned;
 pub use positioned::*;

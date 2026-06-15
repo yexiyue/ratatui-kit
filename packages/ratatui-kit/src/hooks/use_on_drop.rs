@@ -9,12 +9,12 @@ mod private {
 pub trait UseOnDrop: private::Sealed {
     fn use_on_drop<F>(&mut self, f: F)
     where
-        F: FnMut() + Send + 'static;
+        F: FnMut() + 'static;
 }
 
 #[derive(Default)]
 struct UseOnDropImpl {
-    callback: Option<Box<dyn FnMut() + Send>>,
+    callback: Option<Box<dyn FnMut()>>,
 }
 
 impl Hook for UseOnDropImpl {
@@ -29,7 +29,7 @@ impl UseOnDrop for crate::Hooks<'_, '_> {
     /// 在组件销毁时执行回调。注意不要在回调中使用State。
     fn use_on_drop<F>(&mut self, f: F)
     where
-        F: FnMut() + Send + 'static,
+        F: FnMut() + 'static,
     {
         let hook = self.use_hook(UseOnDropImpl::default);
         hook.callback.replace(Box::new(f));

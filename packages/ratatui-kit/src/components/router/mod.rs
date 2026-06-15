@@ -97,9 +97,6 @@ impl Route {
     }
 }
 
-unsafe impl Send for Route {}
-unsafe impl Sync for Route {}
-
 pub struct Routes(Vec<Route>);
 
 #[allow(clippy::derivable_impls)]
@@ -134,9 +131,6 @@ impl DerefMut for Routes {
         &mut self.0
     }
 }
-
-unsafe impl Send for Routes {}
-unsafe impl Sync for Routes {}
 
 #[derive(Default, Clone)]
 pub(crate) struct RouteContext {

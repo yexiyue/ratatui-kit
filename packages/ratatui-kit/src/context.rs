@@ -12,24 +12,24 @@ use std::{
 
 /// 通用上下文类型，支持所有权、不可变引用、可变引用三种模式。
 pub enum Context<'a> {
-    Ref(&'a (dyn Any + Send + Sync)),
-    Mut(&'a mut (dyn Any + Send + Sync)),
-    Owned(Box<dyn Any + Send + Sync>),
+    Ref(&'a dyn Any),
+    Mut(&'a mut dyn Any),
+    Owned(Box<dyn Any>),
 }
 
 impl<'a> Context<'a> {
     /// 创建一个拥有所有权的上下文。
-    pub fn owned<T: Any + Send + Sync>(context: T) -> Self {
+    pub fn owned<T: Any>(context: T) -> Self {
         Context::Owned(Box::new(context))
     }
 
     /// 创建一个不可变引用的上下文。
-    pub fn form_ref<T: Any + Send + Sync>(context: &'a T) -> Self {
+    pub fn form_ref<T: Any>(context: &'a T) -> Self {
         Context::Ref(context)
     }
 
     /// 创建一个可变引用的上下文。
-    pub fn form_mut<T: Any + Send + Sync>(context: &'a mut T) -> Self {
+    pub fn form_mut<T: Any>(context: &'a mut T) -> Self {
         Context::Mut(context)
     }
 
@@ -63,7 +63,7 @@ pub struct ContextStack<'a> {
 }
 
 impl<'a> ContextStack<'a> {
-    pub(crate) fn root(root_context: &'a mut (dyn Any + Send + Sync)) -> Self {
+    pub(crate) fn root(root_context: &'a mut dyn Any) -> Self {
         ContextStack {
             stack: vec![RefCell::new(Context::Mut(root_context))],
         }
@@ -112,9 +112,6 @@ impl<'a> ContextStack<'a> {
 pub struct SystemContext {
     should_exit: bool,
 }
-
-unsafe impl Send for SystemContext {}
-unsafe impl Sync for SystemContext {}
 
 impl SystemContext {
     pub(crate) fn new() -> Self {

@@ -13,7 +13,7 @@ pub trait UseMemo: private::Sealed {
     where
         F: FnOnce() -> T,
         D: Hash,
-        T: Clone + Send + Unpin + 'static;
+        T: Clone + Unpin + 'static;
 }
 
 pub(crate) fn hash_deps<D: Hash>(deps: D) -> u64 {
@@ -36,14 +36,14 @@ impl<T> Default for UseMemoImpl<T> {
     }
 }
 
-impl<T: Send + Unpin> Hook for UseMemoImpl<T> {}
+impl<T: Unpin> Hook for UseMemoImpl<T> {}
 
 impl UseMemo for Hooks<'_, '_> {
     fn use_memo<F, D, T>(&mut self, f: F, deps: D) -> T
     where
         F: FnOnce() -> T,
         D: Hash,
-        T: Clone + Send + Unpin + 'static,
+        T: Clone + Unpin + 'static,
     {
         let dep_hash = hash_deps(deps);
         let hook = self.use_hook(UseMemoImpl::<T>::default);
