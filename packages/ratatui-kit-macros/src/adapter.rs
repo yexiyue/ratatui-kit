@@ -3,8 +3,8 @@ use syn::{Expr, Ident, Token, parse::Parse};
 use uuid::Uuid;
 
 pub enum ParsedAdapter {
-    Widget(syn::Expr),
-    StatefulWidget(syn::Expr, syn::Expr),
+    Widget(Expr),
+    StatefulWidget(Expr, Expr),
 }
 
 impl Parse for ParsedAdapter {
@@ -55,14 +55,14 @@ impl ToTokens for ParsedAdapter {
                     }
                 });
             }
-            ParsedAdapter::StatefulWidget(expr, state_ident) => {
+            ParsedAdapter::StatefulWidget(expr, state) => {
                 tokens.extend(quote! {
                     {
                         let mut _element=::ratatui_kit::Element::<::ratatui_kit::components::StatefulWidgetAdapter<_>>{
                             key: ::ratatui_kit::ElementKey::decl(#decl_key),
                             props: ::ratatui_kit::components::StatefulWidgetAdapterProps{
                                 inner: #expr,
-                                state: #state_ident
+                                state: #state
                             },
                         };
                         _element
