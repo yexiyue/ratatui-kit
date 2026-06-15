@@ -78,11 +78,9 @@ pub struct Border {
     pub bottom_title: Option<Line<'static>>,
 }
 
-impl Component for Border {
-    type Props<'a> = BorderProps<'a>;
-
-    /// 根据属性创建 Border 组件实例
-    fn new(props: &Self::Props<'_>) -> Self {
+impl Border {
+    /// 从 props 派生自身状态的单一构造源（字段镜像列表只写一处，避免 new/update 漂移）。
+    fn from_props(props: &BorderProps<'_>) -> Self {
         Self {
             padding: props.padding,
             border_style: props.border_style,
@@ -93,6 +91,15 @@ impl Component for Border {
             bottom_title: props.bottom_title.clone(),
         }
     }
+}
+
+impl Component for Border {
+    type Props<'a> = BorderProps<'a>;
+
+    /// 根据属性创建 Border 组件实例
+    fn new(props: &Self::Props<'_>) -> Self {
+        Self::from_props(props)
+    }
 
     /// 根据最新属性和子组件更新自身状态
     fn update(
@@ -101,21 +108,9 @@ impl Component for Border {
         _hooks: crate::Hooks,
         updater: &mut crate::ComponentUpdater,
     ) {
-        // 获取布局属性
-        let layout_style = props.layout_style();
-        // 用新属性重建自身
-        *self = Self {
-            padding: props.padding,
-            border_style: props.border_style,
-            borders: props.borders,
-            border_set: props.border_set,
-            style: props.style,
-            top_title: props.top_title.clone(),
-            bottom_title: props.bottom_title.clone(),
-        };
-        // 设置布局样式
-        updater.set_layout_style(layout_style);
-        // 更新子组件
+        *self = Self::from_props(props);
+        // 布局与子节点收尾保持显式（不并入 from_props，后者只构造自身状态）。
+        updater.set_layout_style(props.layout_style());
         updater.update_children(&mut props.children, None);
     }
 
