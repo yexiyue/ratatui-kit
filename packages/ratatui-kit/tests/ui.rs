@@ -11,6 +11,7 @@ fn ui() {
     let t = trybuild::TestCases::new();
     t.pass("tests/ui/pass/*.rs");
     t.compile_fail("tests/ui/fail/*.rs");
-    // TODO(add-test-suite): router/store 等门控宏(routes!/use_stores!/#[derive(Store)])
-    // 的 pass 用例待补,届时加 `#[cfg(all(feature="router",feature="store"))] t.pass("tests/ui/pass_full/*.rs")`。
+    // TODO(add-test-suite): router 门控宏(routes!)的 pass 用例待补,
+    // 届时加 `#[cfg(feature = "router")] t.pass("tests/ui/pass_router/*.rs")`。
+    // 注:全局状态已改 atom（Atom/use_atom，非宏），无需 trybuild 宏用例。
 }

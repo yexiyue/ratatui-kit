@@ -19,6 +19,5 @@ proc-macro = true
 [features]
 default = []
 router = []
-store = []
 
-full = ["router", "store"]
+full = ["router"]

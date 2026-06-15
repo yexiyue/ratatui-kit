@@ -1,4 +1,4 @@
-use crate::{ElementKey, Hook, StoreState};
+use crate::{Atom, AtomState, ElementKey, Hook};
 use std::task::Poll;
 
 mod private {
@@ -6,31 +6,37 @@ mod private {
     impl Sealed for crate::Hooks<'_, '_> {}
 }
 
-pub trait UseStore: private::Sealed {
-    fn use_store<T>(&mut self, state: StoreState<T>) -> StoreState<T>
+pub trait UseAtom: private::Sealed {
+    /// 在组件内订阅一个全局原子：注册本组件的 waker，返回 `Copy + Send` 句柄
+    /// （可移入 `tokio::spawn` 在后台更新）。写入仅唤醒订阅了该 atom 的组件（细粒度）。
+    fn use_atom<T>(&mut self, atom: &'static Atom<T>) -> AtomState<T>
     where
         T: Unpin + Send + Sync + 'static;
 }
 
-impl UseStore for crate::Hooks<'_, '_> {
-    fn use_store<T>(&mut self, state: StoreState<T>) -> StoreState<T>
+impl UseAtom for crate::Hooks<'_, '_> {
+    fn use_atom<T>(&mut self, atom: &'static Atom<T>) -> AtomState<T>
     where
         T: Unpin + Send + Sync + 'static,
     {
-        let hook = self.use_hook(|| UseStoreImpl { state, key: None });
+        // atom.state() 惰性解析底层句柄;use_hook 仅首帧执行此闭包,故只解析一次。
+        let hook = self.use_hook(|| UseAtomImpl {
+            state: atom.state(),
+            key: None,
+        });
         hook.state
     }
 }
 
-struct UseStoreImpl<T>
+struct UseAtomImpl<T>
 where
     T: Unpin + Send + Sync + 'static,
 {
-    state: StoreState<T>,
+    state: AtomState<T>,
     key: Option<ElementKey>,
 }
 
-impl<T> Hook for UseStoreImpl<T>
+impl<T> Hook for UseAtomImpl<T>
 where
     T: Unpin + Send + Sync + 'static,
 {

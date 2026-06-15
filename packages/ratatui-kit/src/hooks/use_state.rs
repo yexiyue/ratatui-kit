@@ -284,69 +284,8 @@ impl<T: Display + Sync + Send + 'static> Display for State<T> {
     }
 }
 
-impl<T: ops::Add<Output = T> + Copy + Sync + Send + 'static> ops::Add<T> for State<T> {
-    type Output = T;
-
-    fn add(self, rhs: T) -> Self::Output {
-        self.get() + rhs
-    }
-}
-
-impl<T: ops::AddAssign<T> + Copy + Sync + Send + 'static> ops::AddAssign<T> for State<T> {
-    fn add_assign(&mut self, rhs: T) {
-        if let Some(mut v) = self.try_write() {
-            *v += rhs;
-        }
-    }
-}
-
-impl<T: ops::Sub<Output = T> + Copy + Sync + Send + 'static> ops::Sub<T> for State<T> {
-    type Output = T;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        self.get() - rhs
-    }
-}
-
-impl<T: ops::SubAssign<T> + Copy + Sync + Send + 'static> ops::SubAssign<T> for State<T> {
-    fn sub_assign(&mut self, rhs: T) {
-        if let Some(mut v) = self.try_write() {
-            *v -= rhs;
-        }
-    }
-}
-
-impl<T: ops::Mul<Output = T> + Copy + Sync + Send + 'static> ops::Mul<T> for State<T> {
-    type Output = T;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        self.get() * rhs
-    }
-}
-
-impl<T: ops::MulAssign<T> + Copy + Sync + Send + 'static> ops::MulAssign<T> for State<T> {
-    fn mul_assign(&mut self, rhs: T) {
-        if let Some(mut v) = self.try_write() {
-            *v *= rhs;
-        }
-    }
-}
-
-impl<T: ops::Div<Output = T> + Copy + Sync + Send + 'static> ops::Div<T> for State<T> {
-    type Output = T;
-
-    fn div(self, rhs: T) -> Self::Output {
-        self.get() / rhs
-    }
-}
-
-impl<T: ops::DivAssign<T> + Copy + Sync + Send + 'static> ops::DivAssign<T> for State<T> {
-    fn div_assign(&mut self, rhs: T) {
-        if let Some(mut v) = self.try_write() {
-            *v /= rhs;
-        }
-    }
-}
+// 算术运算符重载：与 AtomState 同构，由单一宏生成（见 reactive_ops.rs）。
+crate::reactive_ops::impl_reactive_ops!(State);
 
 impl<T: Hash + Sync + Send> Hash for State<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {

@@ -1,4 +1,6 @@
 #![allow(clippy::needless_update)]
+#[cfg(feature = "atom")]
+mod atom;
 mod component;
 pub mod components;
 mod context;
@@ -7,12 +9,13 @@ mod handler;
 mod hooks;
 mod multimap;
 mod props;
+mod reactive_ops;
 mod render;
-#[cfg(feature = "store")]
-mod store;
 mod terminal;
 
 mod flatten_export {
+    #[cfg(feature = "atom")]
+    pub use crate::atom::*;
     pub use crate::component::*;
     pub use crate::context::*;
     pub use crate::element::*;
@@ -20,8 +23,6 @@ mod flatten_export {
     pub use crate::hooks::*;
     pub use crate::props::*;
     pub use crate::render::*;
-    #[cfg(feature = "store")]
-    pub use crate::store::*;
     pub use crate::terminal::*;
 }
 

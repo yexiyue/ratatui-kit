@@ -29,13 +29,14 @@ default = []
 # 组件源码隔离保留在 `src/components/textarea.rs`(未接入模块树),待 tui-textarea
 # 发布 0.30 兼容版后,恢复下方 feature/依赖/example 并重新接入即可。
 router = ["regex", "ratatui-kit-macros/router"]
-store = ["ratatui-kit-macros/store"]
+# 全局响应式原子（Atom/use_atom）。纯主库实现，无宏依赖。
+atom = []
 input = ["tui-input"]
 tree = ["tui-tree-widget"]
 
 full = [
     "router",
-    "store",
+    "atom",
     "input",
     "tree",
     "ratatui-kit-macros/full",
