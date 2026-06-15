@@ -28,18 +28,24 @@ impl Route {
     /// 路径含 `/:name` 段时,将其转为命名捕获组 `(?<name>[^/]+)`(只匹配单段、不跨 `/`),
     /// 编译为正则并以 `Arc` 持有;非法正则在此 panic(路径为 `routes!` 中的静态字面量,
     /// 属开发期错误,构造期暴露优于每次渲染暴露)。静态路由不编译、不持有正则。
+    ///
+    /// 两个关键不变量,与静态路由的 `starts_with` 前缀语义保持一致:
+    /// - **锚定开头**:pattern 以 `^` 起始,只在路径**前缀**匹配。否则 `regexp.find` 会命中
+    ///   路径中段——`/users/:id` 误匹配 `/foo/users/42`。
+    /// - **静态段转义**:非 `:param` 段经 `regex::escape`,使 `.` `+` 等正则元字符按字面匹配。
+    ///   否则 `/v1.0/:id` 的 `.` 会变通配,误匹配 `/v1x0/42`。
     pub fn new(path: String, component: AnyElement<'static>, children: Routes) -> Self {
         let matcher = if path.contains("/:") {
             let pattern = path
                 .split('/')
                 .map(|seg| match seg.strip_prefix(':') {
                     Some(name) => format!("(?<{name}>[^/]+)"),
-                    None => seg.to_string(),
+                    None => regex::escape(seg),
                 })
                 .collect::<Vec<_>>()
                 .join("/");
             Some(Arc::new(
-                regex::Regex::new(&pattern).expect("Invalid route path regex"),
+                regex::Regex::new(&format!("^{pattern}")).expect("Invalid route path regex"),
             ))
         } else {
             None
@@ -208,5 +214,91 @@ mod tests {
     #[test]
     fn no_match_returns_none() {
         assert!(route("/settings").match_path("/profile").is_none());
+    }
+
+    #[test]
+    fn multiple_dynamic_params_extracted() {
+        let (rest, params) = route("/users/:uid/posts/:pid")
+            .match_path("/users/7/posts/42")
+            .expect("应匹配多参数");
+        assert_eq!(params.get("uid").map(String::as_str), Some("7"));
+        assert_eq!(params.get("pid").map(String::as_str), Some("42"));
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn dynamic_route_is_anchored_at_start() {
+        // 回归:动态正则须锚定开头,不能命中路径中段
+        // (未锚定时 `/users/:id` 会误匹配 `/foo/users/42`)。
+        assert!(
+            route("/users/:id").match_path("/foo/users/42").is_none(),
+            "动态路由不应匹配中段"
+        );
+    }
+
+    #[test]
+    fn static_segment_in_dynamic_route_is_escaped() {
+        // 回归:动态路由里的静态段须 regex::escape,`.` 不能当通配。
+        let r = route("/v1.0/:id");
+        let (rest, params) = r.match_path("/v1.0/9").expect("字面点应匹配");
+        assert_eq!(params.get("id").map(String::as_str), Some("9"));
+        assert_eq!(rest, "");
+        assert!(r.match_path("/v1x0/9").is_none(), "点不应作通配");
+    }
+
+    #[test]
+    fn dynamic_param_requires_nonempty_segment() {
+        // `[^/]+` 要求至少一个字符:空参数段 / 缺参数段都不匹配。
+        assert!(
+            route("/users/:id").match_path("/users/").is_none(),
+            "空参数段不应匹配"
+        );
+        assert!(
+            route("/users/:id").match_path("/users").is_none(),
+            "缺参数段不应匹配"
+        );
+    }
+
+    #[test]
+    fn dynamic_param_accepts_dots_and_dashes() {
+        // 参数值可含非 `/` 的任意字符(点、连字符)。
+        let (_, params) = route("/file/:name")
+            .match_path("/file/a-b.txt")
+            .expect("应匹配");
+        assert_eq!(params.get("name").map(String::as_str), Some("a-b.txt"));
+    }
+
+    #[test]
+    fn dynamic_route_no_prefix_match_is_none() {
+        assert!(route("/users/:id").match_path("/posts/1").is_none());
+    }
+
+    #[test]
+    fn dynamic_param_value_does_not_swallow_following_segment() {
+        // 参数只吃单段,后续段留入 rest 供嵌套 Outlet 续匹配。
+        let (rest, params) = route("/u/:id")
+            .match_path("/u/5/detail")
+            .expect("应匹配前缀");
+        assert_eq!(params.get("id").map(String::as_str), Some("5"));
+        assert_eq!(rest, "/detail");
+    }
+
+    #[test]
+    fn static_trailing_slash_is_rest() {
+        // 段边界:精确匹配剩余空,带尾斜杠剩余 "/"。
+        assert_eq!(route("/a").match_path("/a").unwrap().0, "");
+        assert_eq!(route("/a").match_path("/a/").unwrap().0, "/");
+    }
+
+    #[test]
+    fn route_state_downcasts_to_correct_type() {
+        let s = RouteState::new(42u32);
+        assert_eq!(s.downcast::<u32>().map(|a| *a), Some(42));
+    }
+
+    #[test]
+    fn route_state_downcast_wrong_type_is_none() {
+        let s = RouteState::new(42u32);
+        assert!(s.downcast::<String>().is_none());
     }
 }

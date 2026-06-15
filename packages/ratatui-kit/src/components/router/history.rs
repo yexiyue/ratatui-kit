@@ -152,4 +152,73 @@ mod tests {
         assert!(h.go(-2));
         assert_eq!(h.current, before - 2);
     }
+
+    #[test]
+    fn replace_overwrites_current_and_truncates_forward() {
+        let mut h = new_history(10);
+        h.push(ctx("/a")); // [/, /a], current=1
+        h.push(ctx("/b")); // [/, /a, /b], current=2
+        h.back(); // current=1
+        h.replace(ctx("/x")); // history[1]=/x, truncate(2)
+        assert_eq!(h.current_context().path, "/x");
+        assert_eq!(h.history.len(), 2);
+        // 前进栈已被截断。
+        assert!(!h.forward());
+    }
+
+    #[test]
+    fn push_in_middle_truncates_forward() {
+        let mut h = new_history(10);
+        h.push(ctx("/a"));
+        h.push(ctx("/b")); // [/, /a, /b], current=2
+        h.back();
+        h.back(); // current=0
+        h.push(ctx("/c")); // 从中部 push:截断 /a、/b
+        assert_eq!(h.current_context().path, "/c");
+        assert_eq!(h.history.len(), 2);
+        assert!(!h.forward(), "前进栈应被截断");
+    }
+
+    #[test]
+    fn go_zero_stays_put() {
+        let mut h = new_history(10);
+        h.push(ctx("/a")); // current=1
+        assert!(h.go(0)); // 原地,仍在范围内
+        assert_eq!(h.current_context().path, "/a");
+    }
+
+    #[test]
+    fn max_length_one_keeps_only_latest() {
+        let mut h = new_history(1);
+        for i in 0..5 {
+            h.push(ctx(&format!("/r{i}")));
+            assert!(h.history.len() <= 1, "step {i} 超出 max_length=1");
+        }
+        assert_eq!(h.current_context().path, "/r4");
+        assert_eq!(h.current, 0);
+    }
+
+    /// 边界:max_length=0 当前不 panic,退化为只保留最近一项(语义同 1)。
+    /// Codex 审查标记此输入待规整,这里先锁定「不崩」现状,日后若 clamp 再改断言。
+    #[test]
+    fn max_length_zero_does_not_panic() {
+        let mut h = new_history(0);
+        for i in 0..5 {
+            h.push(ctx(&format!("/r{i}")));
+            assert!(h.current < h.history.len(), "step {i} 越界");
+        }
+        assert_eq!(h.current_context().path, "/r4");
+    }
+
+    #[test]
+    fn current_context_tracks_current_pointer() {
+        let mut h = new_history(10);
+        h.push(ctx("/a"));
+        h.push(ctx("/b"));
+        assert_eq!(h.current_context().path, "/b");
+        h.back();
+        assert_eq!(h.current_context().path, "/a");
+        h.forward();
+        assert_eq!(h.current_context().path, "/b");
+    }
 }

@@ -108,3 +108,76 @@ fn center_offsets_content_from_origin() {
     // 居中 → 不在左上原点列。
     assert!(x > 0, "居中后 x 应不在第 0 列, 实际列 {x}");
 }
+
+/// 路由渲染链路集成测试:验证 `RouterProvider` + `Outlet` 按 `index_path` 选中并
+/// 渲染正确组件,以及嵌套 `Outlet` 消费剩余 path。仅在 `router` 特性下编译。
+#[cfg(feature = "router")]
+mod router_tests {
+    use super::{render_to_buffer, row};
+    use crate::prelude::*;
+
+    // 零状态测试页面,各渲染可辨识文本。
+    #[component]
+    fn HomePage(_hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        element!(Text(text: "HOME"))
+    }
+
+    #[component]
+    fn AboutPage(_hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        element!(Text(text: "ABOUT"))
+    }
+
+    // 父布局:仅渲染 Outlet,用于验证嵌套消费剩余 path。
+    #[component]
+    fn LayoutPage(_hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        element!(Outlet)
+    }
+
+    fn two_pages() -> Routes {
+        routes! {
+            "/home" => HomePage,
+            "/about" => AboutPage,
+        }
+        .into()
+    }
+
+    #[test]
+    fn renders_index_route() {
+        let buf = render_to_buffer(
+            element!(RouterProvider(routes: two_pages(), index_path: "/home")),
+            8,
+            1,
+        );
+        assert!(row(&buf, 0).contains("HOME"), "实际: {:?}", row(&buf, 0));
+    }
+
+    #[test]
+    fn renders_sibling_route_by_index_path() {
+        let buf = render_to_buffer(
+            element!(RouterProvider(routes: two_pages(), index_path: "/about")),
+            8,
+            1,
+        );
+        assert!(row(&buf, 0).contains("ABOUT"), "实际: {:?}", row(&buf, 0));
+    }
+
+    #[test]
+    fn nested_outlet_consumes_remaining_path() {
+        let routes: Routes = routes! {
+            "/" => LayoutPage {
+                "/home" => HomePage,
+            },
+        }
+        .into();
+        let buf = render_to_buffer(
+            element!(RouterProvider(routes: routes, index_path: "/home")),
+            8,
+            1,
+        );
+        assert!(
+            row(&buf, 0).contains("HOME"),
+            "嵌套应渲染 HOME, 实际: {:?}",
+            row(&buf, 0)
+        );
+    }
+}
