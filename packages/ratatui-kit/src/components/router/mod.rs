@@ -53,9 +53,37 @@ impl Route {
         }
     }
 
-    /// 本路由的预编译匹配正则(动态路由为 `Some`,静态路由为 `None`)。
-    pub(crate) fn matcher(&self) -> Option<&Arc<regex::Regex>> {
-        self.matcher.as_ref()
+    /// 尝试把 `path` 匹配到本路由。
+    ///
+    /// 返回 `Some((剩余路径, 提取的命名参数))` 表示匹配,`None` 表示不匹配:
+    /// - 动态路由(有 matcher):用预编译正则匹配前缀,并提取各 `:name` 参数;
+    /// - 根路由 `"/"`:返回 `None`(留给 `Outlet` 最后兜底匹配);
+    /// - 静态路由:前缀匹配且落在**段边界**(剩余为空或以 `/` 起始),否则不匹配
+    ///   (避免 `"/book-source"` 误匹配 `"/book-source-login"`)。
+    pub(crate) fn match_path(&self, path: &str) -> Option<(String, HashMap<String, String>)> {
+        if let Some(regexp) = &self.matcher {
+            let matched_len = regexp.find(path).map(|m| m.end()).unwrap_or(0);
+            if matched_len == 0 {
+                return None;
+            }
+            let mut params = HashMap::new();
+            if let Some(caps) = regexp.captures(path) {
+                for name in regexp.capture_names().flatten() {
+                    if let Some(matched) = caps.name(name) {
+                        params.insert(name.to_string(), matched.as_str().to_string());
+                    }
+                }
+            }
+            Some((path[matched_len..].to_string(), params))
+        } else if self.path == "/" {
+            None
+        } else if path.starts_with(&self.path)
+            && matches!(path[self.path.len()..].chars().next(), None | Some('/'))
+        {
+            Some((path[self.path.len()..].to_string(), HashMap::new()))
+        } else {
+            None
+        }
     }
 
     pub fn borrow(&mut self) -> Route {
@@ -133,5 +161,58 @@ impl RouteState {
         T: Any + Send + Sync + 'static,
     {
         self.0.clone().downcast().ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::Fragment;
+
+    // match_path 不关心组件,用任意 Fragment 元素占位。
+    fn route(path: &str) -> Route {
+        Route::new(
+            path.to_string(),
+            crate::element!(Fragment).into_any(),
+            Routes::default(),
+        )
+    }
+
+    #[test]
+    fn dynamic_param_extracted_and_rest_empty() {
+        let (rest, params) = route("/users/:id").match_path("/users/42").expect("应匹配");
+        assert_eq!(params.get("id").map(String::as_str), Some("42"));
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn dynamic_segment_does_not_cross_slash() {
+        let (rest, params) = route("/users/:id")
+            .match_path("/users/42/profile")
+            .expect("应匹配前缀");
+        assert_eq!(params.get("id").map(String::as_str), Some("42"));
+        assert_eq!(rest, "/profile");
+    }
+
+    #[test]
+    fn static_match_respects_segment_boundary() {
+        let r = route("/book-source");
+        // 段中间不匹配:"/book-source-login" 的剩余 "-login" 不是新段。
+        assert!(r.match_path("/book-source-login").is_none());
+        // 精确匹配。
+        assert_eq!(r.match_path("/book-source").unwrap().0, "");
+        // 段边界(以 / 续)匹配。
+        assert_eq!(r.match_path("/book-source/detail").unwrap().0, "/detail");
+    }
+
+    #[test]
+    fn root_route_is_not_matched_here() {
+        // "/" 留给 Outlet 兜底,不在 match_path 命中。
+        assert!(route("/").match_path("/anything").is_none());
+    }
+
+    #[test]
+    fn no_match_returns_none() {
+        assert!(route("/settings").match_path("/profile").is_none());
     }
 }

@@ -278,3 +278,35 @@ impl<T: cmp::PartialOrd<T> + Sync + Send + 'static> cmp::PartialOrd<StoreState<T
 }
 
 impl<T: cmp::Eq + Sync + Send + 'static> cmp::Eq for StoreState<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // StoreState::new 用进程级全局 OWNER,无需额外保活即可在单测里使用。
+
+    #[test]
+    fn add_and_sub_assign_mutate_value() {
+        let mut s = StoreState::new(0i32);
+        s += 5;
+        assert_eq!(s.get(), 5);
+        s -= 2;
+        assert_eq!(s.get(), 3);
+    }
+
+    #[test]
+    fn set_overwrites_and_get_reads() {
+        let mut s = StoreState::new(10i32);
+        s.set(42);
+        assert_eq!(s.get(), 42);
+    }
+
+    #[test]
+    fn copy_handles_share_storage() {
+        let mut s = StoreState::new(1i32);
+        let s2 = s; // Copy:同一底层 box
+        s += 41;
+        assert_eq!(s.get(), 42);
+        assert_eq!(s2.get(), 42);
+    }
+}

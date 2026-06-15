@@ -25,11 +25,16 @@
 - [x] 4.1 `element/key.rs`：`ElementKey::decl`/`user` 不碰撞、相等性、Hash 与 Eq 自洽
 - [x] 4.2 `multimap.rs`：FIFO pop_front、缺失 key、iter 只产未移除项
 - [x] 4.3 `hooks/use_state.rs`：`State<T>` 的 `+=`/`-=`/`*=`、`set`/`get`、`Copy` 句柄共享
-- [ ] 4.4 `store/`（`store` feature）：`StoreState` 运算符与读写
+- [x] 4.4 `store/`（`store` feature）：`StoreState` 运算符（+=/-=）、set/get、Copy 共享
 - [x] 4.5 `router/history.rs`：扩充 back/forward/go 越界用例
-- [ ] 4.6 `router` 路径匹配单测（① 已把匹配抽到 `Route` 上，可对 `Route::new` + matcher 写段边界/参数提取测试）
+- [x] 4.6 `router` 路径匹配单测：把匹配逻辑从 Outlet 抽成 `Route::match_path`（可测），覆盖动态参数提取、不跨 `/`、静态段边界、根路由不命中、无匹配
 
-## 5. 组件渲染 harness 与渲染测试
+## 5. 组件渲染 harness 与渲染测试（⏸ 延后：需核心改动）
+
+> 阻塞点：`InstantiatedComponent::update` 经 `dyn ComponentHelperExt::update_component` 间接持有
+> `Terminal<CrossTerminal>`,而构造它需真实 TTY。泛型化会破坏 `dyn` 对象安全;须把终端抽象做
+> **对象安全的类型擦除**(如把 `insert_before` 的闭包 box 化、抽出 object-safe `TerminalHandle`),
+> 属独立核心改动,单列一个 change 更稳妥。
 
 - [ ] 5.1 落地「单次离屏渲染元素到 `ratatui` Buffer」test-only harness（design 决策 3 的 A/B，倾向 B）
 - [ ] 5.2 `Text` 渲染断言
@@ -39,5 +44,5 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 更新 `dev-notes/knowledge/toolchain.md`：测试约定改为「编译验证为基线 + 宏/运行时/组件针对性测试」
-- [x] 6.2 四件套全绿（`--all-features`）：本批（运行时单测 15 + trybuild ui）已 clippy/fmt/test/doc 全绿；后续批次落地后再次全量验证
+- [x] 6.1 更新 `dev-notes/knowledge/toolchain.md`：测试约定改为「编译验证为基线 + 宏/运行时针对性测试」，并记录渲染 harness 的阻塞点
+- [x] 6.2 四件套全绿（`--all-features`）：运行时单测 23（含 router/store）+ trybuild ui 已 clippy/fmt/test/doc 全绿

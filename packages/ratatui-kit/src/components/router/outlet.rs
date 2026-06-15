@@ -17,49 +17,17 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
     let mut routes = hooks.use_context_mut::<Routes>();
     let mut route_context = hooks.use_context_mut::<RouteContext>();
 
-    // 查找与当前路径匹配的第一个路由
+    // 查找与当前路径匹配的第一个路由（匹配逻辑见 Route::match_path）。
+    // 命中则把提取的参数并入上下文、并把路径推进为剩余未匹配部分,供嵌套 Outlet 续匹配。
     let mut current_route = routes.iter_mut().find(|r| {
         let path = route_context.path.clone();
-
-        // 含动态参数（如 "/users/:id"）的路由:复用构造期一次性编译的正则（见 Route::new），
-        // 不再每次渲染重新编译。静态路由 matcher 为 None,走下方字符串段边界匹配。
-        if let Some(regexp) = r.matcher() {
-            // 计算匹配长度
-            let matched_len = regexp.find(&path).map(|m| m.end()).unwrap_or(0);
-
-            // 如果没有匹配到，则返回 false 表示不匹配此路由
-            if matched_len == 0 {
-                return false;
+        match r.match_path(&path) {
+            Some((rest, params)) => {
+                route_context.params.extend(params);
+                route_context.path = rest;
+                true
             }
-
-            // 提取动态参数并保存到 route_context.params 中
-            if let Some(caps) = regexp.captures(&path) {
-                for name in regexp.capture_names().flatten() {
-                    if let Some(matched) = caps.name(name) {
-                        route_context
-                            .params
-                            .insert(name.to_string(), matched.as_str().to_string());
-                    }
-                }
-            }
-
-            // 更新上下文中的路径为未匹配的部分
-            route_context.path = path[matched_len..].to_string();
-            true
-        } else if r.path == "/" {
-            // 如果路由路径是根路径 "/"，则不在此处处理（留给最后兜底匹配）
-            false
-        } else if path.starts_with(&r.path)
-            && matches!(path[r.path.len()..].chars().next(), None | Some('/'))
-        {
-            // 静态前缀匹配必须落在「段边界」:剩余部分为空(精确匹配)或以 '/' 开头
-            // (继续嵌套匹配)。否则 "/book-source-login" 会被先注册的 "/book-source"
-            // 误匹配(剩余 "-login" 不是新段),渲染成错误页面、表现为「导航无反应」。
-            route_context.path = path[r.path.len()..].to_string();
-            true
-        } else {
-            // 不满足任何条件，不匹配此路由
-            false
+            None => false,
         }
     });
 
