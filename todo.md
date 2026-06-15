@@ -28,3 +28,7 @@
 - [ ] 重构textarea组件，考虑使用tui-input实现，并实现自动换行功能
 - [x] 重构scrollview组件，现在逻辑有点混乱，缺少边框功能
 - [ ] 添加ErrorBoundary组件
+- [ ] 优化和新增hook
+- [ ] examples 优化重写
+- [ ] docs换框架+优化重写，文档注释规范化，要国际化
+- [ ] 新增skill

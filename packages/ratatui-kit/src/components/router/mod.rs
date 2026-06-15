@@ -17,8 +17,7 @@ pub struct Route {
     pub children: Routes,
     /// 含动态参数(`/:name`)的路由的匹配正则,在构造时一次性编译并以 `Arc` 共享,
     /// 供 `Outlet` 每次渲染复用,避免重复编译(见 `outlet.rs`)。静态路由为 `None`。
-    /// 私有字段:故 `Route` 须经 `Route::new` 构造(`routes!` 宏即如此),
-    /// crate 内的 `borrow()` 透传同一 `Arc`。
+    /// 私有字段:故 `Route` 须经 `Route::new` 构造(`routes!` 宏即如此)。
     matcher: Option<Arc<regex::Regex>>,
 }
 
@@ -61,6 +60,8 @@ impl Route {
 
     /// 尝试把 `path` 匹配到本路由。
     ///
+    /// `Outlet` 按 `routes!` 声明顺序选择第一个匹配项；同前缀静态路由应声明在动态路由之前。
+    ///
     /// 返回 `Some((剩余路径, 提取的命名参数))` 表示匹配,`None` 表示不匹配:
     /// - 动态路由(有 matcher):用预编译正则匹配前缀,并提取各 `:name` 参数;
     /// - 根路由 `"/"`:返回 `None`(留给 `Outlet` 最后兜底匹配);
@@ -70,6 +71,9 @@ impl Route {
         if let Some(regexp) = &self.matcher {
             let matched_len = regexp.find(path).map(|m| m.end()).unwrap_or(0);
             if matched_len == 0 {
+                return None;
+            }
+            if !matches!(path[matched_len..].chars().next(), None | Some('/')) {
                 return None;
             }
             let mut params = HashMap::new();
@@ -91,16 +95,6 @@ impl Route {
             None
         }
     }
-
-    pub fn borrow(&mut self) -> Route {
-        Route {
-            path: self.path.clone(),
-            component: AnyElement::from(&mut self.component),
-            children: self.children.borrow(),
-            // 透传同一已编译正则(Arc 共享),不重新编译。
-            matcher: self.matcher.clone(),
-        }
-    }
 }
 
 pub struct Routes(Vec<Route>);
@@ -109,12 +103,6 @@ pub struct Routes(Vec<Route>);
 impl Default for Routes {
     fn default() -> Self {
         Routes(Vec::new())
-    }
-}
-
-impl Routes {
-    pub fn borrow(&mut self) -> Routes {
-        Routes(self.0.iter_mut().map(|r| r.borrow()).collect())
     }
 }
 
@@ -281,6 +269,14 @@ mod tests {
             .expect("应匹配前缀");
         assert_eq!(params.get("id").map(String::as_str), Some("5"));
         assert_eq!(rest, "/detail");
+    }
+
+    #[test]
+    fn dynamic_static_tail_respects_segment_boundary() {
+        let route = route("/users/:id/edit");
+        assert!(route.match_path("/users/42/edit-more").is_none());
+        assert_eq!(route.match_path("/users/42/edit").unwrap().0, "");
+        assert_eq!(route.match_path("/users/42/edit/sub").unwrap().0, "/sub");
     }
 
     #[test]

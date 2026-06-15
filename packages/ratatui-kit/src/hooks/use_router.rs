@@ -1,8 +1,4 @@
-use std::{
-    cell::{Ref, RefMut},
-    collections::HashMap,
-    sync::Arc,
-};
+use std::{cell::Ref, collections::HashMap, sync::Arc};
 
 use crate::{
     Handler, State, UseContext,
@@ -23,8 +19,6 @@ pub trait UseRouter<'a>: private::Sealed {
     fn use_route_state<T: Send + Sync + 'static>(&self) -> Arc<T>;
     /// 获取当前路由信息。
     fn use_route(&self) -> Ref<'a, Route>;
-    /// 获取当前路由的可变引用。
-    fn use_route_mut(&mut self) -> RefMut<'a, Route>;
     /// 获取当前路由参数。
     fn use_params(&self) -> Ref<'a, HashMap<String, String>>;
 }
@@ -52,10 +46,6 @@ impl<'a> UseRouter<'a> for crate::Hooks<'a, '_> {
 
     fn use_route(&self) -> Ref<'a, Route> {
         self.use_context::<Route>()
-    }
-
-    fn use_route_mut(&mut self) -> RefMut<'a, Route> {
-        self.use_context_mut::<Route>()
     }
 
     fn use_params(&self) -> Ref<'a, HashMap<String, String>> {

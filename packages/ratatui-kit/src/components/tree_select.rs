@@ -8,7 +8,7 @@ use tui_tree_widget::{TreeItem, TreeState};
 
 /// 树形组件的属性定义
 #[derive(Debug, Props, Clone)]
-pub struct TreeSelect<T>
+pub struct TreeSelectProps<T>
 where
     T: Sync + Send + Clone + Eq + Hash + 'static,
 {
@@ -38,7 +38,7 @@ where
     pub block: Option<Block<'static>>,
 }
 
-impl<T> Default for TreeSelect<T>
+impl<T> Default for TreeSelectProps<T>
 where
     T: Sync + Send + Clone + Eq + Hash,
 {
@@ -58,18 +58,30 @@ where
     }
 }
 
+/// 树形组件实现。
+pub struct TreeSelect<T>
+where
+    T: Sync + Send + Clone + Eq + Hash + 'static,
+{
+    props: TreeSelectProps<T>,
+    tree_is_valid: bool,
+}
+
 impl<T> Component for TreeSelect<T>
 where
     T: Sync + Send + Clone + Eq + Hash + Unpin + 'static,
 {
     type Props<'a>
-        = TreeSelect<T>
+        = TreeSelectProps<T>
     where
         Self: 'a;
 
     /// 根据属性创建新的树形组件实例
     fn new(props: &Self::Props<'_>) -> Self {
-        props.clone()
+        Self {
+            props: props.clone(),
+            tree_is_valid: tui_tree_widget::Tree::new(&props.items).is_ok(),
+        }
     }
 
     fn update(
@@ -78,26 +90,37 @@ where
         _hooks: crate::Hooks,
         _updater: &mut crate::ComponentUpdater,
     ) {
-        *self = props.clone();
+        self.tree_is_valid = tui_tree_widget::Tree::new(&props.items).is_ok();
+        self.props = props.clone();
     }
 
     /// 绘制树形组件
     fn draw(&mut self, drawer: &mut ratatui_kit::ComponentDrawer<'_, '_>) {
-        let mut tree = tui_tree_widget::Tree::new(&self.items)
-            .unwrap()
-            .style(self.style)
-            .highlight_style(self.highlight_style)
-            .highlight_symbol(self.highlight_symbol)
-            .node_closed_symbol(self.node_closed_symbol)
-            .node_open_symbol(self.node_open_symbol)
-            .node_no_children_symbol(self.node_no_children_symbol)
-            .experimental_scrollbar(self.scrollbar.clone());
+        if !self.tree_is_valid {
+            if let Some(block) = self.props.block.as_ref() {
+                drawer.render_widget(block, drawer.area);
+            }
+            return;
+        }
 
-        if let Some(block) = self.block.as_ref() {
+        let Ok(mut tree) = tui_tree_widget::Tree::new(&self.props.items) else {
+            return;
+        };
+
+        tree = tree
+            .style(self.props.style)
+            .highlight_style(self.props.highlight_style)
+            .highlight_symbol(self.props.highlight_symbol)
+            .node_closed_symbol(self.props.node_closed_symbol)
+            .node_open_symbol(self.props.node_open_symbol)
+            .node_no_children_symbol(self.props.node_no_children_symbol)
+            .experimental_scrollbar(self.props.scrollbar.clone());
+
+        if let Some(block) = self.props.block.as_ref() {
             tree = tree.block(block.clone());
         }
 
-        if let Some(state) = &mut self.state {
+        if let Some(state) = &mut self.props.state {
             // 渲染有状态的树形组件
             drawer.render_stateful_widget(tree, drawer.area, &mut state.write_no_update());
         } else {

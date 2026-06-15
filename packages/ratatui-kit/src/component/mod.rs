@@ -5,7 +5,7 @@ use crate::{
     props::{AnyProps, Props},
     render::{ComponentDrawer, ComponentUpdater},
 };
-use std::{any::Any, pin::Pin, task::Context};
+use std::{any::Any, task::Context};
 
 mod component_helper;
 pub(crate) use component_helper::{ComponentHelper, ComponentHelperExt};
@@ -20,7 +20,7 @@ use ratatui::layout::{Direction, Layout};
 /// - `new` 创建组件实例。
 /// - `update` 响应 props/hook 变化，适合副作用、事件注册等。
 /// - `draw` 渲染组件内容。
-/// - `calc_children_areas` 默认 flex 布局计算子组件区域，可重写自定义布局。
+/// - `calc_children_areas` 默认 flex 布局计算子组件区域，可重写自定义布局；返回区域数必须等于子节点数。
 /// - `poll_change` 支持异步/响应式副作用。
 /// - `render_ref` 低级渲染接口，通常无需重写。
 ///
@@ -75,7 +75,7 @@ pub trait Component: Any + Unpin {
 
     fn draw(&mut self, _drawer: &mut ComponentDrawer<'_, '_>) {}
 
-    // 默认使用flex布局计算子组件的area
+    // 默认使用flex布局计算子组件的area。实现者重写时必须返回与 children 数量相同的区域。
     fn calc_children_areas(
         &self,
         children: &Components,
@@ -102,7 +102,7 @@ pub trait Component: Any + Unpin {
         children_areas
     }
 
-    fn poll_change(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> std::task::Poll<()> {
+    fn poll_change(&mut self, _cx: &mut Context<'_>) -> std::task::Poll<()> {
         std::task::Poll::Pending
     }
 }
@@ -119,7 +119,7 @@ pub trait AnyComponent: Any + Unpin {
         drawer: &mut ComponentDrawer,
     ) -> Vec<ratatui::prelude::Rect>;
 
-    fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()>;
+    fn poll_change(&mut self, cx: &mut Context) -> std::task::Poll<()>;
 }
 
 impl<C> ElementType for C
@@ -136,7 +136,7 @@ where
     fn update(&mut self, mut props: AnyProps, hooks: Hooks, updater: &mut ComponentUpdater) {
         Component::update(
             self,
-            unsafe { props.downcast_mut_unchecked() },
+            unsafe { props.downcast_mut_unchecked(ComponentHelper::<C>::props_type_id()) },
             hooks,
             updater,
         );
@@ -155,7 +155,7 @@ where
         Component::calc_children_areas(self, children, layout_style, drawer)
     }
 
-    fn poll_change(self: Pin<&mut Self>, cx: &mut Context) -> std::task::Poll<()> {
+    fn poll_change(&mut self, cx: &mut Context) -> std::task::Poll<()> {
         Component::poll_change(self, cx)
     }
 }

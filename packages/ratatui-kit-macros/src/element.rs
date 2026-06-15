@@ -372,6 +372,18 @@ impl ParsedElementHead {
             }
         };
 
+        let element_binding = if set_children.is_some() {
+            quote!(let mut _element=::ratatui_kit::Element::<#ty>{
+                key: #key,
+                props: _props,
+            };)
+        } else {
+            quote!(let _element=::ratatui_kit::Element::<#ty>{
+                key: #key,
+                props: _props,
+            };)
+        };
+
         // 外层括号 load-bearing:块表达式 `{ … }` 须加括号方能在实参位继续 `.into_any()`。
         if has_props_assignments {
             quote! {
@@ -380,14 +392,11 @@ impl ParsedElementHead {
                     // 用户填满全部字段时,兜底的 `..Default::default()` 会触发 needless_update;
                     // element! 统一以 Default 补未填字段,此处多余属预期(宏无从得知字段总数),显式 allow。
                     #[allow(clippy::needless_update)]
-                    let mut _props = Props{
+                    let _props = Props{
                         #default_rest
                     };
 
-                    let mut _element=::ratatui_kit::Element::<#ty>{
-                        key: #key,
-                        props: _props,
-                    };
+                    #element_binding
                     #set_children
                     _element
                 })
@@ -396,11 +405,8 @@ impl ParsedElementHead {
             quote! {
                 ({
                     type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
-                    let mut _props = Props::default();
-                    let mut _element=::ratatui_kit::Element::<#ty>{
-                        key: #key,
-                        props: _props,
-                    };
+                    let _props = Props::default();
+                    #element_binding
                     #set_children
                     _element
                 })

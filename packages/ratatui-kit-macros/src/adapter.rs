@@ -44,21 +44,21 @@ impl ToTokens for ParsedAdapter {
         match self {
             ParsedAdapter::Widget(expr) => {
                 tokens.extend(quote! {
-                    {
-                        let mut _element=::ratatui_kit::Element::<::ratatui_kit::components::WidgetAdapter<_>>{
+                    ({
+                        let _element=::ratatui_kit::Element::<::ratatui_kit::components::WidgetAdapter<_>>{
                             key: ::ratatui_kit::ElementKey::decl(#decl_key),
                             props: ::ratatui_kit::components::WidgetAdapterProps{
                                 inner: #expr
                             },
                         };
                         _element
-                    }
+                    })
                 });
             }
             ParsedAdapter::StatefulWidget(expr, state) => {
                 tokens.extend(quote! {
-                    {
-                        let mut _element=::ratatui_kit::Element::<::ratatui_kit::components::StatefulWidgetAdapter<_>>{
+                    ({
+                        let _element=::ratatui_kit::Element::<::ratatui_kit::components::StatefulWidgetAdapter<_>>{
                             key: ::ratatui_kit::ElementKey::decl(#decl_key),
                             props: ::ratatui_kit::components::StatefulWidgetAdapterProps{
                                 inner: #expr,
@@ -66,7 +66,7 @@ impl ToTokens for ParsedAdapter {
                             },
                         };
                         _element
-                    }
+                    })
                 });
             }
         }

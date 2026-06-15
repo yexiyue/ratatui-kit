@@ -32,7 +32,6 @@ use crate::{
 };
 use std::{
     any::Any,
-    pin::Pin,
     task::{Context, Poll},
 };
 mod use_context;
@@ -69,7 +68,7 @@ pub use use_router::*;
 ///
 /// 通常无需手动实现，除非自定义复杂 hook。
 pub trait Hook: Unpin {
-    fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
+    fn poll_change(&mut self, _cx: &mut Context) -> Poll<()> {
         Poll::Pending
     }
 
@@ -93,10 +92,10 @@ impl<T: Hook + 'static> AnyHook for T {
 }
 
 impl Hook for Vec<Box<dyn AnyHook>> {
-    fn poll_change(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
+    fn poll_change(&mut self, _cx: &mut Context) -> Poll<()> {
         let mut is_ready = false;
         for hook in self.iter_mut() {
-            if Pin::new(&mut **hook).poll_change(_cx).is_ready() {
+            if hook.poll_change(_cx).is_ready() {
                 is_ready = true;
             }
         }

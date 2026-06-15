@@ -1,9 +1,10 @@
 use std::{
-    any::Any,
+    any::{Any, type_name},
     cell::{Ref, RefMut},
 };
 
 use super::Hooks;
+use crate::context::ContextLookup;
 
 mod private {
     pub trait Sealed {}
@@ -24,26 +25,40 @@ pub trait UseContext<'a>: private::Sealed {
 
 impl<'a> UseContext<'a> for Hooks<'a, '_> {
     fn use_context<T: Any>(&self) -> Ref<'a, T> {
-        self.context
-            .expect("context not available")
-            .get_context()
-            .expect("context not found")
+        let stack = self.context.expect("context not available");
+        match stack.get_context::<T>() {
+            ContextLookup::Found(res) => res,
+            ContextLookup::AlreadyBorrowed => panic!(
+                "context `{}` 已被借用，请先释放现有 context 守卫",
+                type_name::<T>()
+            ),
+            ContextLookup::NotFound => panic!("context `{}` not found", type_name::<T>()),
+        }
     }
 
     fn use_context_mut<T: Any>(&self) -> RefMut<'a, T> {
-        self.context
-            .expect("context not available")
-            .get_context_mut()
-            .expect("context not found")
+        let stack = self.context.expect("context not available");
+        match stack.get_context_mut::<T>() {
+            ContextLookup::Found(res) => res,
+            ContextLookup::AlreadyBorrowed => panic!(
+                "context `{}` 已被借用，请先释放现有 context 守卫",
+                type_name::<T>()
+            ),
+            ContextLookup::NotFound => panic!("context `{}` not found", type_name::<T>()),
+        }
     }
 
     fn try_use_context<T: Any>(&self) -> Option<Ref<'a, T>> {
-        self.context
-            .and_then(|context_stack| context_stack.get_context())
+        match self.context?.get_context::<T>() {
+            ContextLookup::Found(res) => Some(res),
+            _ => None,
+        }
     }
 
     fn try_use_context_mut<T: Any>(&self) -> Option<RefMut<'a, T>> {
-        self.context
-            .and_then(|context_stack| context_stack.get_context_mut())
+        match self.context?.get_context_mut::<T>() {
+            ContextLookup::Found(res) => Some(res),
+            _ => None,
+        }
     }
 }

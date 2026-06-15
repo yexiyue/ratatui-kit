@@ -6,7 +6,7 @@
 //! 静态输出，不轮询 future/事件。
 
 use crate::{
-    AnyElement, ComponentDrawer, ElementExt,
+    AnyElement, ComponentDrawer, ElementRepr,
     render::tree::Tree,
     terminal::{TerminalEvents, UpdaterTerminal},
 };
@@ -107,6 +107,77 @@ fn center_offsets_content_from_origin() {
     let (x, _y) = find(&buf, "x").expect("应渲染 x");
     // 居中 → 不在左上原点列。
     assert!(x > 0, "居中后 x 应不在第 0 列, 实际列 {x}");
+}
+
+mod scroll_view_tests {
+    use super::{render_to_buffer, row};
+    use crate::prelude::*;
+    use ratatui::{
+        layout::{Constraint, Direction},
+        widgets::Block,
+    };
+
+    #[test]
+    fn large_fill_weight_does_not_panic() {
+        let buf = render_to_buffer(
+            element!(ScrollView(flex_direction: Direction::Horizontal) {
+                View(width: Constraint::Fill(820)) {
+                    Text(text: "wide")
+                }
+            }),
+            20,
+            3,
+        );
+
+        assert!(
+            row(&buf, 0).contains("wide"),
+            "应渲染内容, 实际: {:?}",
+            row(&buf, 0)
+        );
+    }
+
+    #[test]
+    fn boundary_sized_content_remains_visible() {
+        let buf = render_to_buffer(
+            element!(ScrollView(flex_direction: Direction::Vertical) {
+                View(height: Constraint::Length(2)) {
+                    Text(text: "fit")
+                }
+            }),
+            12,
+            3,
+        );
+
+        assert!(
+            row(&buf, 0).contains("fit"),
+            "临界尺寸内容应可见, 实际: {:?}",
+            row(&buf, 0)
+        );
+    }
+
+    #[component]
+    fn ControlledScroll(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        let scroll_state = hooks.use_state(ScrollViewState::default);
+
+        element!(ScrollView(
+            scroll_view_state: scroll_state,
+            block: Block::bordered(),
+        ) {
+            Text(text: "boxed")
+        })
+    }
+
+    #[test]
+    fn controlled_state_with_block_renders() {
+        let buf = render_to_buffer(element!(ControlledScroll), 12, 3);
+
+        assert_ne!(buf[(0, 0)].symbol(), " ", "应渲染边框");
+        assert!(
+            row(&buf, 1).contains("boxed"),
+            "应渲染受控内容, 实际: {:?}",
+            row(&buf, 1)
+        );
+    }
 }
 
 /// 路由渲染链路集成测试:验证 `RouterProvider` + `Outlet` 按 `index_path` 选中并

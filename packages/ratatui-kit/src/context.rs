@@ -6,7 +6,7 @@
 //! - [`SystemContext`]：系统级上下文，控制全局退出等。
 
 use std::{
-    any::Any,
+    any::{Any, TypeId},
     cell::{Ref, RefCell, RefMut},
 };
 
@@ -56,16 +56,49 @@ impl<'a> Context<'a> {
             Context::Owned(context) => Context::Mut(&mut **context),
         }
     }
+
+    fn type_id(&self) -> TypeId {
+        match self {
+            Context::Ref(context) => (*context).type_id(),
+            Context::Mut(context) => (**context).type_id(),
+            Context::Owned(context) => (**context).type_id(),
+        }
+    }
+}
+
+struct ContextEntry<'a> {
+    type_id: TypeId,
+    context: RefCell<Context<'a>>,
+}
+
+impl<'a> ContextEntry<'a> {
+    fn new(context: Context<'a>) -> Self {
+        Self {
+            type_id: context.type_id(),
+            context: RefCell::new(context),
+        }
+    }
+}
+
+/// `ContextStack` 查找结果——区分三态,使断言型 `use_context` 给出精确诊断,
+/// 而 `try_use_context` 能安全降级为 `None`(不 panic)。
+pub(crate) enum ContextLookup<R> {
+    /// 找到且成功借用。
+    Found(R),
+    /// 类型匹配但当前已被借用(持守卫重入,属编程错误)。
+    AlreadyBorrowed,
+    /// 栈中无该类型 context。
+    NotFound,
 }
 
 pub struct ContextStack<'a> {
-    stack: Vec<RefCell<Context<'a>>>,
+    stack: Vec<ContextEntry<'a>>,
 }
 
 impl<'a> ContextStack<'a> {
     pub(crate) fn root(root_context: &'a mut dyn Any) -> Self {
         ContextStack {
-            stack: vec![RefCell::new(Context::Mut(root_context))],
+            stack: vec![ContextEntry::new(Context::Mut(root_context))],
         }
     }
     // 在上下文栈中临时插入一个新的上下文，并在闭包 f 执行期间可用。
@@ -78,7 +111,7 @@ impl<'a> ContextStack<'a> {
             // 只有在不允许对栈进行其他更改，并且在调用后立即恢复栈的情况下才是安全的。
             let shorter_lived_self =
                 unsafe { std::mem::transmute::<&mut Self, &mut ContextStack<'b>>(self) };
-            shorter_lived_self.stack.push(RefCell::new(context));
+            shorter_lived_self.stack.push(ContextEntry::new(context));
             f(shorter_lived_self);
             shorter_lived_self.stack.pop();
         } else {
@@ -86,26 +119,40 @@ impl<'a> ContextStack<'a> {
         };
     }
 
-    pub fn get_context<T: Any>(&'_ self) -> Option<Ref<'_, T>> {
-        for context in self.stack.iter().rev() {
-            if let Ok(context) = context.try_borrow()
-                && let Ok(res) = Ref::filter_map(context, |context| context.downcast_ref::<T>())
-            {
-                return Some(res);
+    pub(crate) fn get_context<T: Any>(&'_ self) -> ContextLookup<Ref<'_, T>> {
+        let expected_type_id = TypeId::of::<T>();
+        for entry in self.stack.iter().rev() {
+            if entry.type_id != expected_type_id {
+                continue;
+            }
+
+            let Ok(context) = entry.context.try_borrow() else {
+                return ContextLookup::AlreadyBorrowed;
+            };
+
+            if let Ok(res) = Ref::filter_map(context, |context| context.downcast_ref::<T>()) {
+                return ContextLookup::Found(res);
             }
         }
-        None
+        ContextLookup::NotFound
     }
 
-    pub fn get_context_mut<T: Any>(&'_ self) -> Option<RefMut<'_, T>> {
-        for context in self.stack.iter().rev() {
-            if let Ok(context) = context.try_borrow_mut()
-                && let Ok(res) = RefMut::filter_map(context, |context| context.downcast_mut::<T>())
-            {
-                return Some(res);
+    pub(crate) fn get_context_mut<T: Any>(&'_ self) -> ContextLookup<RefMut<'_, T>> {
+        let expected_type_id = TypeId::of::<T>();
+        for entry in self.stack.iter().rev() {
+            if entry.type_id != expected_type_id {
+                continue;
+            }
+
+            let Ok(context) = entry.context.try_borrow_mut() else {
+                return ContextLookup::AlreadyBorrowed;
+            };
+
+            if let Ok(res) = RefMut::filter_map(context, |context| context.downcast_mut::<T>()) {
+                return ContextLookup::Found(res);
             }
         }
-        None
+        ContextLookup::NotFound
     }
 }
 

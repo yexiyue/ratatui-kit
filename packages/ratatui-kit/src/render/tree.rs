@@ -5,12 +5,20 @@ use crate::{
     ElementKey,
     component::{ComponentHelperExt, InstantiatedComponent},
     context::{ContextStack, SystemContext},
-    element::ElementExt,
+    element::ElementRepr,
     props::AnyProps,
     terminal::{Terminal, UpdaterTerminal},
 };
 
 use super::ComponentDrawer;
+
+struct RestoreGuard;
+
+impl Drop for RestoreGuard {
+    fn drop(&mut self) {
+        ratatui::restore();
+    }
+}
 
 pub struct Tree<'a> {
     root_component: InstantiatedComponent,
@@ -47,13 +55,11 @@ impl<'a> Tree<'a> {
     fn render(&mut self, terminal: &mut Terminal) -> io::Result<()> {
         self.update_once(terminal);
 
-        terminal
-            .draw(|frame| {
-                let area = frame.area();
-                let mut drawer = ComponentDrawer::new(frame, area);
-                self.draw_root(&mut drawer);
-            })
-            .expect("Failed to draw the terminal");
+        terminal.draw(|frame| {
+            let area = frame.area();
+            let mut drawer = ComponentDrawer::new(frame, area);
+            self.draw_root(&mut drawer);
+        })?;
 
         Ok(())
     }
@@ -77,17 +83,13 @@ impl<'a> Tree<'a> {
     }
 }
 
-pub(crate) async fn render_loop<E: ElementExt>(
+pub(crate) async fn render_loop<E: ElementRepr>(
     mut element: E,
     mut terminal: Terminal,
 ) -> io::Result<()> {
     let helper = element.helper();
     let mut tree = Tree::new(element.props_mut(), helper);
+    let _restore_guard = RestoreGuard;
 
-    terminal.events()?;
-
-    tree.render_loop(&mut terminal).await?;
-
-    ratatui::restore();
-    Ok(())
+    tree.render_loop(&mut terminal).await
 }

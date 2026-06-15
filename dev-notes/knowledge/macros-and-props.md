@@ -108,6 +108,24 @@ ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦
 
 **相关文件**：`packages/ratatui-kit/src/props.rs`、`packages/ratatui-kit/src/render/updater.rs`
 
+### AnyProps 借用句柄不得放大生命周期
+
+`AnyProps::borrow(&mut self)` 必须返回 `AnyProps<'_>`，生命周期绑定到这次 `&mut self` 借用；`AnyElement::from(&mut AnyElement<'b>)` 同理只能产出借用期内的 `AnyElement<'_>`。这是防止从路由表、props 或临时 element 派生出的裸指针句柄逃逸。
+
+**正确做法**：
+- `AnyProps` 携带由 `ComponentHelper` 传入的 props `TypeId`，`downcast_ref_unchecked`/`downcast_mut_unchecked` 在 debug 下断言匹配。
+- 遇到“借用 element 后返回”的生命周期错误时，改成在 `update_children` 期间立即消费，或把数据临时移出再放回；不要把返回类型改回更长生命周期。
+
+**相关文件**：`packages/ratatui-kit/src/props.rs`、`packages/ratatui-kit/src/element/any_element.rs`、`packages/ratatui-kit/src/components/router/outlet.rs`
+
+### with_layout_style 只支持具名字段结构体
+
+`#[with_layout_style]` 会向 props 注入布局字段，因此只能用于具名字段结构体。元组结构体或单元结构体会产生稳定错误：``#[with_layout_style]` 只能用于具名字段结构体`。
+
+**正确做法**：需要布局能力的 props 使用 `struct Props { ... }` 具名字段形态，再叠加 `#[with_layout_style]`。
+
+**相关文件**：`packages/ratatui-kit-macros/src/with_layout_style.rs`、`packages/ratatui-kit/tests/ui/fail/with_layout_style_non_named.rs`
+
 ## 库内自引用
 
 ### `extern crate self as ratatui_kit` 让库内也能用本库宏

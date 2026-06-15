@@ -64,3 +64,39 @@ loop { render(); if should_exit || ctrl_c break; select(component.wait(), termin
 **不要做**：在 `element!` 里给一个函数组件包装器直接挂布局属性并指望它形成独立布局区——它是透明的，属性会被忽略/穿透。
 
 **相关文件**：`packages/ratatui-kit-macros/src/component.rs`（`set_transparent_layout`）、`packages/ratatui-kit/src/components/view.rs`
+
+### 组件树运行时契约
+
+透明布局组件如果本帧没有子节点，`layout_style` 必须重置为 `LayoutStyle::default()`，不能沿用上一帧从子节点继承的旧布局。`Component::calc_children_areas` 的返回区域数必须等于子节点数；draw 路径会在 debug 下断言这个契约，避免 `zip` 静默丢子节点。
+
+**正确做法**：
+- 自定义 `calc_children_areas` 时始终按 children 数量返回区域。
+- 条件渲染可能返回空子树的透明组件不需要手动清布局，运行时会重置。
+
+**相关文件**：`packages/ratatui-kit/src/component/mod.rs`、`packages/ratatui-kit/src/component/instantiated_component.rs`
+
+### poll_change 必须三路全 poll
+
+`InstantiatedComponent::poll_change` 会对组件自身、子节点、hooks 三路全部求值。不要把它改成 `||` 短路形式；即使某一路已经 `Ready`，其余 `Pending` 路也需要在本轮注册 waker，否则后续变化可能不会唤醒渲染循环。
+
+**正确做法**：改 poll 聚合逻辑时先保存三路结果，再统一判断是否有 `Ready`。
+
+**相关文件**：`packages/ratatui-kit/src/component/instantiated_component.rs`
+
+### ScrollView 内容尺寸与滚动条判定共用公式
+
+`ScrollView` 的子区域计算和滚动条渲染都通过 `ScrollBars::layout_for` 判断是否预留滚动条并缩小可见区域。尺寸推导中的 `Fill`/`Percentage`/`Ratio` 使用高位宽计算并饱和到 `u16`，负 `gap` 会饱和为 0，避免 debug 溢出或 release 回绕。
+
+**正确做法**：改 ScrollView 显隐或尺寸公式时同时走 `layout_for`，不要在 `calc_children_areas` 和 `render_scrollbars` 分叉维护两套 ±1 规则。
+
+**相关文件**：`packages/ratatui-kit/src/components/scroll_view/mod.rs`、`packages/ratatui-kit/src/components/scroll_view/scrollbars.rs`
+
+### Context 查找区分「已借用」与「未找到」三态
+
+`ContextStack::get_context(_mut)` 返回三态 `ContextLookup`（`Found` / `AlreadyBorrowed` / `NotFound`），而非 `Option`。断言型 `use_context(_mut)` 据此分别给「已被借用」（持守卫重入）与「未找到」（Provider 未注入）两种精确 panic 诊断；`try_use_context(_mut)` 与 `ComponentUpdater::get_context` 则把非 `Found` 一律降级为 `None`，**保持 try_/Option 接口永不 panic**。
+
+**正确做法**：改 context 查找逻辑时保留三态——断言型给诊断、try_/Option 型安全降级。这与响应式状态的 `try_*` 约定一致（见 `hooks-and-state.md`）：`try_` 系列绝不 panic，只有断言型（`use_*` / `read` / `write`）才 panic。
+
+**不要做**：把「已借用」的 panic 放进 `get_context` 这种被 `try_use_context` 复用的共享方法——会让 try_ 变体跟着 panic，破坏其非 panic 契约。
+
+**相关文件**：`packages/ratatui-kit/src/context.rs`、`packages/ratatui-kit/src/hooks/use_context.rs`、`packages/ratatui-kit/src/render/updater.rs`

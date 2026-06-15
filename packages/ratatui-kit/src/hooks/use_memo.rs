@@ -1,5 +1,3 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use crate::{Hook, Hooks};
 
 mod private {
@@ -12,45 +10,38 @@ pub trait UseMemo: private::Sealed {
     fn use_memo<F, D, T>(&mut self, f: F, deps: D) -> T
     where
         F: FnOnce() -> T,
-        D: Hash,
+        D: PartialEq + Clone + Unpin + 'static,
         T: Clone + Unpin + 'static;
 }
 
-pub(crate) fn hash_deps<D: Hash>(deps: D) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    deps.hash(&mut hasher);
-    hasher.finish()
-}
-
-pub struct UseMemoImpl<T> {
+pub struct UseMemoImpl<T, D> {
     memoized_value: Option<T>,
-    deps_hash: u64,
+    deps: Option<D>,
 }
 
-impl<T> Default for UseMemoImpl<T> {
+impl<T, D> Default for UseMemoImpl<T, D> {
     fn default() -> Self {
-        UseMemoImpl {
+        Self {
             memoized_value: None,
-            deps_hash: 0,
+            deps: None,
         }
     }
 }
 
-impl<T: Unpin> Hook for UseMemoImpl<T> {}
+impl<T: Unpin, D: Unpin> Hook for UseMemoImpl<T, D> {}
 
 impl UseMemo for Hooks<'_, '_> {
     fn use_memo<F, D, T>(&mut self, f: F, deps: D) -> T
     where
         F: FnOnce() -> T,
-        D: Hash,
+        D: PartialEq + Clone + Unpin + 'static,
         T: Clone + Unpin + 'static,
     {
-        let dep_hash = hash_deps(deps);
-        let hook = self.use_hook(UseMemoImpl::<T>::default);
-        if hook.deps_hash != dep_hash || hook.memoized_value.is_none() {
+        let hook = self.use_hook(UseMemoImpl::<T, D>::default);
+        if hook.deps.as_ref() != Some(&deps) || hook.memoized_value.is_none() {
             hook.memoized_value = Some(f());
-            hook.deps_hash = dep_hash;
+            hook.deps = Some(deps.clone());
         }
-        hook.memoized_value.clone().unwrap()
+        hook.memoized_value.clone().expect("memoized value is set")
     }
 }

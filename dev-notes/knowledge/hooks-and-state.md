@@ -69,3 +69,27 @@
 **正确做法**：自定义 Hook 若依赖 props/参数，不要只把参数写进 `use_hook(|| ...)` 的初始化闭包；后续帧也要更新 hook 内部状态，并清理旧订阅/资源。
 
 **相关文件**：`packages/ratatui-kit/src/atom/use_atom.rs`
+
+### ReactiveHandle 是 State/AtomState 的单一真源
+
+`State<T>` 与 `AtomState<T>` 的读写访问、`try_*`、格式化/比较/Hash 和算术运算符由 `ReactiveHandle<T, N>` 统一提供；差异只在 notifier：`SingleWaker`（本地 state）和 `WakerMap`（按组件 key 订阅的 atom）。
+
+**正确做法**：
+- 修改响应式读写语义时优先改 `reactive_handle.rs`，不要在 `use_state.rs` 和 `atom/mod.rs` 复制两份实现。
+- `State`/`AtomState` 继续使用 `SyncStorage`，并保持 `Send + Sync`，以支持后台任务持有句柄写入并唤醒 UI。
+
+**不要做**：
+- 不要恢复 `try_read` 中的 `loop`/`continue` 重试；`try_*` 获取不到借用时应直接返回 `None`，`read()`/`write()` 由 `expect` 快速暴露编程错误。
+- 不要把本地 State 改回 `UnsyncStorage`。
+
+**相关文件**：`packages/ratatui-kit/src/reactive_handle.rs`、`packages/ratatui-kit/src/hooks/use_state.rs`、`packages/ratatui-kit/src/atom/mod.rs`
+
+### 依赖型 Hook 用 PartialEq 比较依赖
+
+`use_memo`、`use_effect`、`use_async_effect` 的依赖从 `Hash` 改为 `PartialEq + Clone`，hook 内保存 `Option<D>`：`None` 表示首帧未运行，保证首次必跑；后续用值相等判断是否重算/重跑，避免哈希碰撞漏更新。
+
+**正确做法**：
+- deps 选小而稳定的 `Copy`/`Clone` 值或元组。
+- 自定义依赖型 Hook 若需要首次必跑，优先存 `Option<D>`，不要用 `0` 这类哨兵值。
+
+**相关文件**：`packages/ratatui-kit/src/hooks/use_memo.rs`、`packages/ratatui-kit/src/hooks/use_effect.rs`、`packages/ratatui-kit/src/hooks/use_future.rs`

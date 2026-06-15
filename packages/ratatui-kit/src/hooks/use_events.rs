@@ -59,10 +59,7 @@ struct UseEventsImpl {
 }
 
 impl Hook for UseEventsImpl {
-    fn poll_change(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context,
-    ) -> std::task::Poll<()> {
+    fn poll_change(&mut self, cx: &mut std::task::Context) -> std::task::Poll<()> {
         while let Some(Poll::Ready(Some(event))) = self
             .events
             .as_mut()

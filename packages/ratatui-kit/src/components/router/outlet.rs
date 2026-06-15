@@ -5,51 +5,78 @@
 //! 类似于 React Router 的 <Outlet />，用于在父路由中渲染匹配的子路由内容，支持递归嵌套和参数传递。
 
 use crate::{
-    AnyElement, Context, Hooks, UseContext,
-    prelude::{ContextProvider, RouteContext, Routes},
+    AnyElement, Component, ComponentUpdater, Context, Hooks, NoProps, UseContext, element,
+    prelude::{ContextProvider, Fragment, Route, RouteContext, Routes},
 };
-use ratatui_kit_macros::{component, element};
 
 /// Outlet 组件实现。
-#[component]
-pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
-    // 获取全局路由表和当前路径上下文
-    let mut routes = hooks.use_context_mut::<Routes>();
-    let mut route_context = hooks.use_context_mut::<RouteContext>();
+pub struct Outlet;
 
-    // 查找与当前路径匹配的第一个路由（匹配逻辑见 Route::match_path）。
-    // 命中则把提取的参数并入上下文、并把路径推进为剩余未匹配部分,供嵌套 Outlet 续匹配。
-    let mut current_route = routes.iter_mut().find(|r| {
-        let path = route_context.path.clone();
-        match r.match_path(&path) {
-            Some((rest, params)) => {
-                route_context.params.extend(params);
-                route_context.path = rest;
-                true
-            }
-            None => false,
-        }
-    });
+impl Component for Outlet {
+    type Props<'a> = NoProps;
 
-    // 如果没有找到匹配的路由，则尝试匹配根路径 "/"
-    if current_route.is_none() {
-        current_route = routes.iter_mut().find(|r| r.path == "/");
+    fn new(_props: &Self::Props<'_>) -> Self {
+        Self
     }
 
-    // 解包 Option 并确保存在匹配的路由
-    let current_route = current_route.expect("No matching route found");
-
-    // 构建当前路由对应的 UI 元素
-    let current_element = AnyElement::from(&mut current_route.component);
-
-    // 返回构建的 UI 树结构
-    element!(ContextProvider(
-        value: Context::owned(current_route.children.borrow())
+    fn update(
+        &mut self,
+        _props: &mut Self::Props<'_>,
+        mut hooks: Hooks,
+        updater: &mut ComponentUpdater,
     ) {
-        ContextProvider(
-            value: Context::owned(current_route.borrow())
-        ) {
-            { current_element }
-        }
-    })
+        let Some((current_index, route_snapshot, mut component, mut children)) = ({
+            let hooks = hooks.with_context_stack(updater.component_context_stack());
+            let mut routes = hooks.use_context_mut::<Routes>();
+            let mut route_context = hooks.use_context_mut::<RouteContext>();
+
+            let path = route_context.path.clone();
+            let mut current_index = None;
+            for (index, route) in routes.iter_mut().enumerate() {
+                if let Some((rest, params)) = route.match_path(&path) {
+                    route_context.params.extend(params);
+                    route_context.path = rest;
+                    current_index = Some(index);
+                    break;
+                }
+            }
+
+            if current_index.is_none() {
+                current_index = routes.iter().position(|route| route.path == "/");
+            }
+
+            current_index.map(|index| {
+                let current_route = &mut routes[index];
+                let route_snapshot = Route {
+                    path: current_route.path.clone(),
+                    component: element!(Fragment).into_any(),
+                    children: Routes::default(),
+                    matcher: current_route.matcher.clone(),
+                };
+                let component =
+                    std::mem::replace(&mut current_route.component, element!(Fragment).into_any());
+                let children = std::mem::take(&mut current_route.children);
+                (index, route_snapshot, component, children)
+            })
+        }) else {
+            #[cfg(debug_assertions)]
+            eprintln!("ratatui-kit router: no route matched current path");
+            updater.update_children(Vec::<AnyElement<'_>>::new(), None);
+            return;
+        };
+
+        updater.update_children(
+            [
+                element!(ContextProvider(value: Context::owned(route_snapshot)) {
+                    { &mut component }
+                }),
+            ],
+            Some(Context::form_mut(&mut children)),
+        );
+
+        let hooks = hooks.with_context_stack(updater.component_context_stack());
+        let mut routes = hooks.use_context_mut::<Routes>();
+        routes[current_index].component = component;
+        routes[current_index].children = children;
+    }
 }
