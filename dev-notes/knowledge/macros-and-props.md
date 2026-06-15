@@ -16,20 +16,20 @@
 
 **相关文件**：`packages/ratatui-kit-macros/src/component.rs`
 
-### `element!`：一等控制流、`#(expr)` 内嵌、`$expr` 桥接原生 widget
+### `element!`：一等控制流、`{ expr }` 内嵌、显式 adapter 桥接原生 widget
 
 - `Comp(prop: val) { children }` 构造子树。
 - **一等控制流（首选）**：子节点块内直接写 `if`/`if let`/`else if`/`for`/`match`，分支体即子节点。
   codegen 把分支包在 `if/for/match` 外、内部仍是 `extend_with_elements` 调用——故**各分支可返回不同元素类型，无需 `.into_any()` 统一类型**。`for`/`match` 分支体用 `{}` 包裹；`for` 循环里的元素须给 `key:`（如 `key: i`）保证列表项稳定身份。
-- `#(expr)` 仍可内嵌任意返回 `Option` / `Vec` / `impl Iterator<Item = Element>` / `Element` 的 Rust 表达式（动态/复杂场景的逃生）。
-- **`$expr` 前缀**：通过 adapter 桥接实现 `Widget` 的 ratatui 原生 widget；`$(expr, state)` 桥接 `StatefulWidget`。是「逃生舱」，文本场景优先用 `Text(text: ...)`（见下）。
+- `{ expr }` 可内嵌任意返回 `Option` / `Vec` / `impl Iterator<Item = Element>` / `Element` 的 Rust 表达式（动态/复杂场景的逃生）。
+- **adapter 显式节点**：`widget(expr)` 桥接实现 `Widget` 的 ratatui 原生 widget；`stateful(widget, state)` 桥接 `StatefulWidget`。是「逃生舱」，文本场景优先用 `Text(text: ...)`（见下）。
 
-**正确做法**：条件/列表渲染优先用一等控制流；纯文本优先 `Text(text: "..." 或 Line/Text)`；只有 StatefulWidget（`$(w, s)`）或确需直接塞原生 widget 时才用 `$`。
+**正确做法**：条件/列表渲染优先用一等控制流；纯文本优先 `Text(text: "..." 或 Line/Text)`；只有 StatefulWidget（`stateful(w, s)`）或确需直接塞原生 widget 时才用 adapter。
 
 ```rust
 // 条件：各分支不同元素类型，无需 into_any
 element!(View { if loading.get() { Loading() } else { Content(data: d) } })
-// 列表：内联 for，免去宏外 .map().collect::<Vec<AnyElement>>() + #()
+// 列表：内联 for，免去宏外 .map().collect::<Vec<AnyElement>>() + { expr }
 element!(View { for (i, x) in items.iter().enumerate() { Row(label: x, key: i) } })
 ```
 
@@ -39,7 +39,7 @@ element!(View { for (i, x) in items.iter().enumerate() { Row(label: x, key: i) }
 
 `WidgetAdapter`/`StatefulWidgetAdapter` 的 `draw` 用 `render_widget(&self.inner, ..)` 按引用渲染，免去每帧 clone。ratatui 0.30 起所有内置 widget 都实现 `Widget for &T`（`WidgetRef` 仍是 unstable，不依赖它）。
 
-**正确做法**：自定义 widget 想经 `$` 嵌入时，除 `Widget for T` 外最好也实现 `Widget for &T`（ratatui 官方推荐）；否则会因 adapter 的 `for<'a> &'a T: Widget` 约束编译失败（参考 `text.rs` 给 `&TextParagraph` 补的 impl）。`new`/`update` 仍需 `Clone` 从借用 props 拷入持久组件，无法省。
+**正确做法**：自定义 widget 想经 `widget(...)` 嵌入时，除 `Widget for T` 外最好也实现 `Widget for &T`（ratatui 官方推荐）；否则会因 adapter 的 `for<'a> &'a T: Widget` 约束编译失败（参考 `text.rs` 给 `&TextParagraph` 补的 impl）。`new`/`update` 仍需 `Clone` 从借用 props 拷入持久组件，无法省。
 
 **相关文件**：`packages/ratatui-kit/src/components/adapter/widget.rs`、`stateful_widget.rs`
 

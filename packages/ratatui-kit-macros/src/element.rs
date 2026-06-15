@@ -1,23 +1,25 @@
 use proc_macro2::Span;
 use quote::{ToTokens, quote};
 use syn::{
-    Expr, FieldValue, Member, Pat, Token, TypePath, braced, parse::Parse, parse::ParseStream,
-    punctuated::Punctuated, spanned::Spanned, token::Comma,
+    Expr, FieldValue, Ident, Member, Pat, Token, TypePath, braced, parse::Parse,
+    parse::ParseStream, punctuated::Punctuated, spanned::Spanned, token::Comma,
 };
 use uuid::Uuid;
 
 use crate::adapter::ParsedAdapter;
 
-/// 单个子节点：嵌套元素 / `$` 适配器、`#(expr)` 任意表达式、或一等控制流(if/for/match)。
+/// 单个子节点：嵌套元素 / adapter / 任意表达式、或一等控制流(if/for/match)。
 enum ParsedElementChild {
     Element(ElementOrAdapter),
     Expr(Expr),
-    ControlFlow(ControlFlow),
+    // ControlFlow 装箱:If/For 内联持有 syn 的 Expr/Pat,是本枚举最大的变体,
+    // 不装箱会触发 clippy::large_enum_variant(parse AST,装箱成本可忽略)。
+    ControlFlow(Box<ControlFlow>),
 }
 
 /// element! 子节点块内的一等控制流。分支体本身又是一组子节点。
 ///
-/// 相比 `#(if cond { elem.into_any() } else { ... })`,一等控制流让每个分支独立把自己的
+/// 相比把条件渲染塞进表达式插槽,一等控制流让每个分支独立把自己的
 /// 子节点 `extend` 进 children——故各分支可返回不同元素类型,无需 `.into_any()` 统一类型。
 enum ControlFlow {
     If {
@@ -52,20 +54,19 @@ struct MatchArm {
 fn parse_children(input: ParseStream) -> syn::Result<Vec<ParsedElementChild>> {
     let mut children = Vec::new();
     while !input.is_empty() {
-        if input.peek(Token![#]) {
-            // `#(expr)`:把子节点位置交还给任意 Rust 表达式(返回 Option/Vec/Iterator/Element)。
-            input.parse::<Token![#]>()?;
-            let expr;
-            syn::parenthesized!(expr in input);
-            children.push(ParsedElementChild::Expr(expr.parse()?));
-        } else if input.peek(Token![if]) {
-            children.push(ParsedElementChild::ControlFlow(parse_if(input)?));
+        if input.peek(Token![if]) {
+            children.push(ParsedElementChild::ControlFlow(Box::new(parse_if(input)?)));
         } else if input.peek(Token![for]) {
-            children.push(ParsedElementChild::ControlFlow(parse_for(input)?));
+            children.push(ParsedElementChild::ControlFlow(Box::new(parse_for(input)?)));
         } else if input.peek(Token![match]) {
-            children.push(ParsedElementChild::ControlFlow(parse_match(input)?));
+            children.push(ParsedElementChild::ControlFlow(Box::new(parse_match(
+                input,
+            )?)));
+        } else if input.peek(syn::token::Brace) {
+            // `{ expr }`:把子节点位置交还给任意 Rust 表达式(返回 Option/Vec/Iterator/Element)。
+            children.push(ParsedElementChild::Expr(input.parse()?));
         } else {
-            // 嵌套元素 `Comp(..){..}` 或 `$widget` 适配器。
+            // 嵌套元素 `Comp(..){..}` 或 `widget(...)` / `stateful(...)` 适配器。
             children.push(ParsedElementChild::Element(input.parse()?));
         }
     }
@@ -143,14 +144,19 @@ fn parse_match(input: ParseStream) -> syn::Result<ControlFlow> {
 impl ParsedElementChild {
     /// 生成「把本子节点 extend 进 `dest`」的语句。控制流会把内层 extend 包进 if/for/match。
     fn to_extend(&self, dest: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-        // Element 与 Expr 都走同一条 extend_with_elements 通道,只是内层 token 不同;
-        // ControlFlow 则递归把内层 extend 包进 if/for/match 外壳。
-        let child = match self {
-            ParsedElementChild::Element(element) => quote!(#element),
-            ParsedElementChild::Expr(expr) => quote!(#expr),
-            ParsedElementChild::ControlFlow(cf) => return cf.to_extend(dest),
-        };
-        quote!(::ratatui_kit::extend_with_elements(&mut #dest, #child);)
+        match self {
+            ParsedElementChild::Element(element) => {
+                quote!(::ratatui_kit::extend_with_elements(&mut #dest, #element);)
+            }
+            // Expr 形如块 `{ ... }`:先绑定到局部再 extend——避免把 `{ expr }` 直接做实参
+            // 触发 clippy::unnecessary_braces,同时允许块内写多条语句。
+            ParsedElementChild::Expr(expr) => quote!({
+                let _child = #expr;
+                ::ratatui_kit::extend_with_elements(&mut #dest, _child);
+            }),
+            // ControlFlow 递归把内层 extend 包进 if/for/match 外壳。
+            ParsedElementChild::ControlFlow(cf) => cf.to_extend(dest),
+        }
     }
 }
 
@@ -381,19 +387,35 @@ impl ToTokens for ParsedElement {
 
 pub enum ElementOrAdapter {
     Element(ParsedElement),
-    Adapter(ParsedAdapter),
+    // Adapter 装箱:ParsedAdapter 含两个 syn::Expr(stateful 的 widget+state),内联较大,
+    // 不装箱会使本枚举因变体大小失衡触发 clippy::large_enum_variant。
+    Adapter(Box<ParsedAdapter>),
 }
 
 impl Parse for ElementOrAdapter {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        if input.peek(Token![$]) {
-            input.parse::<Token![$]>()?;
-            let adapter: ParsedAdapter = input.parse()?;
-            Ok(ElementOrAdapter::Adapter(adapter))
-        } else {
-            let element: ParsedElement = input.parse()?;
-            Ok(ElementOrAdapter::Element(element))
+        if input.peek(Ident) {
+            let fork = input.fork();
+            let ident: Ident = fork.parse()?;
+            let ident = ident.to_string();
+            if matches!(ident.as_str(), "widget" | "stateful") && fork.peek(syn::token::Paren) {
+                let adapter: ParsedAdapter = input.parse()?;
+                return Ok(ElementOrAdapter::Adapter(Box::new(adapter)));
+            }
         }
+
+        if input.peek(Token![$]) {
+            return Err(input.error(
+                "`$` adapter syntax was removed; use `widget(...)` or `stateful(widget, state)`",
+            ));
+        }
+
+        if input.peek(Token![#]) {
+            return Err(input.error("`#(expr)` child syntax was removed; use `{ expr }`"));
+        }
+
+        let element: ParsedElement = input.parse()?;
+        Ok(ElementOrAdapter::Element(element))
     }
 }
 

@@ -2,7 +2,7 @@ use crate::{
     AnyElement, Hooks, UsePreviousSize,
     prelude::{Fragment, Positioned, Text, View},
 };
-use ratatui::{layout::Constraint, style::Style, text::Span};
+use ratatui::{style::Style, text::Span};
 use ratatui_kit_macros::{Props, component, element};
 
 #[derive(Debug, Clone, Props, Default)]
@@ -32,18 +32,16 @@ pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'stat
 
     element!(View{
         Fragment{
-            #(if !props.hide_cursor{
-                element!(Positioned(
+            if !props.hide_cursor {
+                Positioned(
                     x: position.0.min(size.x + size.width.saturating_sub(1)),
                     y: position.1.min(size.y + size.height),
                     width: 1u16,
                     height: 1u16,
                 ){
-                    $Span::from(" ").style(props.cursor_style)
-                }).into_any()
-            }else{
-                element!(View(height:Constraint::Length(0),width:Constraint::Length(0))).into_any()
-            })
+                    widget(Span::from(" ").style(props.cursor_style))
+                }
+            }
         }
         Text(
             text:text,

@@ -106,10 +106,10 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     padding:ratatui::widgets::Padding::new(2,2,1,1),
                 ) {
                     View(height:ratatui::layout::Constraint::Length(1),){
-                        $modal_title
+                        widget(modal_title)
                     }
                     View{
-                        $modal_content
+                        widget(modal_content)
                     }
                 }
             }

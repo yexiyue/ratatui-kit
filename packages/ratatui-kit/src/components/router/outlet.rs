@@ -99,7 +99,7 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
         ContextProvider(
             value: Context::owned(current_route.borrow())
         ) {
-            #(current_element)
+            { current_element }
         }
     })
 }

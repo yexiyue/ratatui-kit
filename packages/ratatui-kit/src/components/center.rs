@@ -25,7 +25,7 @@ pub fn Center<'a>(props: &mut CenterProps<'a>) -> impl Into<AnyElement<'a>> {
                     justify_content:Flex::Center,
                     flex_direction:Direction::Vertical,
                 ){
-                    #(props.children.iter_mut())
+                    { props.children.iter_mut() }
                 }
             }
         }

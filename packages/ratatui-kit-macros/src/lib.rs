@@ -8,8 +8,8 @@
 //!   - 支持嵌套、props、children、一等控制流渲染。
 //!   - **一等控制流**：子节点块内可直接写 `if/else`、`if let`、`for`、`match`，分支体即子节点；
 //!     各分支独立 extend，可返回不同元素类型，无需 `.into_any()`。
-//!   - `#(expr)` 仍可内嵌任意返回 Option/Vec/impl Iterator/Element 的 Rust 表达式。
-//!   - 通过 `$` 前缀可兼容任何实现 `Widget`/`StatefulWidget` 的 ratatui 原生组件（逃生舱）。
+//!   - `{ expr }` 可内嵌任意返回 Option/Vec/impl Iterator/Element 的 Rust 表达式。
+//!   - `widget(expr)` / `stateful(widget, state)` 可兼容 ratatui 原生组件（逃生舱）。
 //!   - 适用于声明式构建终端 UI 组件树。
 //!
 //! ## element! 宏语法
@@ -24,12 +24,12 @@
 //!     for item in items {
 //!         ListItem(label: item, key: item.id)
 //!     }
-//!     $Block::default().borders(Borders::ALL)
+//!     widget(Block::default().borders(Borders::ALL))
 //! })
 //! ```
 //!
-//! - 控制流分支体直接写子元素；动态/复杂表达式仍可用 `#(...)`。
-//! - 通过 `$` 前缀可直接集成 ratatui 原生组件。
+//! - 控制流分支体直接写子元素；动态/复杂表达式仍可用 `{ expr }`。
+//! - 通过 `widget(...)` / `stateful(...)` 可直接集成 ratatui 原生组件。
 //! - 语法风格类似 JSX，但为 Rust 语法友好设计。
 //! - 适用于声明式构建终端 UI 组件树。
 
@@ -63,8 +63,8 @@ pub fn derive_props(item: TokenStream) -> TokenStream {
 /// - 语法风格类似 React JSX，但为 Rust 语法友好设计。
 /// - **一等控制流**：子节点块内可直接写 `if/else`、`if let`、`for`、`match`，分支体即子节点。
 ///   各分支独立 extend，故可返回不同元素类型，无需 `.into_any()` 统一类型。
-/// - `#(expr)` 仍可内嵌任意返回 `Option`/`Vec`/`Iterator`/`Element` 的 Rust 表达式。
-/// - 通过 `$` 前缀可兼容任何实现 `Widget`/`StatefulWidget` 的 ratatui 原生组件（逃生舱）。
+/// - `{ expr }` 可内嵌任意返回 `Option`/`Vec`/`Iterator`/`Element` 的 Rust 表达式。
+/// - `widget(expr)` / `stateful(widget, state)` 可兼容 ratatui 原生组件（逃生舱）。
 /// - 适用于声明式构建终端 UI 组件树。
 ///
 /// ## element! 宏语法
@@ -81,7 +81,7 @@ pub fn derive_props(item: TokenStream) -> TokenStream {
 ///     for item in items {
 ///         ListItem(label: item, key: item.id)
 ///     }
-///     $Block::default().borders(Borders::ALL)
+///     widget(Block::default().borders(Borders::ALL))
 /// })
 /// ```
 #[proc_macro]

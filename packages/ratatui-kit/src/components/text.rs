@@ -123,7 +123,7 @@ pub fn Text(props: &TextProps) -> impl Into<AnyElement<'static>> {
 
     element! {
         Fragment{
-            $paragraph
+            widget(paragraph)
         }
     }
 }
