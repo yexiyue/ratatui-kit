@@ -37,7 +37,7 @@ element!(View { for (i, x) in items.iter().enumerate() { Row(label: x, key: i) }
 
 ### `routes!`：右侧复用 `element!` 头部解析，可传 props
 
-`routes!` 右侧 `"/path" => Component` 现支持像 `element!` 一样传 props：`"/path" => Component(prop: val)`。圆括号 `()` 传 props、花括号 `{}` 留给嵌套子路由，二者顺序固定且互斥。实现支点是 `ParsedElement::parse_head`（只解析 `Ty` + 可选 `(props)`、**不消费** `{}`），被 `element!` 的 `Parse` 与 `routes!` 的 `ParsedRoute::parse` 共用——单一真源，no-props 路径与旧 `element!(#element)` 字节等价，`key`/`..rest`/`(expr).into()` 全部白拿。
+`routes!` 右侧 `"/path" => Component` 现支持像 `element!` 一样传 props：`"/path" => Component(prop: val)`。圆括号 `()` 传 props、花括号 `{}` 留给嵌套子路由，二者顺序固定且互斥。实现支点是 **`ParsedElementHead`**（只含 `ty` + `props`、**无 children 字段**）：它 `impl Parse` 只吃 `Ty` + 可选 `(props)`、不消费 `{}`，并以 `to_element_expr(children)` 作为 element codegen 的**单一真源**——`element!` 传实际子节点切片、`routes!` 传空切片。`ParsedElement` 则是 `{ head, children }` 的组合。no-props 路径与旧 `element!(#element)` 字节等价，`key`/`..rest`/`(expr).into()` 全部白拿。
 
 **正确做法**：
 - 静态配置走 props：`"/dash" => Dashboard(columns: 3) { "/panel" => Panel }`（标题、只读标志、列数等构造期常量）。
@@ -45,11 +45,12 @@ element!(View { for (i, x) in items.iter().enumerate() { Row(label: x, key: i) }
 
 **不要做 / 边界**：
 - **`'static` 硬约束**：经 `routes!` 传入的 props 会被烘进 `AnyElement<'static>`，**不能借用栈上局部**。同样的 `Comp(prop: x)` 在组件内联使用时可持 `&borrow`，放进 `routes!` 却会被 `'static` 拒绝——报生命周期错时先查这条。
-- **`key:` 被拒绝**：路由身份由 path 决定，`routes!` 在 `ParsedRoute::parse` 显式报错「路由组件不支持 key:」（经 `ParsedElement::key_span` 检测）。
-- **`parse_head` 不变量**：它**绝不能** peek／消费 `Brace`，否则子路由块会被当成 element children 吞掉。护栏是 `router/mod.rs` 的 `routes_macro_accepts_props_with_children` 测试，勿删。
-- **`key:` 字段查找单一真源**：`element.rs` 用 `PropsItem::as_key_field` 集中「是否 `key:` 字段」的判断（魔法串 `"key"` 只此一处），`to_tokens` 的 key 构造/props 过滤与 `key_span` 都经它，勿再各自手写 `Member::Named("key")` 匹配。
+- **`key:` 被拒绝**：路由身份由 path 决定，`routes!` 在 `ParsedRoute::parse` 显式报错「路由组件不支持 key:」（经 `ParsedElementHead::key_span` 检测）。
+- **「无 children」是类型强制、非注释约定**：`ParsedElementHead` 没有 children 字段，故「头部解析阶段消费 `{}`」结构上无法表达，`routes!` 持有的 head 也物理上无静态 children 可传——`{}` 必归子路由。回归护栏仍是 `router/mod.rs` 的 `routes_macro_accepts_props_with_children` 测试，勿删。
+- **codegen 形态自洽**：`to_element_expr` 输出**带外层括号**的元素表达式 `({…})`，调用方（`router` 的 `.into_any()`、`element!` 嵌套 extend、方法链 `.fullscreen()`）直接用，不需补括号、不依赖内部是块——勿在 `router` 恢复手动加括号。
+- **`key:` 字段查找单一真源**：`element.rs` 用 `PropsItem::as_key_field` 集中「是否 `key:` 字段」的判断（魔法串 `"key"` 只此一处），`to_element_expr` 的 key 构造/props 过滤与 `key_span` 都经它，勿再各自手写 `Member::Named("key")` 匹配。
 
-**相关文件**：`packages/ratatui-kit-macros/src/router.rs`、`packages/ratatui-kit-macros/src/element.rs`（`parse_head` / `key_span` / `PropsItem::as_key_field`）、`packages/ratatui-kit/src/components/router/mod.rs`（routes! 传 props 测试）
+**相关文件**：`packages/ratatui-kit-macros/src/router.rs`、`packages/ratatui-kit-macros/src/element.rs`（`ParsedElementHead`：`to_element_expr` / `key_span` / `PropsItem::as_key_field`；`ParsedElement` = head + children）、`packages/ratatui-kit/src/components/router/mod.rs`（routes! 传 props 测试）
 
 ### adapter 按引用渲染（ratatui 0.30）：bound 用 `for<'a> &'a T: Widget`，非 `Clone`
 

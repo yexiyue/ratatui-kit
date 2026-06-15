@@ -6,14 +6,14 @@ use syn::{
     token::{Brace, Comma},
 };
 
-use crate::element::ParsedElement;
+use crate::element::ParsedElementHead;
 
 pub struct ParsedRoute {
     pub path: LitStr,
     /// 复用 `element!` 的头部解析:`Component` 或 `Component(prop: val)`。
-    /// 只持有「类型 + props」(经 `ParsedElement::parse_head`,不含 children)——
+    /// 持有不含 children 的 `ParsedElementHead`——路由组件结构上无静态 children,
     /// `{}` 留给本结构体的 `children` 当嵌套子路由。
-    pub element: ParsedElement,
+    pub element: ParsedElementHead,
     pub children: Routes,
 }
 
@@ -24,8 +24,8 @@ impl Parse for ParsedRoute {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let path: LitStr = input.parse()?;
         input.parse::<Token![=>]>()?;
-        // parse_head 只吃 `Ty` + 可选 `(props)`,不消费 `{}`——后者归子路由。
-        let element = ParsedElement::parse_head(input)?;
+        // ParsedElementHead 只吃 `Ty` + 可选 `(props)`,不消费 `{}`——后者归子路由。
+        let element = input.parse::<ParsedElementHead>()?;
 
         // 路由身份由 path 决定,`key:` 在路由元素上无意义,显式拒绝以免误用。
         if let Some(span) = element.key_span() {
@@ -60,19 +60,17 @@ impl Parse for Routes {
 impl ToTokens for ParsedRoute {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let path = &self.path;
-        let element = &self.element;
         let children = &self.children;
+        // head 的 to_element_expr 输出带括号的 element 表达式,且传入空 children——
+        // 路由组件无静态 children。router 直接 `.into_any()`,不依赖其 token 形状。
+        let element = self.element.to_element_expr(&[]);
 
         // 经 Route::new 构造,使含动态参数的路由在构造期一次性编译匹配正则
         // (Route 的 matcher 字段私有,不能用结构体字面量构造)。
-        //
-        // `element` 是 `ParsedElement`,其 `ToTokens` 在 children 为空时产出等价于
-        // `element!(Comp(props))` 的 `Element` 构造块。外层括号 load-bearing——
-        // 块表达式 `{ ... }` 须加括号才能在实参位继续 `.into_any()`。
         tokens.extend(quote! {
             ::ratatui_kit::components::Route::new(
                 #path.to_string(),
-                (#element).into_any(),
+                #element.into_any(),
                 #children.into(),
             )
         });
