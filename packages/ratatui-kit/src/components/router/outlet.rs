@@ -21,27 +21,9 @@ pub fn Outlet<'a>(hooks: Hooks) -> impl Into<AnyElement<'a>> {
     let mut current_route = routes.iter_mut().find(|r| {
         let path = route_context.path.clone();
 
-        // 判断路径是否包含动态参数（例如 "/users/:id"）
-        if r.path.contains("/:") {
-            // 将路径按 '/' 分割成多个段
-            let regexp = r
-                .path
-                .split("/")
-                .map(|s| {
-                    // 如果是动态参数段（以 ':' 开头），则生成正则表达式捕获组
-                    if s.starts_with(":") {
-                        let name = s.trim_start_matches(":");
-                        format!("(?<{name}>[^/]+)") // 使用 [^/]+ 确保只匹配单个路径段
-                    } else {
-                        s.to_string()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("/"); // 合并所有段形成完整的正则表达式
-
-            // 编译正则表达式
-            let regexp = regex::Regex::new(&regexp).expect("Invalid route path");
-
+        // 含动态参数（如 "/users/:id"）的路由:复用构造期一次性编译的正则（见 Route::new），
+        // 不再每次渲染重新编译。静态路由 matcher 为 None,走下方字符串段边界匹配。
+        if let Some(regexp) = r.matcher() {
             // 计算匹配长度
             let matched_len = regexp.find(&path).map(|m| m.end()).unwrap_or(0);
 

@@ -49,12 +49,14 @@ impl ToTokens for ParsedRoute {
         let element = &self.element;
         let children = &self.children;
 
+        // 经 Route::new 构造,使含动态参数的路由在构造期一次性编译匹配正则
+        // (Route 的 matcher 字段私有,不能用结构体字面量构造)。
         tokens.extend(quote! {
-            ::ratatui_kit::components::Route{
-                path: #path.to_string(),
-                component: ::ratatui_kit::element!(#element).into_any(),
-                children: #children.into(),
-            }
+            ::ratatui_kit::components::Route::new(
+                #path.to_string(),
+                ::ratatui_kit::element!(#element).into_any(),
+                #children.into(),
+            )
         });
     }
 }

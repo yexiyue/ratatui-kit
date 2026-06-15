@@ -15,14 +15,56 @@ pub struct Route {
     pub path: String,
     pub component: AnyElement<'static>,
     pub children: Routes,
+    /// 含动态参数(`/:name`)的路由的匹配正则,在构造时一次性编译并以 `Arc` 共享,
+    /// 供 `Outlet` 每次渲染复用,避免重复编译(见 `outlet.rs`)。静态路由为 `None`。
+    /// 私有字段:故 `Route` 须经 `Route::new` 构造(`routes!` 宏即如此),
+    /// crate 内的 `borrow()` 透传同一 `Arc`。
+    matcher: Option<Arc<regex::Regex>>,
 }
 
 impl Route {
+    /// 构造路由,并在此**一次性**编译动态参数匹配正则。
+    ///
+    /// 路径含 `/:name` 段时,将其转为命名捕获组 `(?<name>[^/]+)`(只匹配单段、不跨 `/`),
+    /// 编译为正则并以 `Arc` 持有;非法正则在此 panic(路径为 `routes!` 中的静态字面量,
+    /// 属开发期错误,构造期暴露优于每次渲染暴露)。静态路由不编译、不持有正则。
+    pub fn new(path: String, component: AnyElement<'static>, children: Routes) -> Self {
+        let matcher = if path.contains("/:") {
+            let pattern = path
+                .split('/')
+                .map(|seg| match seg.strip_prefix(':') {
+                    Some(name) => format!("(?<{name}>[^/]+)"),
+                    None => seg.to_string(),
+                })
+                .collect::<Vec<_>>()
+                .join("/");
+            Some(Arc::new(
+                regex::Regex::new(&pattern).expect("Invalid route path regex"),
+            ))
+        } else {
+            None
+        };
+
+        Route {
+            path,
+            component,
+            children,
+            matcher,
+        }
+    }
+
+    /// 本路由的预编译匹配正则(动态路由为 `Some`,静态路由为 `None`)。
+    pub(crate) fn matcher(&self) -> Option<&Arc<regex::Regex>> {
+        self.matcher.as_ref()
+    }
+
     pub fn borrow(&mut self) -> Route {
         Route {
             path: self.path.clone(),
             component: AnyElement::from(&mut self.component),
             children: self.children.borrow(),
+            // 透传同一已编译正则(Arc 共享),不重新编译。
+            matcher: self.matcher.clone(),
         }
     }
 }
