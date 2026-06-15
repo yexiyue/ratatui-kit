@@ -301,4 +301,52 @@ mod tests {
         let s = RouteState::new(42u32);
         assert!(s.downcast::<String>().is_none());
     }
+
+    // --- routes! 宏传 props(右侧复用 element! 的 `Comp(prop: val)` 语法)---
+    use crate::components::Text;
+    use ratatui_kit_macros::{Props, component};
+
+    #[derive(Default, Props)]
+    struct GreetProps {
+        name: String,
+    }
+
+    #[component]
+    fn Greet(props: &GreetProps) -> impl Into<crate::AnyElement<'static>> {
+        crate::element!(Text(text: props.name.clone()))
+    }
+
+    #[test]
+    fn routes_macro_accepts_props() {
+        // 圆括号传 props:`Comp(prop: val)`。
+        let routes: Vec<Route> = crate::routes! {
+            "/hi" => Greet(name: "world".to_string()),
+        };
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].path, "/hi");
+    }
+
+    #[test]
+    fn routes_macro_accepts_props_with_children() {
+        // 护栏:props 的 `)` 后 `{}` 干净交还子路由解析,二者不串扰。
+        let routes: Vec<Route> = crate::routes! {
+            "/a" => Greet(name: "x".to_string()) {
+                "/b" => Greet(name: "y".to_string()),
+            },
+        };
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].path, "/a");
+        assert_eq!(routes[0].children.len(), 1);
+        assert_eq!(routes[0].children[0].path, "/b");
+    }
+
+    #[test]
+    fn routes_macro_no_props_still_works() {
+        // 回归:无 props 的裸组件写法仍成立(parse_head 的无括号路径)。
+        let routes: Vec<Route> = crate::routes! {
+            "/home" => Fragment,
+        };
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].path, "/home");
+    }
 }

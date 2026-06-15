@@ -35,6 +35,22 @@ element!(View { for (i, x) in items.iter().enumerate() { Row(label: x, key: i) }
 
 **相关文件**：`packages/ratatui-kit-macros/src/element.rs`（`parse_children` / `ControlFlow` / `to_extend`）、`packages/ratatui-kit-macros/src/adapter.rs`、`packages/ratatui-kit/src/components/text.rs`（`Text` 组件、`TextParagraph: From<&str>/Line/Text`）
 
+### `routes!`：右侧复用 `element!` 头部解析，可传 props
+
+`routes!` 右侧 `"/path" => Component` 现支持像 `element!` 一样传 props：`"/path" => Component(prop: val)`。圆括号 `()` 传 props、花括号 `{}` 留给嵌套子路由，二者顺序固定且互斥。实现支点是 `ParsedElement::parse_head`（只解析 `Ty` + 可选 `(props)`、**不消费** `{}`），被 `element!` 的 `Parse` 与 `routes!` 的 `ParsedRoute::parse` 共用——单一真源，no-props 路径与旧 `element!(#element)` 字节等价，`key`/`..rest`/`(expr).into()` 全部白拿。
+
+**正确做法**：
+- 静态配置走 props：`"/dash" => Dashboard(columns: 3) { "/panel" => Panel }`（标题、只读标志、列数等构造期常量）。
+- 动态数据**不要**走 props：路径参数 `/:id` 用 `use_params`，导航载荷用 `use_route_state::<T>()` + `push_with_state`（对应 React 的 `useParams`/`useLoaderData`）。
+
+**不要做 / 边界**：
+- **`'static` 硬约束**：经 `routes!` 传入的 props 会被烘进 `AnyElement<'static>`，**不能借用栈上局部**。同样的 `Comp(prop: x)` 在组件内联使用时可持 `&borrow`，放进 `routes!` 却会被 `'static` 拒绝——报生命周期错时先查这条。
+- **`key:` 被拒绝**：路由身份由 path 决定，`routes!` 在 `ParsedRoute::parse` 显式报错「路由组件不支持 key:」（经 `ParsedElement::key_span` 检测）。
+- **`parse_head` 不变量**：它**绝不能** peek／消费 `Brace`，否则子路由块会被当成 element children 吞掉。护栏是 `router/mod.rs` 的 `routes_macro_accepts_props_with_children` 测试，勿删。
+- **`key:` 字段查找单一真源**：`element.rs` 用 `PropsItem::as_key_field` 集中「是否 `key:` 字段」的判断（魔法串 `"key"` 只此一处），`to_tokens` 的 key 构造/props 过滤与 `key_span` 都经它，勿再各自手写 `Member::Named("key")` 匹配。
+
+**相关文件**：`packages/ratatui-kit-macros/src/router.rs`、`packages/ratatui-kit-macros/src/element.rs`（`parse_head` / `key_span` / `PropsItem::as_key_field`）、`packages/ratatui-kit/src/components/router/mod.rs`（routes! 传 props 测试）
+
 ### adapter 按引用渲染（ratatui 0.30）：bound 用 `for<'a> &'a T: Widget`，非 `Clone`
 
 `WidgetAdapter`/`StatefulWidgetAdapter` 的 `draw` 用 `render_widget(&self.inner, ..)` 按引用渲染，免去每帧 clone。ratatui 0.30 起所有内置 widget 都实现 `Widget for &T`（`WidgetRef` 仍是 unstable，不依赖它）。

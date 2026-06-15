@@ -18,7 +18,7 @@ use std::fs;
 async fn main() {
     let routes = routes! {
         "/" => HomePage,
-        "/counter" => CounterPage,
+        "/counter" => CounterPage(step: 5),
         "/markdown" => MarkdownReader,
         "/input" => InputPage,
     };
@@ -64,14 +64,21 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     )
 }
 
+#[derive(Default, Props)]
+struct CounterPageProps {
+    /// 每秒自增的步长,经 routes! 以静态 props 传入(演示 `Comp(prop: val)` 新语法)。
+    step: i32,
+}
+
 #[component]
-fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+fn CounterPage(props: &CounterPageProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let step = props.step;
     let mut state = hooks.use_state(|| 0);
     let mut navigate = hooks.use_navigate();
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            state += 1;
+            state += step;
         }
     });
     hooks.use_events(move |event| {
@@ -86,7 +93,7 @@ fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         Border(
             style:Style::default().green(),
             height:Constraint::Length(5),
-            top_title:Line::from("计数器页面 (ESC 返回)").centered(),
+            top_title:Line::from(format!("计数器页面 步长={step} (ESC 返回)")).centered(),
         ){
             Text(text: Line::styled(
                 format!("Counter: {state}"),

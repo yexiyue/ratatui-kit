@@ -246,6 +246,19 @@ impl PropsItem {
             PropsItem::Rest(expr) => expr.span(),
         }
     }
+
+    /// 若本项是保留的 `key:` 字段(元素身份键),返回其 `FieldValue`。
+    ///
+    /// 单一真源:`ToTokens` 的 key 构造与 props 过滤、`ParsedElement::key_span` 都经此查找——
+    /// 避免「`Member::Named("key")` 匹配 + 魔法串 `"key"`」散落多处、改名时需多处同步。
+    fn as_key_field(&self) -> Option<&FieldValue> {
+        match self {
+            PropsItem::FieldValue(fv) if matches!(&fv.member, Member::Named(ident) if ident == "key") => {
+                Some(fv)
+            }
+            _ => None,
+        }
+    }
 }
 
 pub struct ParsedElement {
@@ -254,8 +267,15 @@ pub struct ParsedElement {
     children: Vec<ParsedElementChild>,
 }
 
-impl Parse for ParsedElement {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+impl ParsedElement {
+    /// 只解析元素「头部」:类型路径 + 可选 `(props)`,**不消费** `{}` 块。
+    ///
+    /// `children` 置空,把 `{}` 的归属留给调用方:`element!` 的 `Parse` 紧接着把它当
+    /// 子节点;而 `routes!`(`router.rs`)把它当嵌套子路由。两者复用同一份 props 解析与
+    /// codegen——这是「routes! 像 element! 一样传 props」的实现支点。
+    ///
+    /// 不变量:本方法**绝不能** `peek`/消费 `Brace`,否则 `routes!` 的子路由块会被吞掉。
+    pub fn parse_head(input: ParseStream) -> syn::Result<Self> {
         let ty: TypePath = input.parse()?;
         let props = if input.peek(syn::token::Paren) {
             let props_input;
@@ -278,19 +298,32 @@ impl Parse for ParsedElement {
             ));
         }
 
-        let children = if input.peek(syn::token::Brace) {
-            let children_input;
-            braced!(children_input in input);
-            parse_children(&children_input)?
-        } else {
-            Vec::new()
-        };
-
         Ok(Self {
             ty,
             props,
-            children,
+            children: Vec::new(),
         })
+    }
+
+    /// 返回 `key:` 字段的 span(若存在)。`routes!` 借此拒绝路由元素上的 `key:`——
+    /// 路由身份由 path 决定,元素 key 在路由场景下无意义(详见 `router.rs`)。
+    pub fn key_span(&self) -> Option<Span> {
+        self.props
+            .iter()
+            .find_map(PropsItem::as_key_field)
+            .map(|fv| fv.member.span())
+    }
+}
+
+impl Parse for ParsedElement {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut element = Self::parse_head(input)?;
+        if input.peek(syn::token::Brace) {
+            let children_input;
+            braced!(children_input in input);
+            element.children = parse_children(&children_input)?;
+        }
+        Ok(element)
     }
 }
 
@@ -298,35 +331,26 @@ impl ToTokens for ParsedElement {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let ty = &self.ty;
         let decl_key = Uuid::new_v4().as_u128();
-        let mut has_rest = false;
+        let has_rest = self
+            .props
+            .iter()
+            .any(|item| matches!(item, PropsItem::Rest(_)));
         // 有用户 `key:` → User((decl_key, expr)) 单次堆分配;否则 Decl(decl_key) 零堆分配。
         let key = self
             .props
             .iter()
-            .find_map(|props_item: &PropsItem| match props_item {
-                PropsItem::FieldValue(FieldValue { member, expr, .. }) => match member {
-                    Member::Named(ident) if ident == "key" => {
-                        Some(quote!(::ratatui_kit::ElementKey::user((#decl_key, #expr))))
-                    }
-                    _ => None,
-                },
-                PropsItem::Rest(_) => {
-                    has_rest = true;
-                    None
-                }
+            .find_map(PropsItem::as_key_field)
+            .map(|fv| {
+                let expr = &fv.expr;
+                quote!(::ratatui_kit::ElementKey::user((#decl_key, #expr)))
             })
             .unwrap_or_else(|| quote!(::ratatui_kit::ElementKey::decl(#decl_key)));
 
         let props_assignments = self
             .props
             .iter()
-            .filter_map(|props_item: &PropsItem| match props_item {
-                PropsItem::FieldValue(FieldValue { member, .. }) => match member {
-                    Member::Named(ident) if ident == "key" => None,
-                    _ => Some(quote!(#props_item)),
-                },
-                _ => Some(quote!(#props_item)),
-            })
+            .filter(|item| item.as_key_field().is_none())
+            .map(|props_item| quote!(#props_item))
             .collect::<Vec<_>>();
 
         let set_children = if !self.children.is_empty() {
@@ -356,6 +380,9 @@ impl ToTokens for ParsedElement {
             tokens.extend(quote! {
                 {
                     type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
+                    // 用户填满全部字段时,兜底的 `..Default::default()` 会触发 needless_update;
+                    // element! 统一以 Default 补未填字段,此处多余属预期(宏无从得知字段总数),显式 allow。
+                    #[allow(clippy::needless_update)]
                     let mut _props = Props{
                         #default_rest
                     };
