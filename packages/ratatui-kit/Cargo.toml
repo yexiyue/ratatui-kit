@@ -18,6 +18,10 @@ ratatui = "0.30.1"
 tui-input = { version = "0.15.3", optional = true, features = ["ratatui"] }
 tui-tree-widget = { version = "0.24.0", optional = true }
 
+[dev-dependencies]
+# proc-macro 的 UI 编译测试（pass/compile_fail）。失败用例只断言本库稳定报错。
+trybuild = "1.0"
+
 [features]
 default = []
 # 注:`textarea` feature 暂时下线——其底层 `tui-textarea` 截至本次升级仍无支持

@@ -115,4 +115,41 @@ mod tests {
         }
         assert_eq!(h.current_context().path, "/m29");
     }
+
+    #[test]
+    fn back_at_start_is_noop() {
+        let mut h = new_history(10);
+        // current == 0,无可回退。
+        assert!(!h.back());
+        assert_eq!(h.current, 0);
+    }
+
+    #[test]
+    fn forward_at_end_is_noop() {
+        let mut h = new_history(10);
+        h.push(ctx("/a"));
+        // 已在末尾。
+        assert!(!h.forward());
+        // 回退一格后可前进。
+        assert!(h.back());
+        assert!(h.forward());
+        assert_eq!(h.current_context().path, "/a");
+    }
+
+    #[test]
+    fn go_out_of_range_is_noop() {
+        let mut h = new_history(10);
+        for i in 0..3 {
+            h.push(ctx(&format!("/r{i}")));
+        }
+        // 现有 4 项(含初始 "/"),current == 3。
+        let before = h.current;
+        assert!(!h.go(5)); // 越上界
+        assert_eq!(h.current, before);
+        assert!(!h.go(-10)); // 越下界
+        assert_eq!(h.current, before);
+        // 范围内成功。
+        assert!(h.go(-2));
+        assert_eq!(h.current, before - 2);
+    }
 }

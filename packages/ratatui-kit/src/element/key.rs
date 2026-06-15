@@ -33,3 +33,49 @@ impl ElementKey {
         Self::User(Arc::new(key))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ElementKey;
+    use std::collections::HashSet;
+
+    #[test]
+    fn decl_and_user_never_collide() {
+        // 不同变体永不相等,即便内含的 decl_key 相同。
+        assert_ne!(ElementKey::decl(42), ElementKey::user((42u128, "x")));
+    }
+
+    #[test]
+    fn decl_equality_by_value() {
+        assert_eq!(ElementKey::decl(7), ElementKey::decl(7));
+        assert_ne!(ElementKey::decl(7), ElementKey::decl(8));
+    }
+
+    #[test]
+    fn user_equality_by_tuple() {
+        assert_eq!(
+            ElementKey::user((1u128, "a")),
+            ElementKey::user((1u128, "a"))
+        );
+        // 同声明点(decl_key 相同)、不同用户值 → 不等(列表项区分的来源)。
+        assert_ne!(
+            ElementKey::user((1u128, "a")),
+            ElementKey::user((1u128, "b"))
+        );
+        // 不同声明点、相同用户值 → 不等(位置稳定性的来源)。
+        assert_ne!(
+            ElementKey::user((1u128, "a")),
+            ElementKey::user((2u128, "a"))
+        );
+    }
+
+    #[test]
+    fn hash_consistent_with_eq() {
+        let mut set = HashSet::new();
+        set.insert(ElementKey::decl(1));
+        set.insert(ElementKey::decl(1)); // 重复,去重
+        set.insert(ElementKey::user((1u128, "a")));
+        // decl(1) 去重为 1 个,user(..) 独立 1 个。
+        assert_eq!(set.len(), 2);
+    }
+}

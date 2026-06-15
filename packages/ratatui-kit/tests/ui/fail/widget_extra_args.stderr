@@ -1,0 +1,5 @@
+error: `widget(...)` expects exactly one expression
+ --> tests/ui/fail/widget_extra_args.rs:8:31
+  |
+8 |         widget(Line::from("a"), Line::from("b"))
+  |                               ^

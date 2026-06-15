@@ -379,3 +379,48 @@ impl<T: cmp::PartialOrd<T> + Sync + Send + 'static> cmp::PartialOrd<State<T>> fo
 }
 
 impl<T: cmp::Eq + Sync + Send + 'static> cmp::Eq for State<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 经 UseStateImpl 持有 Owner 保活,即可在单测里拿到一个可用的 State<T>。
+    // holder 在作用域内存活 → 底层 generational-box 有效。
+
+    #[test]
+    fn add_and_sub_assign_mutate_value() {
+        let holder = UseStateImpl::new(0i32);
+        let mut s = holder.state; // State 是 Copy
+        s += 5;
+        assert_eq!(s.get(), 5);
+        s -= 2;
+        assert_eq!(s.get(), 3);
+    }
+
+    #[test]
+    fn mul_assign_mutates_value() {
+        let holder = UseStateImpl::new(3i32);
+        let mut s = holder.state;
+        s *= 4;
+        assert_eq!(s.get(), 12);
+    }
+
+    #[test]
+    fn set_overwrites_and_get_reads() {
+        let holder = UseStateImpl::new(10i32);
+        let mut s = holder.state;
+        s.set(99);
+        assert_eq!(s.get(), 99);
+    }
+
+    #[test]
+    fn copy_handles_share_storage() {
+        let holder = UseStateImpl::new(1i32);
+        let mut s = holder.state;
+        let s2 = s; // Copy:同一底层 box
+        s += 41;
+        // 两个句柄看到同一值。
+        assert_eq!(s.get(), 42);
+        assert_eq!(s2.get(), 42);
+    }
+}

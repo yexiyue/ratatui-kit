@@ -1,0 +1,5 @@
+error: `$` adapter syntax was removed; use `widget(...)` or `stateful(widget, state)`
+ --> tests/ui/fail/old_dollar_syntax.rs:8:9
+  |
+8 |         $Line::from("x")
+  |         ^

@@ -1,0 +1,5 @@
+error: invalid argument name, expected `props` or `hooks`
+ --> tests/ui/fail/bad_component_param.rs:5:8
+  |
+5 | fn App(foo: u8) -> impl Into<AnyElement<'static>> {
+  |        ^^^
