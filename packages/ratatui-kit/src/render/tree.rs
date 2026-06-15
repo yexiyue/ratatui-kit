@@ -7,7 +7,7 @@ use crate::{
     context::{ContextStack, SystemContext},
     element::ElementExt,
     props::AnyProps,
-    terminal::Terminal,
+    terminal::{Terminal, UpdaterTerminal},
 };
 
 use super::ComponentDrawer;
@@ -31,16 +31,27 @@ impl<'a> Tree<'a> {
         }
     }
 
-    fn render(&mut self, terminal: &mut Terminal) -> io::Result<()> {
+    /// 只跑一次 update（自顶向下运行组件、协调子树）。终端以对象安全的
+    /// `&mut dyn UpdaterTerminal` 传入,故渲染 harness 可用 no-op 终端驱动。
+    pub(crate) fn update_once(&mut self, terminal: &mut dyn UpdaterTerminal) {
         let mut component_context_stack = ContextStack::root(&mut self.system_context);
         self.root_component
             .update(terminal, &mut component_context_stack, self.props.borrow());
+    }
+
+    /// 只跑一次 draw（把树绘到给定 drawer）。供渲染 harness 直接画到 TestBackend Buffer。
+    pub(crate) fn draw_root(&mut self, drawer: &mut ComponentDrawer) {
+        self.root_component.draw(drawer);
+    }
+
+    fn render(&mut self, terminal: &mut Terminal) -> io::Result<()> {
+        self.update_once(terminal);
 
         terminal
             .draw(|frame| {
                 let area = frame.area();
                 let mut drawer = ComponentDrawer::new(frame, area);
-                self.root_component.draw(&mut drawer);
+                self.draw_root(&mut drawer);
             })
             .expect("Failed to draw the terminal");
 

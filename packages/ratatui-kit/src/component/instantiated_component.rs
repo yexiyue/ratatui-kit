@@ -6,7 +6,7 @@ use crate::{
     multimap::RemoveOnlyMultimap,
     props::AnyProps,
     render::{ComponentDrawer, ComponentUpdater, layout_style::LayoutStyle},
-    terminal::Terminal,
+    terminal::UpdaterTerminal,
 };
 use ratatui::layout::{Constraint, Direction};
 use std::{
@@ -94,7 +94,7 @@ impl InstantiatedComponent {
 
     pub fn update(
         &mut self,
-        terminal: &mut Terminal,
+        terminal: &mut dyn UpdaterTerminal,
         context_stack: &mut ContextStack,
         mut props: AnyProps,
     ) {

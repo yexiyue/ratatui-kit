@@ -29,18 +29,17 @@
 - [x] 4.5 `router/history.rs`：扩充 back/forward/go 越界用例
 - [x] 4.6 `router` 路径匹配单测：把匹配逻辑从 Outlet 抽成 `Route::match_path`（可测），覆盖动态参数提取、不跨 `/`、静态段边界、根路由不命中、无匹配
 
-## 5. 组件渲染 harness 与渲染测试（⏸ 延后：需核心改动）
+## 5. 组件渲染 harness 与渲染测试（✅ 由 `render-test-harness` 变更完成）
 
-> 阻塞点：`InstantiatedComponent::update` 经 `dyn ComponentHelperExt::update_component` 间接持有
-> `Terminal<CrossTerminal>`,而构造它需真实 TTY。泛型化会破坏 `dyn` 对象安全;须把终端抽象做
-> **对象安全的类型擦除**(如把 `insert_before` 的闭包 box 化、抽出 object-safe `TerminalHandle`),
-> 属独立核心改动,单列一个 change 更稳妥。
+> 阻塞点（终端抽象对象安全化）已由独立变更 `render-test-harness` 解决：`UpdaterTerminal` 对象
+> 安全 trait + `ComponentUpdater` 持 `&mut dyn` + `Tree::update_once/draw_root` + `render_to_buffer`
+> harness + `Text`/`Border`/`View`/`Center` 渲染测试。
 
-- [ ] 5.1 落地「单次离屏渲染元素到 `ratatui` Buffer」test-only harness（design 决策 3 的 A/B，倾向 B）
-- [ ] 5.2 `Text` 渲染断言
-- [ ] 5.3 `Border` 边框断言
-- [ ] 5.4 `View`/`Center` 布局/居中断言
-- [ ] 5.5 （可选）`Modal`/`ScrollView`
+- [x] 5.1 单次离屏渲染 harness（`src/render/harness.rs`，no-op 终端跑 update + TestBackend 跑 draw）
+- [x] 5.2 `Text` 渲染断言
+- [x] 5.3 `Border` 边框断言
+- [x] 5.4 `View`/`Center` 布局/居中断言
+- [ ] 5.5 （可选）`Modal`/`ScrollView` —— 暂略，按需再补
 
 ## 6. 收尾
 

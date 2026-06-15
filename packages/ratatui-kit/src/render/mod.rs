@@ -4,3 +4,6 @@ pub use drawer::ComponentDrawer;
 pub use updater::ComponentUpdater;
 pub mod layout_style;
 pub mod tree;
+
+#[cfg(test)]
+mod harness;

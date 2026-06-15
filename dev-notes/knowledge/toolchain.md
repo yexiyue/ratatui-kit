@@ -68,7 +68,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 - **运行时单测**（各模块 `#[cfg(test)] mod tests`）：`element/key.rs`（ElementKey 不碰撞/Hash/Eq）、`multimap.rs`、`hooks/use_state.rs` 与 `store/mod.rs`（运算符重载/Copy/读写）、`components/router/{history,mod}.rs`（history 越界、`Route::match_path` 段边界与参数提取）。可在模块内经 `UseStateImpl::new`/`StoreState::new`/`Route::new` 构造被测对象。
 - **宏 UI 测试**（`packages/ratatui-kit/tests/ui.rs` + `tests/ui/{pass,fail}/`，trybuild）：pass 验证新 DSL 编译通过；fail 的 `.stderr` **只断言本库经 `syn::Error` 产出的稳定文案**（旧 `$`/`#()` 迁移报错、`widget`/`stateful` 参数错误、`#[component]` 非法参名），不绑定 rustc 类型错误。trybuild UI 测试须放 `ratatui-kit` crate（展开的 `::ratatui_kit::` 路径需运行时 crate 在场）。
 
-**待补**：组件渲染测试需要「单次离屏渲染到 ratatui `TestBackend` Buffer」的 harness——`update` 经 `dyn` 的 `update_component` 间接持有 `Terminal<CrossTerminal>`，要让其可测须把终端抽象做**对象安全的类型擦除**(非泛型化,否则破坏 `dyn`),属独立核心改动。
+- **组件渲染测试**（`src/render/harness.rs`，`#[cfg(test)]`）：`render_to_buffer(el, w, h)` 单次离屏渲染——no-op 终端跑 `update`（经对象安全的 `UpdaterTerminal` trait，无需真实 TTY）+ `ratatui::Terminal<TestBackend>` 跑 `draw` → 断言 `Buffer`。终端抽象对象安全化由 `render-test-harness` 落地：`ComponentUpdater` 持 `&mut dyn UpdaterTerminal`，`Tree` 暴露 `update_once`/`draw_root`；`Terminal<T>` 泛型保留（多后端），`UpdaterTerminal::events` 固定 crossterm Event。
 
 **正确做法**：改公开 API/宏后既跑 examples 冒烟,也跑 `--lib`/`--tests`;新增的纯逻辑（key/状态/路由匹配等）优先补 `#[cfg(test)]` 单测，宏的报错质量用 trybuild fail 用例锁住。
 
