@@ -158,11 +158,17 @@ impl<'a> ContextStack<'a> {
 
 pub struct SystemContext {
     should_exit: bool,
+    /// 中央输入事件运行时。组件经 `get_context_mut::<SystemContext>().input` 登记层/handler,
+    /// 渲染循环经 `system_context.input.dispatch(event)` 分发。运行时单线程,无需 Send + Sync。
+    pub(crate) input: crate::input::InputRuntime,
 }
 
 impl SystemContext {
     pub(crate) fn new() -> Self {
-        Self { should_exit: false }
+        Self {
+            should_exit: false,
+            input: crate::input::InputRuntime::default(),
+        }
     }
 
     pub(crate) fn should_exit(&self) -> bool {

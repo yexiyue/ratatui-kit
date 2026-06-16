@@ -19,7 +19,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let value = hooks.use_state(tui_input::Input::default);
     let insert_before = hooks.use_insert_before();
 
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
@@ -41,6 +41,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 }
             }
         }
+        EventResult::Ignored
     });
 
     element!(Border(

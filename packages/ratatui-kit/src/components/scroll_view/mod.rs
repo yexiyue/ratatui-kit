@@ -15,9 +15,15 @@
 //! ```rust
 //! let scroll_state = hooks.use_state(ScrollViewState::default);
 //!
-//! hooks.use_local_events(move |event| {
-//!     scroll_state.write().handle_event(&event);
-//! });
+//! hooks.use_event_handler_with_options(
+//!     EventScope::Current,
+//!     EventPriority::Normal,
+//!     EventOptions { hit_test: true },
+//!     move |event| {
+//!         scroll_state.write().handle_event(&event);
+//!         EventResult::Ignored
+//!     },
+//! );
 //!
 //! element!(ScrollView(
 //!     scroll_view_state: scroll_state,
@@ -34,7 +40,10 @@
 //! 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
 
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
-use crate::{Hook, State, UseEvents, UseState};
+use crate::{
+    Hook, State, UseEventHandler, UseState,
+    input::{EventOptions, EventPriority, EventResult, EventScope},
+};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect, Size},
@@ -171,6 +180,10 @@ impl Component for ScrollView {
         mut hooks: crate::Hooks,
         updater: &mut crate::ComponentUpdater,
     ) {
+        // 手写 Component 的 hooks 默认 context=None;先升级为 context-aware 以便用 use_event_handler。
+        // 所有 hooks 操作须置于后续 `&mut updater`(set_layout_style / update_children)之前。
+        let mut hooks = hooks.with_context_stack(updater.component_context_stack());
+
         let layout_style = props.layout_style();
 
         let this_scroll_view_state = hooks.use_state(ScrollViewState::default);
@@ -190,14 +203,22 @@ impl Component for ScrollView {
             hook.has_block = props.block.is_some();
         }
 
-        hooks.use_local_events({
-            let props_scroll_view_state = props.scroll_view_state;
-            move |event| {
-                if props_scroll_view_state.is_none() && !disabled {
-                    this_scroll_view_state.write().handle_event(&event);
+        // 滚动事件:Current 层 + 鼠标命中过滤(复刻旧 use_local_events 的 in_component 语义)。
+        // 返回 Ignored 不阻断——handle_event 对非滚动事件无副作用,且不应吃掉同层其它 handler 的按键。
+        hooks.use_event_handler_with_options(
+            EventScope::Current,
+            EventPriority::Normal,
+            EventOptions { hit_test: true },
+            {
+                let props_scroll_view_state = props.scroll_view_state;
+                move |event| {
+                    if props_scroll_view_state.is_none() && !disabled {
+                        this_scroll_view_state.write().handle_event(&event);
+                    }
+                    EventResult::Ignored
                 }
-            }
-        });
+            },
+        );
 
         self.scroll_bars = props.scroll_bars.clone();
 

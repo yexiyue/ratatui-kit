@@ -15,7 +15,10 @@
 //! 适合编辑器、表单、聊天输入等场景。
 
 // todo 重构文本输入组件，支持自动换行
-use crate::{Component, Handler, Hooks, UseEvents};
+use crate::{
+    Component, Handler, Hooks, UseEventHandler,
+    input::{EventOptions, EventPriority, EventResult, EventScope},
+};
 use ratatui::{style::Style, widgets::Widget};
 use ratatui_kit_macros::Props;
 use std::{
@@ -70,41 +73,49 @@ impl Component for TextArea {
         &mut self,
         props: &mut Self::Props<'_>,
         mut hooks: Hooks,
-        _updater: &mut crate::ComponentUpdater,
+        updater: &mut crate::ComponentUpdater,
     ) {
-        hooks.use_local_events({
-            let inner = self.inner.clone();
-            let is_focus = props.is_focus;
-            let multiline = props.multiline;
-            let disable_keys = props.disable_keys.clone();
-            let mut handler = props.on_change.take();
-            move |event| {
-                if is_focus {
-                    let input = Input::from(event);
-                    let key = input.key;
+        let mut hooks = hooks.with_context_stack(updater.component_context_stack());
 
-                    if !multiline && input.key == Key::Enter {
-                        return;
+        hooks.use_event_handler_with_options(
+            EventScope::Current,
+            EventPriority::Normal,
+            EventOptions { hit_test: true },
+            {
+                let inner = self.inner.clone();
+                let is_focus = props.is_focus;
+                let multiline = props.multiline;
+                let disable_keys = props.disable_keys.clone();
+                let mut handler = props.on_change.take();
+                move |event| {
+                    if is_focus {
+                        let input = Input::from(event);
+                        let key = input.key;
+
+                        if !multiline && input.key == Key::Enter {
+                            return EventResult::Ignored;
+                        }
+
+                        if disable_keys.contains(&key) {
+                            return EventResult::Ignored;
+                        }
+
+                        let mut inner = inner.write().unwrap();
+
+                        inner.input(input);
+
+                        let mut string = inner.lines().join("\n");
+
+                        if multiline && key == Key::Enter {
+                            string.push('\n');
+                        }
+
+                        handler(string);
                     }
-
-                    if disable_keys.contains(&key) {
-                        return;
-                    }
-
-                    let mut inner = inner.write().unwrap();
-
-                    inner.input(input);
-
-                    let mut string = inner.lines().join("\n");
-
-                    if multiline && key == Key::Enter {
-                        string.push('\n');
-                    }
-
-                    handler(string);
+                    EventResult::Ignored
                 }
-            }
-        });
+            },
+        );
 
         let mut inner = self.inner.write().unwrap();
 

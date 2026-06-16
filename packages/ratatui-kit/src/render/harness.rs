@@ -6,14 +6,13 @@
 //! 静态输出，不轮询 future/事件。
 
 use crate::{
-    AnyElement, ComponentDrawer, ElementRepr,
-    render::tree::Tree,
-    terminal::{TerminalEvents, UpdaterTerminal},
+    AnyElement, ComponentDrawer, ElementRepr, render::tree::Tree, terminal::UpdaterTerminal,
 };
 use ratatui::buffer::Buffer;
 use std::io;
 
-/// no-op 终端：`insert_before` 空操作、`events` 返回空流。仅供驱动 update。
+/// no-op 终端：`insert_before` 空操作。仅供驱动 update。事件不再经终端订阅（改由 `InputRuntime`)，
+/// harness 跑 `update_once`(含 `begin_frame`)建注册表但永不 `dispatch`。
 struct NoopTerminal;
 
 impl UpdaterTerminal for NoopTerminal {
@@ -23,10 +22,6 @@ impl UpdaterTerminal for NoopTerminal {
         _draw_fn: Box<dyn FnOnce(&mut Buffer)>,
     ) -> io::Result<()> {
         Ok(())
-    }
-
-    fn events(&mut self) -> io::Result<TerminalEvents<crossterm::event::Event>> {
-        Ok(TerminalEvents::empty())
     }
 }
 
@@ -107,6 +102,32 @@ fn center_offsets_content_from_origin() {
     let (x, _y) = find(&buf, "x").expect("应渲染 x");
     // 居中 → 不在左上原点列。
     assert!(x > 0, "居中后 x 应不在第 0 列, 实际列 {x}");
+}
+
+#[test]
+fn handwritten_component_can_use_terminal_size_without_context_upgrade() {
+    use crate::{Component, ComponentUpdater, Hooks, NoProps, UseTerminalSize};
+
+    struct ManualSize;
+
+    impl Component for ManualSize {
+        type Props<'a> = NoProps;
+
+        fn new(_props: &Self::Props<'_>) -> Self {
+            Self
+        }
+
+        fn update(
+            &mut self,
+            _props: &mut Self::Props<'_>,
+            mut hooks: Hooks,
+            _updater: &mut ComponentUpdater,
+        ) {
+            let _ = hooks.use_terminal_size();
+        }
+    }
+
+    let _ = render_to_buffer(crate::element!(ManualSize), 4, 1);
 }
 
 mod scroll_view_tests {

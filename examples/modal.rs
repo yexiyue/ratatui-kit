@@ -44,7 +44,7 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     );
 
     // 事件处理：Tab 弹出 Modal,其余按键交给输入框
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
         {
@@ -54,6 +54,7 @@ fn JsonEditor(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 json_text.write().handle_event(&event);
             }
         }
+        EventResult::Ignored
     });
 
     let info_line = if error.read().is_empty() {

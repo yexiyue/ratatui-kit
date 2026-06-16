@@ -22,7 +22,11 @@ use ratatui::{
 };
 use ratatui_kit_macros::{Props, with_layout_style};
 
-use crate::{AnyElement, Component, layout_style::LayoutStyle};
+use crate::{
+    AnyElement, Component, Context, SystemContext,
+    input::{CurrentLayer, InputLayer},
+    layout_style::LayoutStyle,
+};
 
 #[derive(Default, Clone, Copy)]
 /// 弹窗位置枚举。
@@ -67,6 +71,16 @@ pub struct ModalProps<'a> {
     pub placement: Placement,
     /// 是否显示弹窗。
     pub open: bool,
+    /// 外部注入的输入层句柄（父组件已 `use_input_layer` 时)。
+    ///
+    /// `None` → Modal 内部自开层（handler 全在 Modal 子树内的常见场景)；
+    /// `Some(h)` → 复用父级已登记的层（不重复登记)，仅向子树注入 `CurrentLayer`——
+    /// 用于「handler 注册在 Modal 父组件」的场景（父 `use_input_layer` + `use_event_handler(Layer(h))`)。
+    ///
+    /// **Footgun**：走 `Layer(h)` 路径时必须把 `h` 传进来，否则 Modal 自开新层会截断 `h` → 父级 handler 失聪。
+    pub layer: Option<InputLayer>,
+    /// 是否截断更低层。`None` 视作 `true`（模态独占输入)；非阻塞浮层可设 `Some(false)`。
+    pub blocks_lower: Option<bool>,
 }
 
 /// Modal 组件实现。
@@ -109,7 +123,26 @@ impl Component for Modal {
         self.placement = props.placement;
 
         if self.open {
-            updater.update_children(props.children.iter_mut(), None);
+            let blocks = props.blocks_lower.unwrap_or(true);
+            // 借用纪律：取 SystemContext 守卫拿 layer id 后【立即 drop】,再 update_children,
+            // 否则子树组件访问 SystemContext(use_input_layer / use_exit)会撞 AlreadyBorrowed。
+            let layer_id = match props.layer {
+                // 外部已登记该层（父级 use_input_layer)：Modal 不重复 push,仅注入给子树。
+                Some(h) => h.id,
+                // 内部自开层（handler 全在 Modal 子树内)：push 一个独占层。
+                None => {
+                    let mut sys = updater
+                        .get_context_mut::<SystemContext>()
+                        .expect("SystemContext 缺失(根 context 必有)");
+                    sys.input.push_layer(true, blocks).id
+                }
+            };
+
+            // 给子树注入 CurrentLayer:子树内 use_event_handler(Current) 自动归属本层。
+            updater.update_children(
+                props.children.iter_mut(),
+                Some(Context::owned(CurrentLayer(layer_id))),
+            );
         }
 
         updater.set_layout_style(LayoutStyle {

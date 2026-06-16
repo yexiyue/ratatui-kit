@@ -33,7 +33,7 @@ fn StatefulList(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     let state = hooks.use_state(ListState::default);
 
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
@@ -47,6 +47,7 @@ fn StatefulList(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 _ => {}
             }
         }
+        EventResult::Ignored
     });
 
     element!(

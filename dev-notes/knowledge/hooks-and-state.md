@@ -31,9 +31,33 @@
 
 ### 内置 Hook 清单
 
-`use_state` `use_future` `use_events` `use_context` `use_memo` `use_effect` `use_insert_before` `use_size` `use_exit` `use_on_drop`；特性门控的 `use_router`/`use_navigate`（`router`，同一文件内）、`use_atom`（`atom`）。`use_navigate` 定义在 `use_router.rs` 内，不是单独文件。
+`use_state` `use_future` `use_event_handler`/`use_input_layer` `use_context` `use_memo` `use_effect` `use_insert_before` `use_size` `use_exit` `use_on_drop`；特性门控的 `use_router`/`use_navigate`（`router`，同一文件内）、`use_atom`（`atom`）。`use_navigate` 定义在 `use_router.rs` 内，不是单独文件。
 
 **相关文件**：`packages/ratatui-kit/src/hooks/`
+
+### 输入事件系统：use_event_handler 取代了 use_events / use_local_events
+
+旧的「广播订阅」模型（`use_events` / `use_local_events`，所有 handler 平等收到同一事件）已**删除**，换成中央分发器 `InputRuntime`（输入层栈 + 事件消费 + 优先级/作用域），每帧重建。新 API 在 prelude 中。
+
+**迁移映射**（闭包**必须返回** `EventResult`，不消费返回 `EventResult::Ignored`，处理后想截断后续 handler 返回 `EventResult::Consumed`）：
+
+- `hooks.use_events(|e| { BODY })` → `hooks.use_event_handler(EventScope::Current, EventPriority::Normal, |e| { BODY; EventResult::Ignored })`
+- `hooks.use_local_events(|e| { BODY })` → `hooks.use_event_handler_with_options(EventScope::Current, EventPriority::Normal, EventOptions { hit_test: true }, |e| { BODY; EventResult::Ignored })`（`hit_test` 复刻旧 local 的鼠标命中过滤）
+- 闭包内每个 early `return` 也要返回 `EventResult`（如 `return EventResult::Ignored;`）。
+
+**输入互斥三路径**（canonical demo：`examples/input_mutex.rs`）：
+
+- **背景层**（root）：`use_event_handler(EventScope::Current, ..)`，返回 `Ignored`。
+- **独占输入层**：`let l = hooks.use_input_layer(open, true);`（`blocks_lower=true` 截断更低层）+ `use_event_handler(EventScope::Layer(l), EventPriority::High, ..)`，处理后返回 `Consumed`。`open=false` 时层不入栈，绑定它的 handler 静默跳过。
+- **Modal 层(h) footgun**：`use_input_layer` 拿到的句柄必须**同时**传给 `use_event_handler(EventScope::Layer(h), ..)` 和 `Modal(layer: Some(h))`。漏传 `Modal(layer:)` → Modal 自开新层截断 `h` → 父级 handler 失聪。
+
+**关键约束**：
+- `InputLayer` 句柄**跨帧不稳定**（每帧重铸），**禁止**存入 `use_state`；每帧由 `use_input_layer` 重新获取。
+- `use_event_handler`/`use_input_layer` 需在 **context-aware** 的 `Hooks` 上调用：`#[component]` 函数组件由宏自动 `with_context_stack`，开箱即用；**手写 `Component`** 须在 `update` 体内先 `let mut hooks = hooks.with_context_stack(updater.component_context_stack());`。
+- z-order 优先于 priority（下层 High 不抢上层 Normal）——见 input 模块单测 `layer_z_order_beats_priority`。
+- `use_terminal_size` 是例外：它内部经 `post_component_update` 从 `ComponentUpdater` 拿 `SystemContext` 注册 Global Resize，因此手写 `Component` 仍可直接调用，不需要为了它单独 `with_context_stack`。
+
+**相关文件**：`packages/ratatui-kit/src/input/mod.rs`、`packages/ratatui-kit/src/hooks/use_input.rs`、`packages/ratatui-kit/src/components/modal.rs`、`examples/input_mutex.rs`
 
 ## 两套状态体系
 

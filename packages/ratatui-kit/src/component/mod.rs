@@ -40,12 +40,15 @@ use ratatui::layout::{Direction, Layout};
 ///     fn update(
 ///         &mut self,
 ///         _props: &mut Self::Props<'_>,
-///         mut hooks: Hooks,
-///         _updater: &mut ComponentUpdater,
+///         hooks: Hooks,
+///         updater: &mut ComponentUpdater,
 ///     ) {
+///         // 手写 Component 默认 hooks 无 context;先升级为 context-aware 才能用 use_event_handler。
+///         let mut hooks = hooks.with_context_stack(updater.component_context_stack());
 ///         let mut state = hooks.use_state(|| 0);
-///         hooks.use_events(move |event| {
+///         hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
 ///             // 事件处理逻辑
+///             EventResult::Ignored
 ///         });
 ///         // ...
 ///     }

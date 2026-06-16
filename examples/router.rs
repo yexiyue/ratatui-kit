@@ -36,7 +36,7 @@ async fn main() {
 fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut navigate = hooks.use_navigate();
 
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
         {
@@ -47,6 +47,7 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 _ => {}
             }
         }
+        EventResult::Ignored
     });
 
     element!(
@@ -81,13 +82,14 @@ fn CounterPage(props: &CounterPageProps, mut hooks: Hooks) -> impl Into<AnyEleme
             state += step;
         }
     });
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
             && key_event.code == KeyCode::Esc
         {
             navigate.back();
         }
+        EventResult::Ignored
     });
     element!(
         Border(
@@ -117,18 +119,26 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut navigate = hooks.use_navigate();
 
     let scroll_view_state = hooks.use_state(ScrollViewState::default);
-    hooks.use_local_events(move |event| match event {
-        Event::Key(KeyEvent {
-            kind: KeyEventKind::Press,
-            code: KeyCode::Esc,
-            ..
-        }) => {
-            navigate.back();
-        }
-        _ => {
-            scroll_view_state.write().handle_event(&event);
-        }
-    });
+    hooks.use_event_handler_with_options(
+        EventScope::Current,
+        EventPriority::Normal,
+        EventOptions { hit_test: true },
+        move |event| {
+            match event {
+                Event::Key(KeyEvent {
+                    kind: KeyEventKind::Press,
+                    code: KeyCode::Esc,
+                    ..
+                }) => {
+                    navigate.back();
+                }
+                _ => {
+                    scroll_view_state.write().handle_event(&event);
+                }
+            }
+            EventResult::Ignored
+        },
+    );
 
     // 简单 markdown 渲染：标题高亮，其余普通文本
     let rendered: Vec<Line> = lines
@@ -180,7 +190,7 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 
     let mut navigate = hooks.use_navigate();
 
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
         {
@@ -190,6 +200,7 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 value.write().handle_event(&event);
             }
         }
+        EventResult::Ignored
     });
     element!(
         Border(

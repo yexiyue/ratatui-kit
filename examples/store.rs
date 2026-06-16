@@ -38,7 +38,7 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let count = hooks.use_atom(&COUNT);
     let value = hooks.use_atom(&VALUE);
     let mut navigate = hooks.use_navigate();
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
         {
@@ -49,6 +49,7 @@ fn HomePage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 _ => {}
             }
         }
+        EventResult::Ignored
     });
     element!(
         Border(
@@ -76,13 +77,14 @@ fn CounterPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             count += 1;
         }
     });
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
             && key_event.code == KeyCode::Esc
         {
             navigate.back();
         }
+        EventResult::Ignored
     });
     element!(
         Border(
@@ -106,7 +108,7 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     // 注:TextArea 暂时下线,改用单行 Input;输入实时同步到全局 VALUE 原子。
     let input = hooks.use_state(tui_input::Input::default);
     let mut navigate = hooks.use_navigate();
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
         {
@@ -117,6 +119,7 @@ fn InputPage(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 value.set(input.read().value().to_string());
             }
         }
+        EventResult::Ignored
     });
     element!(
         Border(

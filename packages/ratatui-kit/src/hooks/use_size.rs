@@ -1,7 +1,12 @@
+use std::{cell::Cell, rc::Rc};
+
 use crossterm::{event::Event, terminal};
 use ratatui::layout::Rect;
 
-use crate::{Hook, UseEvents, UseState};
+use crate::{
+    Hook, State, SystemContext, UseState,
+    input::{EventOptions, EventPriority, EventResult},
+};
 
 mod private {
     pub trait Sealed {}
@@ -17,13 +22,50 @@ impl UseTerminalSize for crate::Hooks<'_, '_> {
     fn use_terminal_size(&mut self) -> (u16, u16) {
         let mut size = self.use_state(|| terminal::size().unwrap_or((0, 0)));
 
-        self.use_events(move |event| {
-            if let Event::Resize(width, height) = event {
-                size.set((width, height));
-            }
-        });
+        let hook = self.use_hook(UseTerminalSizeImpl::new);
+        hook.size = Some(size);
 
         size.get()
+    }
+}
+
+/// 终端尺寸监听保留为专用 hook，而不是复用 `use_event_handler(Global, ..)`。
+///
+/// 这样手写 Component 直接调用 `use_terminal_size` 时仍不需要先 `with_context_stack`;
+/// 注册 Resize handler 时由 `post_component_update` 通过 updater 拿根 `SystemContext`。
+struct UseTerminalSizeImpl {
+    size: Option<State<(u16, u16)>>,
+}
+
+impl UseTerminalSizeImpl {
+    fn new() -> Self {
+        Self { size: None }
+    }
+}
+
+impl Hook for UseTerminalSizeImpl {
+    fn post_component_update(&mut self, updater: &mut crate::ComponentUpdater) {
+        let Some(mut size) = self.size else {
+            return;
+        };
+        let mut system = updater
+            .get_context_mut::<SystemContext>()
+            .expect("SystemContext 缺失(根 context 必有)");
+
+        // Resize 是真全局事件：`layer=None` 不被任何 blocks_lower 截断,返回 Ignored
+        // 让多个 use_terminal_size 订阅者都能收到。
+        system.input.register_handler(
+            None,
+            EventPriority::Normal,
+            EventOptions::default(),
+            Rc::new(Cell::new(Rect::default())),
+            Box::new(move |event| {
+                if let Event::Resize(width, height) = event {
+                    size.set((width, height));
+                }
+                EventResult::Ignored
+            }),
+        );
     }
 }
 

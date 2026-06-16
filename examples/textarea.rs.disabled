@@ -23,22 +23,16 @@ async fn main() {
 fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut value = hooks.use_state(String::new);
 
-    let mut should_exit = hooks.use_state(|| false);
-
-    let mut system_ctx = hooks.use_context_mut::<SystemContext>();
+    let mut exit = hooks.use_exit();
     let insert_before = hooks.use_insert_before();
 
-    if should_exit.get() {
-        system_ctx.exit();
-    }
-
-    hooks.use_events(move |event| {
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key_event) = event
             && key_event.kind == KeyEventKind::Press
         {
             match key_event.code {
                 KeyCode::Esc => {
-                    should_exit.set(true);
+                    exit();
                 }
                 KeyCode::Enter => {
                     if !value.read().is_empty() {
@@ -52,6 +46,7 @@ fn MyTextInput(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 _ => {}
             }
         }
+        EventResult::Ignored
     });
 
     element!(Border(

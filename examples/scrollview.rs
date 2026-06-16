@@ -24,9 +24,15 @@ fn MarkdownReader(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     );
 
     let scroll_view_state = hooks.use_state(ScrollViewState::default);
-    hooks.use_local_events(move |event| {
-        scroll_view_state.write().handle_event(&event);
-    });
+    hooks.use_event_handler_with_options(
+        EventScope::Current,
+        EventPriority::Normal,
+        EventOptions { hit_test: true },
+        move |event| {
+            scroll_view_state.write().handle_event(&event);
+            EventResult::Ignored
+        },
+    );
 
     // 简单 markdown 渲染：标题高亮，其余普通文本
     let rendered: Vec<Line> = lines

@@ -135,3 +135,20 @@ ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦
 **正确做法**：新增需要在库 crate 内部使用 `element!`/`#[component]` 的模块时，依赖这个 self 别名即可，无需额外引入。
 
 **相关文件**：`packages/ratatui-kit/src/lib.rs`
+
+## 手写 Component 与 context-aware hooks
+
+### Modal 等手写组件经 updater 拿 SystemContext 登记输入层
+
+`#[component]` 函数组件由宏在 implementation 前 `hooks.with_context_stack(updater.component_context_stack())` 升级为 context-aware;**手写 `Component`** 的 `update` 拿到的 `hooks.context == None`(`AnyComponent::update`,`component/mod.rs` 原样转发),直接 `hooks.use_context_mut` 会 **panic**(`use_context.rs` 的 `expect("context not available")`)。两条路：
+
+- 需要 context-aware **hook**(如 `ScrollView` 用 `use_event_handler`/`use_input_layer`)→ 在 `update` 体内先 `let mut hooks = hooks.with_context_stack(updater.component_context_stack());`,且把 hooks 操作置于后续 `&mut updater` 操作（`set_layout_style`/`update_children`)**之前**(时序分离,否则借用冲突)。
+- 只需读写 **context 数据**(如 `Modal` 登记输入层)→ 直接 `updater.get_context_mut::<SystemContext>()`(降级 `None` 版,不经 hooks)。
+
+**借用纪律**：任何经 `SystemContext` 守卫登记 input 都要**块内即弃守卫**再 `update_children`——`SystemContext` 是全树共享单个 `RefCell`,不 drop 则子组件 `use_exit`(panic 版 `use_context_mut`)撞 `AlreadyBorrowed`。
+
+**不在框架层统一注入**：`Component::update(props, hooks, updater)` 同时持 `hooks` 与 `&mut updater`,无法给 hooks 注入与 updater 同源的 `&ContextStack`(借用冲突);函数组件能 context-aware 是因宏把 implementation 与 update_children 时序分开。
+
+`Modal` 新增 `layer: Option<InputLayer>` / `blocks_lower: Option<bool>` prop：外传 `layer` 时复用父级层不重复 push（「handler 在 Modal 父级」场景,需父级 `use_input_layer` + `use_event_handler(Layer(h))` + `Modal(layer: Some(h))` 三件套配对,漏传任一→父级 handler 失聪),否则自开层;均在拿到 layer id 后 drop 守卫再注入 `CurrentLayer` 给子树。
+
+**相关文件**：`packages/ratatui-kit/src/components/modal.rs`、`packages/ratatui-kit/src/components/scroll_view/mod.rs`、`packages/ratatui-kit/src/hooks/use_input.rs`、`packages/ratatui-kit/src/component/mod.rs`
