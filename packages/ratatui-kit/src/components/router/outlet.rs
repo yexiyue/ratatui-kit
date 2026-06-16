@@ -71,7 +71,7 @@ impl Component for Outlet {
                     { &mut component }
                 }),
             ],
-            Some(Context::form_mut(&mut children)),
+            Some(Context::from_mut(&mut children)),
         );
 
         let hooks = hooks.with_context_stack(updater.component_context_stack());

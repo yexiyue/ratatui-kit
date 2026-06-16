@@ -1,0 +1,139 @@
+---
+title: Todo App
+description: 把状态、输入互斥、搜索输入和确认弹窗组合成一个完整工作流。
+sidebar:
+  order: 1
+---
+
+import Mermaid from '../../../components/Mermaid.astro';
+
+`todo_app` 是第一条完整应用纵切。它不引入新的框架 API，而是把前面已经讲过的能力放在同一个屏幕里：页面级快捷键控制任务列表，`SearchInput` 独占键盘新增任务，`ConfirmModal` 独占键盘确认删除。
+
+![todo app demo](/ratatui-kit/recordings/todo-app.gif)
+
+这个录屏由 `docs/tapes/todo-app.tape` 生成。示例先移动任务并切换完成状态，再切到 open 过滤；随后按 `a` 新增 `Draft release notes`，最后打开删除确认并用 `y` 删除新增任务。
+
+## 运行
+
+```bash
+cargo run --example todo_app
+```
+
+按 `j/k` 移动任务，按 `Space` 或 `Enter` 切换完成状态，按 `f` 在 all/open/done 之间切换过滤，按 `a` 新增任务，按 `d` 删除当前任务，按 `q` 退出。
+
+## 应用结构
+
+<Mermaid
+	chart={`
+flowchart TD
+    root["TodoApp component"] --> state["use_state: todos / cursor / filter"]
+    root --> pageKeys["page handler: j/k Space f d q"]
+    root --> add["SearchInput: add task layer"]
+    root --> delete["ConfirmModal: delete layer"]
+    add --> todos["push Todo"]
+    pageKeys --> todos
+    delete --> todos
+	`}
+	caption="TodoApp 自己持有业务状态，内置组件只负责局部交互和输入互斥。"
+/>
+
+这个例子刻意不把状态拆进全局 Atom。任务列表、游标、过滤器、删除草稿都只属于当前应用页面，所以局部 `use_state` 足够：
+
+```rust title="examples/apps/todo_app.rs"
+let todos = hooks.use_state(initial_todos);
+let mut cursor = hooks.use_state(|| 0usize);
+let mut filter = hooks.use_state(|| TodoFilter::All);
+let mut draft = hooks.use_state(String::new);
+let mut pending_delete = hooks.use_state(|| None::<usize>);
+let mut status = hooks.use_state(|| "ready".to_string());
+```
+
+这条边界和 [Atom 全局状态](/ratatui-kit/tutorials/atom-state/) 里的判断一致：状态先放在最小作用域，只有多个页面或长期缓存都要共享时才升到 Atom。
+
+## 背景层快捷键
+
+页面级 handler 只处理背景工作流：
+
+```rust title="examples/apps/todo_app.rs"
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    let Event::Key(key) = event else {
+        return EventResult::Ignored;
+    };
+
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => move_cursor(todos, cursor, filter.get(), 1),
+        KeyCode::Char(' ') | KeyCode::Enter => toggle_current(todos, cursor, status),
+        KeyCode::Char('f') => {
+            let next_filter = filter.get().next();
+            filter.set(next_filter);
+        }
+        KeyCode::Char('d') => pending_delete.set(Some(cursor.get())),
+        _ => return EventResult::Ignored,
+    }
+
+    EventResult::Consumed
+});
+```
+
+当没有输入框或弹窗打开时，这个 handler 属于 root layer，可以正常处理 `j/k/Space/f/d/q`。一旦 `SearchInput` 或 `ConfirmModal` 打开，它们自己的独占 layer 会截断背景层，所以录屏里新增任务时按下的字母不会同时触发页面快捷键。
+
+## 新增任务
+
+新增任务复用 `SearchInput`，只把激活键改成 `a`：
+
+```rust title="examples/apps/todo_app.rs"
+SearchInput(
+    value: draft.read().to_string(),
+    placeholder: "Press a to add a task".to_string(),
+    activate_key: KeyCode::Char('a'),
+    on_change: move |next: String| draft.set(next),
+    on_submit: move |value: String| {
+        let title = value.trim().to_string();
+        if title.len() < 3 {
+            status.set("task title needs at least 3 chars".to_string());
+            return false;
+        }
+
+        todos.write().push(Todo { title, done: false });
+        true
+    },
+    clear_on_submit: true,
+    clear_on_escape: true,
+)
+```
+
+`SearchInput` 仍然是受控输入：展示值来自 `draft`，每次输入变化调用 `on_change`。提交成功后它会清空输入并关闭编辑层；返回 `false` 则保持编辑态，适合校验失败。
+
+## 删除确认
+
+删除用 `ConfirmModal`：
+
+```rust title="examples/apps/todo_app.rs"
+ConfirmModal(
+    open: pending_delete.get().is_some(),
+    title: Line::from("Delete task?"),
+    content: format!("Remove {pending_title}?"),
+    confirm_text: "Delete".to_string(),
+    cancel_text: "Keep".to_string(),
+    on_confirm: move |_: ()| {
+        if let Some(index) = pending_delete.get() {
+            todos.write().remove(index);
+        }
+        pending_delete.set(None);
+    },
+    on_cancel: move |_: ()| pending_delete.set(None),
+)
+```
+
+普通确认弹窗不需要你手写 `use_input_layer`。`ConfirmModal` 内部已经创建独占 layer，并把同一个 layer 传给底层 `Modal`。弹窗打开时，背景列表不会再处理 `j/k/q`，未知键也会被弹窗层消费。
+
+## 为什么这个例子重要
+
+前面的教程分别讲了状态、输入互斥、Router 和组件。`todo_app` 把它们放进一个可工作的界面：
+
+- 业务状态留在页面组件，用 `use_state` 管理。
+- 页面级快捷键返回 `Consumed`，避免同层重复处理。
+- 内置输入组件负责自己的 layer，不让按键穿透背景。
+- 复杂工作流先组合已有组件，只有组件语义不够时才考虑新增框架 API。
+
+下一步可以回到 [示例路线图](/ratatui-kit/examples/)，继续把 examples 按 basics / hooks / components / apps 分组整理。

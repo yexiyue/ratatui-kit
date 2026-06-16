@@ -30,7 +30,7 @@ impl<'a> UseRouter<'a> for crate::Hooks<'a, '_> {
     }
 
     fn try_use_route_state<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
-        let route_context = self.use_context::<RouteContext>();
+        let route_context = self.try_use_context::<RouteContext>()?;
 
         route_context
             .state
@@ -74,6 +74,7 @@ impl Navigate {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
         ctx.path = path.to_string();
+        ctx.state = None;
         history.push(ctx);
     }
 
@@ -96,6 +97,7 @@ impl Navigate {
         let mut history = self.history.write();
         let mut ctx = history.current_context();
         ctx.path = path.to_string();
+        ctx.state = None;
         history.replace(ctx);
     }
 
@@ -129,5 +131,52 @@ impl Navigate {
     pub fn forward(&mut self) {
         let mut history = self.history.write();
         history.forward();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ReactiveHandle;
+    use generational_box::{Owner, SyncStorage};
+
+    fn history_with_state() -> (Owner<SyncStorage>, State<RouterHistory>) {
+        let owner = Owner::default();
+        let history = State::new_in(
+            &owner,
+            RouterHistory::new(
+                RouteContext {
+                    path: "/detail".to_string(),
+                    params: HashMap::new(),
+                    state: Some(RouteState::new("from detail".to_string())),
+                },
+                10,
+            ),
+        );
+        (owner, history)
+    }
+
+    #[test]
+    fn push_without_state_clears_previous_route_state() {
+        let (_owner, history) = history_with_state();
+        let mut navigate = Navigate::new(history);
+
+        navigate.push("/plain");
+
+        let current = history.read().current_context();
+        assert_eq!(current.path, "/plain");
+        assert!(current.state.is_none());
+    }
+
+    #[test]
+    fn replace_without_state_clears_previous_route_state() {
+        let (_owner, history) = history_with_state();
+        let mut navigate = Navigate::new(history);
+
+        navigate.replace("/plain");
+
+        let current = history.read().current_context();
+        assert_eq!(current.path, "/plain");
+        assert!(current.state.is_none());
     }
 }

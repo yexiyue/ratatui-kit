@@ -1,7 +1,7 @@
 use futures::{FutureExt, future::LocalBoxFuture};
 use std::task::Poll;
 
-use crate::{Hook, UseMemo};
+use crate::{Hook, Hooks};
 
 mod private {
     pub trait Sealed {}
@@ -13,13 +13,23 @@ pub trait UseEffect: private::Sealed {
     fn use_effect<F, D>(&mut self, f: F, deps: D)
     where
         F: FnOnce(),
-        D: PartialEq + Clone + Unpin + 'static;
+        D: PartialEq + Unpin + 'static;
 
     /// 注册异步副作用，依赖变化时自动执行，适合异步校验、异步请求等。
     fn use_async_effect<F, D>(&mut self, f: F, deps: D)
     where
         F: Future<Output = ()> + 'static,
-        D: PartialEq + Clone + Unpin + 'static;
+        D: PartialEq + Unpin + 'static;
+}
+
+pub struct UseEffectImpl<D> {
+    deps: Option<D>,
+}
+
+impl<D> Default for UseEffectImpl<D> {
+    fn default() -> Self {
+        Self { deps: None }
+    }
 }
 
 pub struct UseAsyncEffectImpl<D> {
@@ -48,25 +58,31 @@ impl<D: Unpin> Hook for UseAsyncEffectImpl<D> {
     }
 }
 
-impl UseEffect for crate::Hooks<'_, '_> {
+impl<D: Unpin> Hook for UseEffectImpl<D> {}
+
+impl UseEffect for Hooks<'_, '_> {
     fn use_effect<F, D>(&mut self, f: F, deps: D)
     where
         F: FnOnce(),
-        D: PartialEq + Clone + Unpin + 'static,
+        D: PartialEq + Unpin + 'static,
     {
-        self.use_memo(f, deps)
+        let hook = self.use_hook(UseEffectImpl::<D>::default);
+        if hook.deps.as_ref() != Some(&deps) {
+            f();
+            hook.deps = Some(deps);
+        }
     }
 
     fn use_async_effect<F, D>(&mut self, f: F, deps: D)
     where
         F: Future<Output = ()> + 'static,
-        D: PartialEq + Clone + Unpin + 'static,
+        D: PartialEq + Unpin + 'static,
     {
         let hook = self.use_hook(UseAsyncEffectImpl::<D>::default);
 
         if hook.deps.as_ref() != Some(&deps) {
             hook.f = Some(f.boxed_local());
-            hook.deps = Some(deps.clone());
+            hook.deps = Some(deps);
         }
     }
 }

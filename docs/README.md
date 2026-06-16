@@ -1,49 +1,31 @@
-# Starlight Starter Kit: Basics
+# Ratatui Kit Docs
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+这个目录是 ratatui-kit 的 Astro + Starlight 文档站。线上路径使用 GitHub Pages 项目站点：
 
-```
-pnpm create astro@latest -- --template starlight
-```
-
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```text
+https://yexiyue.github.io/ratatui-kit/
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## Commands
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+在 `docs/` 目录下运行：
 
-Static assets, like favicons, can be placed in the `public/` directory.
+| Command | Action |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | 安装文档站依赖 |
+| `pnpm dev` | 启动本地开发服务器 |
+| `pnpm build` | 构建静态站点到 `dist/` |
+| `pnpm preview` | 预览构建结果 |
 
-## 🧞 Commands
+## Content
 
-All commands are run from the root of the project, from a terminal:
+- 文档页面放在 `src/content/docs/`。
+- 可复现的 VHS 脚本放在 `tapes/`。
+- 录制产物放在 `public/recordings/`。
+- Mermaid 流程图通过 `src/components/Mermaid.astro` 显式引入。
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
+新增教程或组件页时，优先保持这条链路：
 
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+```text
+example -> docs/tapes/<name>.tape -> public/recordings/<name>.gif -> docs page
+```

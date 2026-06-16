@@ -1,7 +1,7 @@
 use super::RouteContext;
 use std::collections::VecDeque;
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub(crate) struct RouterHistory {
     pub current: usize,
     pub history: VecDeque<RouteContext>,
@@ -9,7 +9,20 @@ pub(crate) struct RouterHistory {
 }
 
 impl RouterHistory {
+    pub fn new(initial_context: RouteContext, max_length: usize) -> Self {
+        Self {
+            current: 0,
+            history: VecDeque::from([initial_context]),
+            max_length: Self::normalize_max_length(max_length),
+        }
+    }
+
+    fn normalize_max_length(max_length: usize) -> usize {
+        max_length.max(1)
+    }
+
     pub fn push(&mut self, context: RouteContext) {
+        self.max_length = Self::normalize_max_length(self.max_length);
         if self.history.len() >= self.max_length {
             self.history.pop_front();
             // 队首被移除后所有下标左移一位，`current` 必须同步回退，
@@ -40,7 +53,7 @@ impl RouterHistory {
     }
 
     pub fn forward(&mut self) -> bool {
-        if self.current < self.history.len() - 1 {
+        if self.current + 1 < self.history.len() {
             self.current += 1;
             true
         } else {
@@ -76,13 +89,7 @@ mod tests {
     }
 
     fn new_history(max_length: usize) -> RouterHistory {
-        let mut history = VecDeque::new();
-        history.push_back(ctx("/"));
-        RouterHistory {
-            current: 0,
-            history,
-            max_length,
-        }
+        RouterHistory::new(ctx("/"), max_length)
     }
 
     /// 回归:历史栈达到 `max_length` 后继续 push 不再越界 panic
@@ -198,16 +205,17 @@ mod tests {
         assert_eq!(h.current, 0);
     }
 
-    /// 边界:max_length=0 当前不 panic,退化为只保留最近一项(语义同 1)。
-    /// Codex 审查标记此输入待规整,这里先锁定「不崩」现状,日后若 clamp 再改断言。
     #[test]
-    fn max_length_zero_does_not_panic() {
+    fn max_length_zero_is_clamped_to_one() {
         let mut h = new_history(0);
+        assert_eq!(h.max_length, 1);
         for i in 0..5 {
             h.push(ctx(&format!("/r{i}")));
             assert!(h.current < h.history.len(), "step {i} 越界");
+            assert!(h.history.len() <= 1, "step {i} 超出 clamp 后的长度");
         }
         assert_eq!(h.current_context().path, "/r4");
+        assert_eq!(h.current, 0);
     }
 
     #[test]

@@ -46,6 +46,8 @@ mod use_memo;
 pub use use_memo::*;
 mod use_effect;
 pub use use_effect::*;
+mod use_async_state;
+pub use use_async_state::*;
 mod use_insert_before;
 pub use use_insert_before::*;
 mod use_size;

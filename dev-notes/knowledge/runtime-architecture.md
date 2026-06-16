@@ -100,6 +100,8 @@ loop {
 
 `ContextStack::get_context(_mut)` 返回三态 `ContextLookup`（`Found` / `AlreadyBorrowed` / `NotFound`），而非 `Option`。断言型 `use_context(_mut)` 据此分别给「已被借用」（持守卫重入）与「未找到」（Provider 未注入）两种精确 panic 诊断；`try_use_context(_mut)` 与 `ComponentUpdater::get_context` 则把非 `Found` 一律降级为 `None`，**保持 try_/Option 接口永不 panic**。
 
+`Context` 构造入口按所有权语义命名：`Context::owned(value)`、`Context::from_ref(&value)`、`Context::from_mut(&mut value)`。不要再写旧拼写 `form_ref` / `form_mut`。
+
 **正确做法**：改 context 查找逻辑时保留三态——断言型给诊断、try_/Option 型安全降级。这与响应式状态的 `try_*` 约定一致（见 `hooks-and-state.md`）：`try_` 系列绝不 panic，只有断言型（`use_*` / `read` / `write`）才 panic。
 
 **不要做**：把「已借用」的 panic 放进 `get_context` 这种被 `try_use_context` 复用的共享方法——会让 try_ 变体跟着 panic，破坏其非 panic 契约。

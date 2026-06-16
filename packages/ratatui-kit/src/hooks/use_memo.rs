@@ -10,7 +10,7 @@ pub trait UseMemo: private::Sealed {
     fn use_memo<F, D, T>(&mut self, f: F, deps: D) -> T
     where
         F: FnOnce() -> T,
-        D: PartialEq + Clone + Unpin + 'static,
+        D: PartialEq + Unpin + 'static,
         T: Clone + Unpin + 'static;
 }
 
@@ -34,13 +34,13 @@ impl UseMemo for Hooks<'_, '_> {
     fn use_memo<F, D, T>(&mut self, f: F, deps: D) -> T
     where
         F: FnOnce() -> T,
-        D: PartialEq + Clone + Unpin + 'static,
+        D: PartialEq + Unpin + 'static,
         T: Clone + Unpin + 'static,
     {
         let hook = self.use_hook(UseMemoImpl::<T, D>::default);
         if hook.deps.as_ref() != Some(&deps) || hook.memoized_value.is_none() {
             hook.memoized_value = Some(f());
-            hook.deps = Some(deps.clone());
+            hook.deps = Some(deps);
         }
         hook.memoized_value.clone().expect("memoized value is set")
     }

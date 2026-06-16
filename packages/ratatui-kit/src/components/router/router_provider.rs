@@ -17,7 +17,7 @@ use crate::{
     prelude::{ContextProvider, Outlet, RouteContext, RouteState, Routes},
 };
 use ratatui_kit_macros::{Props, element};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 #[derive(Default, Props)]
 /// RouterProvider 组件属性。
@@ -47,14 +47,15 @@ impl Component for RouterProvider {
         mut hooks: Hooks,
         updater: &mut crate::ComponentUpdater,
     ) {
-        let history = hooks.use_state(|| RouterHistory {
-            current: 0,
-            max_length: props.history_length.unwrap_or(10),
-            history: VecDeque::from(vec![RouteContext {
-                params: HashMap::new(),
-                path: props.index_path.clone(),
-                state: props.state.clone(),
-            }]),
+        let history = hooks.use_state(|| {
+            RouterHistory::new(
+                RouteContext {
+                    params: HashMap::new(),
+                    path: props.index_path.clone(),
+                    state: props.state.clone(),
+                },
+                props.history_length.unwrap_or(10),
+            )
         });
 
         let ctx = history.read().current_context();
@@ -71,7 +72,7 @@ impl Component for RouterProvider {
                     }
                 }
             )],
-            Some(Context::form_mut(&mut props.routes)),
+            Some(Context::from_mut(&mut props.routes)),
         );
     }
 }

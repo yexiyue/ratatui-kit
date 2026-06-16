@@ -27,22 +27,34 @@ impl UpdaterTerminal for NoopTerminal {
 
 /// 单次离屏渲染：建树 → no-op 跑 update → `TestBackend` 跑 draw → 返回 `Buffer` 克隆。
 fn render_to_buffer(el: impl Into<AnyElement<'static>>, width: u16, height: u16) -> Buffer {
+    render_to_buffer_frames(el, width, height, 1)
+}
+
+/// 多帧离屏渲染：用于依赖上一帧布局信息的组件，例如 `Input::use_previous_size`。
+fn render_to_buffer_frames(
+    el: impl Into<AnyElement<'static>>,
+    width: u16,
+    height: u16,
+    frames: usize,
+) -> Buffer {
     let mut el = el.into();
     let helper = el.helper();
     let mut tree = Tree::new(el.props_mut(), helper);
 
     let mut noop = NoopTerminal;
-    tree.update_once(&mut noop);
-
     let mut terminal =
         ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height)).unwrap();
-    terminal
-        .draw(|frame| {
-            let area = frame.area();
-            let mut drawer = ComponentDrawer::new(frame, area);
-            tree.draw_root(&mut drawer);
-        })
-        .unwrap();
+
+    for _ in 0..frames.max(1) {
+        tree.update_once(&mut noop);
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                let mut drawer = ComponentDrawer::new(frame, area);
+                tree.draw_root(&mut drawer);
+            })
+            .unwrap();
+    }
 
     terminal.backend().buffer().clone()
 }
@@ -67,6 +79,35 @@ fn text_renders_content() {
 }
 
 #[test]
+fn wrapped_text_renders_hard_wrapped_lines() {
+    use crate::components::WrappedText;
+    let buf = render_to_buffer(
+        crate::element!(WrappedText(
+            text: "alpha beta gamma",
+            wrap_width: 5,
+        )),
+        5,
+        3,
+    );
+
+    assert!(
+        row(&buf, 0).starts_with("alpha"),
+        "第 1 行应渲染 alpha, 实际: {:?}",
+        row(&buf, 0)
+    );
+    assert!(
+        row(&buf, 1).starts_with("beta"),
+        "第 2 行应渲染 beta, 实际: {:?}",
+        row(&buf, 1)
+    );
+    assert!(
+        row(&buf, 2).starts_with("gamma"),
+        "第 3 行应渲染 gamma, 实际: {:?}",
+        row(&buf, 2)
+    );
+}
+
+#[test]
 fn border_draws_box_around_child() {
     use crate::components::{Border, Text};
     let buf = render_to_buffer(crate::element!(Border { Text(text: "x") }), 5, 3);
@@ -85,6 +126,30 @@ fn view_renders_children() {
     use crate::components::{Text, View};
     let buf = render_to_buffer(crate::element!(View { Text(text: "ab") }), 6, 1);
     assert!(row(&buf, 0).contains("ab"), "实际: {:?}", row(&buf, 0));
+}
+
+#[test]
+fn hidden_cursor_input_starts_from_value_prefix() {
+    use crate::components::{Border, Input};
+    use ratatui::layout::Constraint;
+
+    let buf = render_to_buffer_frames(
+        crate::element!(Border(width: Constraint::Length(8), height: Constraint::Length(3)) {
+            Input(
+                input: tui_input::Input::new("dep".to_string()),
+                hide_cursor: true,
+            )
+        }),
+        8,
+        3,
+        2,
+    );
+
+    assert!(
+        row(&buf, 1).contains("dep"),
+        "隐藏光标的输入框应从值开头展示, 实际: {:?}",
+        row(&buf, 1)
+    );
 }
 
 #[test]

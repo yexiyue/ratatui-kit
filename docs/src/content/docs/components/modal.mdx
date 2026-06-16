@@ -1,0 +1,103 @@
+---
+title: Modal 基础弹层
+description: 用 Modal 绘制遮罩、定位内容，并把弹层输入归到正确的 input layer。
+sidebar:
+  order: 3
+---
+
+`Modal` 是底层弹层组件。它只负责三件事：绘制遮罩、把内容放到指定位置、在打开时为子树提供当前 input layer。确认按钮、关闭键、滚动和表单提交都由你在外层或子组件里组合。
+
+![modal demo](/ratatui-kit/recordings/modal.gif)
+
+这个录屏由 `docs/tapes/modal.tape` 生成。示例先移动背景列表，再打开弹窗；弹窗打开后按 `j` 只更新弹窗状态，背景列表不会继续移动。随后用 `Esc` 关闭，再次打开并用 `Enter` 接受当前任务。
+
+## 运行
+
+```bash
+cargo run --example modal
+```
+
+背景状态下按 `j/k` 移动，按 `m` 打开弹窗。弹窗内按 `j/k` 会被弹窗消费，按 `Enter` 接受，按 `Esc` 或 `c` 关闭，按 `q` 退出。
+
+## 最小形态
+
+如果弹窗内部的子组件自己注册 `EventScope::Current` handler，可以让 `Modal` 自己创建输入层：
+
+```rust
+Modal(
+    open: open.get(),
+    width: Constraint::Length(68),
+    height: Constraint::Length(12),
+    style: Style::new().dim(),
+) {
+    Border(top_title: Line::from("Details").centered()) {
+        Text(text: Line::from("Modal content"))
+    }
+}
+```
+
+`Modal(open: false)` 不渲染内容，也不会更新子树。打开时它会自开一个默认 `blocks_lower=true` 的 layer，并把这个 layer 注入给子树；子树中的 `SearchInput`、`Select`、`ScrollView` 或自定义 `use_event_handler(EventScope::Current, ...)` 会自然归到弹窗层。
+
+## 父组件处理弹窗按键
+
+当按键逻辑写在 `Modal` 父组件里时，用父组件持有 layer，再把同一个 layer 传给 `Modal`：
+
+```rust title="examples/components/modal.rs"
+let layer = hooks.use_input_layer(modal_open.get(), true);
+
+hooks.use_event_handler(
+    EventScope::Layer(layer),
+    EventPriority::High,
+    move |event| {
+        // handle Enter / Esc / modal-only shortcuts
+        EventResult::Consumed
+    },
+);
+
+Modal(
+    open: modal_open.get(),
+    layer: Some(layer),
+    width: Constraint::Length(68),
+    height: Constraint::Length(12),
+) {
+    // modal content
+}
+```
+
+这组配对不能拆开。`use_event_handler(EventScope::Layer(layer))` 绑定的是父组件创建的 layer；`Modal(layer: Some(layer))` 告诉弹层复用这个 layer，并把它注入给子树。漏传 `layer` 时，`Modal` 会自己创建另一个更高层，父级 handler 反而收不到弹窗里的按键。
+
+## 输入互斥
+
+`blocks_lower` 默认等价于 `Some(true)`，适合真正的模态弹窗：
+
+```rust
+Modal(open: open.get(), blocks_lower: Some(true)) {
+    // lower layers are blocked
+}
+```
+
+如果要做非阻塞浮层、临时提示或调试面板，可以传 `blocks_lower: Some(false)`。这只表示 lower layer 仍可能收到事件；上层子组件如果返回 `EventResult::Consumed`，事件依然会停止传播。
+
+`Modal` 本身不替你决定哪些键关闭弹窗。底层弹层适合复杂交互；普通确认、提示和快捷键帮助优先用内置的 [ConfirmModal](/ratatui-kit/components/confirm-modal/)、[AlertModal](/ratatui-kit/components/alert-modal/) 和 [ShortcutInfoModal](/ratatui-kit/components/shortcut-info-modal/)。
+
+## 布局和遮罩
+
+`width`、`height` 决定内容区域大小，`placement` 决定内容在终端中的位置：
+
+```rust
+Modal(
+    open: open.get(),
+    placement: Placement::BottomRight,
+    margin: Margin::new(2, 2),
+    offset: Offset { x: -1, y: -1 },
+    width: Constraint::Length(48),
+    height: Constraint::Length(10),
+    style: Style::new().dim(),
+) {
+    // content
+}
+```
+
+`style` 作用在整屏遮罩上，弹窗内容样式由子树决定。常见做法是在 `Modal` 里面放一个 `Border`：外层 `Modal` 控制遮罩和定位，内层 `Border` 控制标题、边框、padding 和具体布局。
+
+需要在弹窗里放长内容时，把 [ScrollView](/ratatui-kit/components/scroll-view/) 放进 `Modal` 子树即可；它的 `Current` handler 会自动归属弹窗 layer。

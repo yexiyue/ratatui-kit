@@ -38,7 +38,7 @@
 
 ## 6. TRNovel 列表导航与简单页面
 
-- [ ] 6.1 (T13) `src/components/{list_select,multi_list_select,file_select,select}.rs`：`use_events` → `use_event_handler(Current, Normal, ...)`,`is_editing` 守卫保留为 handler **首行 early-return**(不放进 `if`,保证 Hook 顺序稳定),命中返回 `Consumed`。
+- [ ] 6.1 (T13) `src/components/{list_select,multi_list_select,select}.rs` + TRNovel 文件树选择用法：`use_events` → `use_event_handler(Current, Normal, ...)`,`is_editing` 守卫保留为 handler **首行 early-return**(不放进 `if`,保证 Hook 顺序稳定),命中返回 `Consumed`。框架侧统一沉淀为通用 `TreeSelect`，文件语义留给 TRNovel。
 - [ ] 6.2 (T13) `src/app/layout.rs`：全局 `q`/`g`/`b` 用 `use_event_handler(Current, Normal, ...)`(**非 Global**——须被弹窗/输入态屏蔽),命中返回 `Consumed`。验证：弹窗/输入态打开时 q/g/b 不触发;`cargo build`。
 - [ ] 6.3 (T14) 简单页面迁移：`home`/`local_novel`/`select_history`/`book_detail`/`book_source_manager`(+`select_book_source`)/`select_books`(+`find_book`)。`use_events` → `use_event_handler(Current)`;删 `!modal_open`/`!is_inputting` 门控;`select_books` 的 explore Modal 靠 Modal 自动开层。验证：`cargo build`。
 

@@ -13,6 +13,22 @@ pub use border::*;
 // 模态框组件，支持弹窗、遮罩等交互场景。
 pub mod modal;
 pub use modal::*;
+// 确认弹窗组件，封装独占输入层与确认/取消键位。
+pub mod confirm_modal;
+pub use confirm_modal::*;
+// 提示弹窗组件，封装独占输入层与关闭键位。
+pub mod alert_modal;
+pub use alert_modal::*;
+// 快捷键帮助弹窗组件，封装独占输入层与关闭键位。
+pub mod shortcut_info_modal;
+pub use shortcut_info_modal::*;
+// 单选列表组件，封装列表状态与键盘选择事件。
+mod list_state;
+pub mod select;
+pub use select::*;
+// 多选列表组件，封装多选状态与键盘选择事件。
+pub mod multi_select;
+pub use multi_select::*;
 // 滚动视图组件，支持内容滚动，适合长列表、文档阅读等。
 pub mod scroll_view;
 pub use scroll_view::*;
@@ -26,6 +42,9 @@ pub use center::*;
 // 文本组件，用于显示文本内容，支持样式、超链接等。
 pub mod text;
 pub use text::*;
+// 自动换行文本组件，用于长文档、日志、小说正文等需要把换行高度交给布局的场景。
+pub mod wrapped_text;
+pub use wrapped_text::*;
 
 // 定位组件，支持绝对定位，适合复杂布局需求。
 pub mod positioned;
@@ -36,6 +55,10 @@ pub mod input;
 #[cfg(feature = "input")]
 pub use input::*;
 #[cfg(feature = "input")]
+pub mod search_input;
+#[cfg(feature = "input")]
+pub use search_input::*;
+#[cfg(feature = "input")]
 pub use tui_input;
 
 #[cfg(feature = "tree")]
@@ -44,6 +67,13 @@ pub mod tree_select;
 pub use tree_select::*;
 #[cfg(feature = "tree")]
 pub use tui_tree_widget;
+
+#[cfg(feature = "virtual-list")]
+pub mod virtual_list;
+#[cfg(feature = "virtual-list")]
+pub use tui_widget_list;
+#[cfg(feature = "virtual-list")]
+pub use virtual_list::*;
 
 // 注:`textarea` 组件暂时下线(其底层 tui-textarea 尚无 ratatui 0.30 兼容版)。
 // 源码隔离保留在 `textarea.rs`(未声明为模块),待依赖支持 0.30 后恢复接入。

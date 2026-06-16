@@ -24,12 +24,12 @@ impl<'a> Context<'a> {
     }
 
     /// 创建一个不可变引用的上下文。
-    pub fn form_ref<T: Any>(context: &'a T) -> Self {
+    pub fn from_ref<T: Any>(context: &'a T) -> Self {
         Context::Ref(context)
     }
 
     /// 创建一个可变引用的上下文。
-    pub fn form_mut<T: Any>(context: &'a mut T) -> Self {
+    pub fn from_mut<T: Any>(context: &'a mut T) -> Self {
         Context::Mut(context)
     }
 
