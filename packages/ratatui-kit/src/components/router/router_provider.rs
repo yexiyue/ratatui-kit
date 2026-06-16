@@ -12,12 +12,12 @@
 //! 子组件可通过 hooks.use_navigate() 跳转页面，通过 hooks.use_route() 获取当前路由。
 
 use crate::{
-    AnyElement, Context, Hooks, UseState,
+    Component, Context, Hooks, UseState,
     components::router::history::RouterHistory,
     prelude::{ContextProvider, Outlet, RouteContext, RouteState, Routes},
 };
-use ratatui_kit_macros::{Props, component, element};
-use std::collections::{HashMap, VecDeque};
+use ratatui_kit_macros::{Props, element};
+use std::collections::HashMap;
 
 #[derive(Default, Props)]
 /// RouterProvider 组件属性。
@@ -32,36 +32,47 @@ pub struct RouterProviderProps {
     pub state: Option<RouteState>,
 }
 
-#[component]
-pub fn RouterProvider<'a>(
-    props: &mut RouterProviderProps,
-    mut hooks: Hooks,
-) -> impl Into<AnyElement<'a>> {
-    let history = hooks.use_state(|| RouterHistory {
-        current: 0,
-        max_length: props.history_length.unwrap_or(10),
-        history: VecDeque::from(vec![RouteContext {
-            params: HashMap::new(),
-            path: props.index_path.clone(),
-            state: props.state.clone(),
-        }]),
-    });
+pub struct RouterProvider;
 
-    let ctx = history.read().current_context();
+impl Component for RouterProvider {
+    type Props<'a> = RouterProviderProps;
 
-    element!(
-        ContextProvider(
-            value: Context::owned(history),
-        ) {
-            ContextProvider(
-                value: Context::owned(ctx),
-            ){
+    fn new(_props: &Self::Props<'_>) -> Self {
+        Self
+    }
+
+    fn update(
+        &mut self,
+        props: &mut Self::Props<'_>,
+        mut hooks: Hooks,
+        updater: &mut crate::ComponentUpdater,
+    ) {
+        let history = hooks.use_state(|| {
+            RouterHistory::new(
+                RouteContext {
+                    params: HashMap::new(),
+                    path: props.index_path.clone(),
+                    state: props.state.clone(),
+                },
+                props.history_length.unwrap_or(10),
+            )
+        });
+
+        let ctx = history.read().current_context();
+
+        updater.update_children(
+            [element!(
                 ContextProvider(
-                    value: Context::owned(props.routes.borrow()),
+                    value: Context::owned(history),
                 ) {
-                    Outlet
+                    ContextProvider(
+                        value: Context::owned(ctx),
+                    ){
+                        Outlet
+                    }
                 }
-            }
-        }
-    )
+            )],
+            Some(Context::from_mut(&mut props.routes)),
+        );
+    }
 }

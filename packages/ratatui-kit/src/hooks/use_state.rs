@@ -1,47 +1,30 @@
 //! 响应式状态管理 Hook 实现。
 //!
 //! 本模块为 ratatui-kit 提供了类似 React useState 的响应式状态管理能力，适用于计数器、输入框等本地状态。
-//!
-//! ## 主要类型
-//! - [`State<T>`]：响应式状态持有者，支持原子读写、变更通知、算术运算等。
-//! - [`StateRef<'a, T>`]：状态的只读引用。
-//! - [`StateMutRef<'a, T>`]：状态的可变引用，支持变更通知。
-//! - [`StateMutNoUpdate<'a, T>`]：状态的可变引用，不触发变更通知。
-//! - [`UseState`] trait：为 [`Hooks`] 提供 use_state 方法。
-//!
-//! ## 用法示例
-//! ```rust
-//! let mut hooks = ...;
-//! let counter = hooks.use_state(|| 0);
-//! counter.set(1);
-//! let value = counter.read();
-//! ```
-//!
-//! ## 线程安全
-//! 本模块所有状态类型均为 Send + Sync，可安全用于多线程场景。
+
+use std::task::Poll;
+
+use generational_box::{Owner, SyncStorage};
 
 use super::{Hook, Hooks};
-use generational_box::{
-    AnyStorage, BorrowError, BorrowMutError, GenerationalBox, Owner, SyncStorage,
-};
-use std::{
-    cmp,
-    fmt::{self, Debug, Display, Formatter},
-    hash::{Hash, Hasher},
-    ops::{self, Deref, DerefMut},
-    task::{Poll, Waker},
-};
+use crate::{ReactiveHandle, ReactiveMutNoUpdate, ReactiveMutRef, ReactiveRef, SingleWaker};
 
 mod private {
     pub trait Sealed {}
     impl Sealed for crate::hooks::Hooks<'_, '_> {}
 }
 
+/// 响应式状态持有者。
+pub type State<T> = ReactiveHandle<T, SingleWaker>;
+/// 状态的只读引用。
+pub type StateRef<'a, T> = ReactiveRef<'a, T, SingleWaker>;
+/// 状态的可变引用，支持变更通知。
+pub type StateMutRef<'a, T> = ReactiveMutRef<'a, T, SingleWaker>;
+/// 状态的可变引用，不触发变更通知。
+pub type StateMutNoUpdate<'a, T> = ReactiveMutNoUpdate<'a, T, SingleWaker>;
+
 pub trait UseState: private::Sealed {
     /// 为 [`Hooks`] 提供 use_state 方法，创建响应式状态。
-    ///
-    /// - `init`：状态初始化闭包。
-    /// - 返回 [`State<T>`]。
     fn use_state<T, F>(&mut self, init: F) -> State<T>
     where
         F: FnOnce() -> T,
@@ -64,13 +47,7 @@ where
     pub fn new(initial_value: T) -> Self {
         let storage = Owner::default();
         UseStateImpl {
-            state: State {
-                inner: storage.insert(StateValue {
-                    value: initial_value,
-                    waker: None,
-                    is_changed: false,
-                }),
-            },
+            state: State::new_in(&storage, initial_value),
             _storage: storage,
         }
     }
@@ -80,21 +57,8 @@ impl<T> Hook for UseStateImpl<T>
 where
     T: Unpin + Send + Sync + 'static,
 {
-    fn poll_change(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context,
-    ) -> std::task::Poll<()> {
-        if let Ok(mut value) = self.state.inner.try_write() {
-            if value.is_changed {
-                value.is_changed = false;
-                Poll::Ready(())
-            } else {
-                value.waker = Some(cx.waker().clone());
-                Poll::Pending
-            }
-        } else {
-            Poll::Pending
-        }
+    fn poll_change(&mut self, cx: &mut std::task::Context) -> std::task::Poll<()> {
+        self.state.poll_change(None, cx)
     }
 }
 
@@ -108,217 +72,6 @@ impl UseState for Hooks<'_, '_> {
     }
 }
 
-struct StateValue<T> {
-    value: T,
-    waker: Option<Waker>,
-    is_changed: bool,
-}
-
-/// 状态的只读引用。
-/// 通过 [`State::read`] 或 [`State::try_read`] 获取。
-pub struct StateRef<'a, T: 'static> {
-    inner: <SyncStorage as AnyStorage>::Ref<'a, StateValue<T>>,
-}
-
-impl<T: 'static> Deref for StateRef<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.value
-    }
-}
-
-/// 状态的可变引用，支持变更通知。
-/// 通过 [`State::write`] 或 [`State::try_write`] 获取。
-pub struct StateMutRef<'a, T: 'static> {
-    inner: <SyncStorage as AnyStorage>::Mut<'a, StateValue<T>>,
-    is_deref_mut: bool,
-}
-
-impl<T: 'static> Deref for StateMutRef<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.value
-    }
-}
-
-impl<T: 'static> DerefMut for StateMutRef<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.is_deref_mut = true;
-        &mut self.inner.value
-    }
-}
-
-impl<T: 'static> Drop for StateMutRef<'_, T> {
-    fn drop(&mut self) {
-        if self.is_deref_mut {
-            self.inner.is_changed = true;
-            if let Some(waker) = self.inner.waker.take() {
-                waker.wake();
-            }
-        }
-    }
-}
-
-/// 状态的可变引用，不触发变更通知。
-/// 通过 [`State::write_no_update`] 或 [`State::try_write_no_update`] 获取。
-pub struct StateMutNoUpdate<'a, T: 'static> {
-    inner: <SyncStorage as AnyStorage>::Mut<'a, StateValue<T>>,
-}
-
-impl<T: 'static> Deref for StateMutNoUpdate<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.value
-    }
-}
-
-impl<T: 'static> DerefMut for StateMutNoUpdate<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner.value
-    }
-}
-
-/// 响应式状态持有者。
-/// 支持原子读写、变更通知、算术运算等。
-pub struct State<T: Send + Sync + 'static> {
-    inner: GenerationalBox<StateValue<T>, SyncStorage>,
-}
-
-impl<T: Send + Sync + 'static> Clone for State<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T: Send + Sync + 'static> Copy for State<T> {}
-
-impl<T: Send + Sync + Copy + 'static> State<T> {
-    pub fn get(&self) -> T {
-        *self.read()
-    }
-}
-
-impl<T: Send + Sync + 'static> State<T> {
-    /// 尝试获取只读引用，失败时返回 None。
-    pub fn try_read(&'_ self) -> Option<StateRef<'_, T>> {
-        loop {
-            match self.inner.try_read() {
-                Ok(inner) => return Some(StateRef { inner }),
-                Err(BorrowError::Dropped(_)) => {
-                    return None;
-                }
-                Err(BorrowError::AlreadyBorrowedMut(_)) => match self.inner.try_write() {
-                    Err(BorrowMutError::Dropped(_)) => {
-                        return None;
-                    }
-                    _ => continue,
-                },
-            }
-        }
-    }
-
-    /// 获取只读引用，失败时 panic。
-    pub fn read(&'_ self) -> StateRef<'_, T> {
-        self.try_read()
-            .expect("attempt to read state after owner was dropped")
-    }
-
-    /// 尝试获取可变引用，支持变更通知，失败时返回 None。
-    pub fn try_write(&'_ self) -> Option<StateMutRef<'_, T>> {
-        self.inner
-            .try_write()
-            .map(|inner| StateMutRef {
-                inner,
-                is_deref_mut: false,
-            })
-            .ok()
-    }
-
-    /// 获取可变引用，支持变更通知，失败时 panic。
-    pub fn write(&'_ self) -> StateMutRef<'_, T> {
-        self.try_write()
-            .expect("attempt to write state after owner was dropped")
-    }
-
-    /// 尝试获取可变引用，不触发变更通知，失败时返回 None。
-    pub fn try_write_no_update(&'_ self) -> Option<StateMutNoUpdate<'_, T>> {
-        self.inner
-            .try_write()
-            .map(|inner| StateMutNoUpdate { inner })
-            .ok()
-    }
-
-    /// 获取可变引用，不触发变更通知，失败时 panic。
-    pub fn write_no_update(&'_ self) -> StateMutNoUpdate<'_, T> {
-        self.try_write_no_update()
-            .expect("attempt to write state after owner was dropped")
-    }
-
-    /// 设置状态值，触发变更通知。
-    pub fn set(&mut self, value: T) {
-        if let Some(mut v) = self.try_write() {
-            *v = value;
-        }
-    }
-
-    /// 设置状态值，不触发变更通知。
-    pub fn set_no_update(&mut self, value: T) {
-        if let Some(mut v) = self.try_write_no_update() {
-            *v = value;
-        }
-    }
-}
-
-impl<T: Debug + Sync + Send + 'static> Debug for State<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.read().fmt(f)
-    }
-}
-
-impl<T: Display + Sync + Send + 'static> Display for State<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.read().fmt(f)
-    }
-}
-
-// 算术运算符重载：与 AtomState 同构，由单一宏生成（见 reactive_ops.rs）。
-crate::reactive_ops::impl_reactive_ops!(State);
-
-impl<T: Hash + Sync + Send> Hash for State<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.read().hash(state)
-    }
-}
-
-impl<T: cmp::PartialEq<T> + Sync + Send + 'static> cmp::PartialEq<T> for State<T> {
-    fn eq(&self, other: &T) -> bool {
-        *self.read() == *other
-    }
-}
-
-impl<T: cmp::PartialOrd<T> + Sync + Send + 'static> cmp::PartialOrd<T> for State<T> {
-    fn partial_cmp(&self, other: &T) -> Option<cmp::Ordering> {
-        self.read().partial_cmp(other)
-    }
-}
-
-impl<T: cmp::PartialEq<T> + Sync + Send + 'static> cmp::PartialEq<State<T>> for State<T> {
-    fn eq(&self, other: &State<T>) -> bool {
-        *self.read() == *other.read()
-    }
-}
-
-impl<T: cmp::PartialOrd<T> + Sync + Send + 'static> cmp::PartialOrd<State<T>> for State<T> {
-    fn partial_cmp(&self, other: &State<T>) -> Option<cmp::Ordering> {
-        self.read().partial_cmp(&other.read())
-    }
-}
-
-impl<T: cmp::Eq + Sync + Send + 'static> cmp::Eq for State<T> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329,37 +82,36 @@ mod tests {
     #[test]
     fn add_and_sub_assign_mutate_value() {
         let holder = UseStateImpl::new(0i32);
-        let mut s = holder.state; // State 是 Copy
-        s += 5;
-        assert_eq!(s.get(), 5);
-        s -= 2;
-        assert_eq!(s.get(), 3);
+        let mut state = holder.state;
+        state += 5;
+        assert_eq!(state.get(), 5);
+        state -= 2;
+        assert_eq!(state.get(), 3);
     }
 
     #[test]
     fn mul_assign_mutates_value() {
         let holder = UseStateImpl::new(3i32);
-        let mut s = holder.state;
-        s *= 4;
-        assert_eq!(s.get(), 12);
+        let mut state = holder.state;
+        state *= 4;
+        assert_eq!(state.get(), 12);
     }
 
     #[test]
     fn set_overwrites_and_get_reads() {
         let holder = UseStateImpl::new(10i32);
-        let mut s = holder.state;
-        s.set(99);
-        assert_eq!(s.get(), 99);
+        let mut state = holder.state;
+        state.set(99);
+        assert_eq!(state.get(), 99);
     }
 
     #[test]
     fn copy_handles_share_storage() {
         let holder = UseStateImpl::new(1i32);
-        let mut s = holder.state;
-        let s2 = s; // Copy:同一底层 box
-        s += 41;
-        // 两个句柄看到同一值。
-        assert_eq!(s.get(), 42);
-        assert_eq!(s2.get(), 42);
+        let mut state = holder.state;
+        let state2 = state;
+        state += 41;
+        assert_eq!(state.get(), 42);
+        assert_eq!(state2.get(), 42);
     }
 }

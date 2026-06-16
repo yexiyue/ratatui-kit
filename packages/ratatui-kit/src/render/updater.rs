@@ -6,8 +6,8 @@ use std::{
 use crate::{
     ElementKey,
     component::{Components, InstantiatedComponent},
-    context::{Context, ContextStack},
-    element::ElementExt,
+    context::{Context, ContextLookup, ContextStack},
+    element::ElementRepr,
     layout_style::LayoutStyle,
     multimap::AppendOnlyMultimap,
     terminal::UpdaterTerminal,
@@ -51,11 +51,17 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
     }
 
     pub fn get_context<T: Any>(&'_ self) -> Option<Ref<'_, T>> {
-        self.component_context_stack.get_context()
+        match self.component_context_stack.get_context::<T>() {
+            ContextLookup::Found(res) => Some(res),
+            _ => None,
+        }
     }
 
     pub fn get_context_mut<T: Any>(&'_ self) -> Option<RefMut<'_, T>> {
-        self.component_context_stack.get_context_mut()
+        match self.component_context_stack.get_context_mut::<T>() {
+            ContextLookup::Found(res) => Some(res),
+            _ => None,
+        }
     }
 
     pub fn terminal(&mut self) -> &mut dyn UpdaterTerminal {
@@ -77,7 +83,7 @@ impl<'a, 'c: 'a> ComponentUpdater<'a, 'c> {
     pub fn update_children<I, T>(&mut self, elements: I, context: Option<Context>)
     where
         I: IntoIterator<Item = T>,
-        T: ElementExt,
+        T: ElementRepr,
     {
         self.component_context_stack
             .with_context(context, |context_stack| {

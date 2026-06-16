@@ -1,0 +1,7 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/any_element_borrow_escape.rs:4:5
+  |
+3 | fn leak_any_element<'short>(source: &'short mut AnyElement<'static>) -> AnyElement<'static> {
+  |                     ------ lifetime `'short` defined here
+4 |     AnyElement::from(source)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'short` must outlive `'static`

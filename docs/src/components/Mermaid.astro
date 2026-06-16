@@ -1,0 +1,131 @@
+---
+interface Props {
+	chart: string;
+	caption?: string;
+}
+
+const { chart, caption } = Astro.props;
+---
+
+<figure class="rk-mermaid-figure">
+	<div class="rk-mermaid" data-chart={chart}></div>
+	{caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<script>
+	const lightTheme = {
+		background: 'transparent',
+		primaryColor: '#eef7f5',
+		primaryBorderColor: '#7db7aa',
+		primaryTextColor: '#16211f',
+		lineColor: '#6c8580',
+		secondaryColor: '#f5f7fb',
+		tertiaryColor: '#ffffff',
+		fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+	};
+
+	const darkTheme = {
+		background: 'transparent',
+		primaryColor: '#10201d',
+		primaryBorderColor: '#69b8a7',
+		primaryTextColor: '#eefaf7',
+		lineColor: '#8aa19c',
+		secondaryColor: '#151b24',
+		tertiaryColor: '#0e141d',
+		fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+	};
+
+	function themeName() {
+		const explicit = document.documentElement.dataset.theme;
+		if (explicit === 'dark' || explicit === 'light') {
+			return explicit;
+		}
+		return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+	}
+
+	let mermaidPromise;
+	function getMermaid() {
+		mermaidPromise ??= import('mermaid').then((module) => module.default);
+		return mermaidPromise;
+	}
+
+	async function renderMermaid() {
+		const blocks = document.querySelectorAll('.rk-mermaid[data-chart]');
+		if (blocks.length === 0) {
+			return;
+		}
+
+		const mode = themeName();
+		const mermaid = await getMermaid();
+		mermaid.initialize({
+			startOnLoad: false,
+			securityLevel: 'strict',
+			theme: 'base',
+			themeVariables: mode === 'dark' ? darkTheme : lightTheme,
+		});
+
+		for (const block of blocks) {
+			if (!(block instanceof HTMLElement) || block.dataset.renderedTheme === mode) {
+				continue;
+			}
+
+			const chart = block.dataset.chart ?? '';
+			const id = `rk-mermaid-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+			try {
+				const { svg } = await mermaid.render(id, chart);
+				block.innerHTML = svg;
+				block.dataset.renderedTheme = mode;
+				block.removeAttribute('data-error');
+			} catch (error) {
+				block.textContent = chart;
+				block.dataset.error = error instanceof Error ? error.message : String(error);
+			}
+		}
+	}
+
+	renderMermaid();
+	document.addEventListener('astro:page-load', renderMermaid);
+
+	const observer = new MutationObserver(renderMermaid);
+	observer.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ['data-theme'],
+	});
+</script>
+
+<style>
+	.rk-mermaid-figure {
+		margin: 2rem 0;
+		border-radius: 1.25rem;
+		border: 1px solid color-mix(in srgb, var(--sl-color-gray-5), transparent 35%);
+		background:
+			linear-gradient(135deg, color-mix(in srgb, var(--sl-color-accent-low), transparent 12%), transparent 46%),
+			color-mix(in srgb, var(--sl-color-bg), var(--sl-color-bg-nav) 40%);
+		padding: 0.75rem;
+	}
+
+	.rk-mermaid {
+		overflow-x: auto;
+		border-radius: 0.85rem;
+		background: color-mix(in srgb, var(--sl-color-bg), transparent 4%);
+		padding: 1.25rem;
+	}
+
+	.rk-mermaid svg {
+		display: block;
+		max-width: 100%;
+		height: auto;
+		margin: 0 auto;
+	}
+
+	.rk-mermaid[data-error] {
+		white-space: pre-wrap;
+		color: var(--sl-color-red-high);
+	}
+
+	.rk-mermaid-figure figcaption {
+		margin: 0.75rem 0.25rem 0;
+		color: var(--sl-color-gray-3);
+		font-size: 0.875rem;
+	}
+</style>

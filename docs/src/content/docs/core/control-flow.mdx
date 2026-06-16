@@ -1,0 +1,93 @@
+---
+title: 控制流语法
+description: 在 element! 里直接使用 if、if let、for 和 match。
+sidebar:
+  order: 3
+---
+
+`control_flow` 展示 `element!` 的一个核心设计：UI 树是普通 Rust 表达式的一部分。你可以把 `if`、`if let`、`for` 和 `match` 写进树里，而且不同分支可以返回不同元素类型，不需要在业务代码里手动统一成 `AnyElement`。
+
+![control flow demo](/ratatui-kit/recordings/control-flow.gif)
+
+这个录屏由 `docs/tapes/control-flow.tape` 生成，运行的是 `examples/core/control_flow.rs`。录屏会移动高亮行、切换 count 奇偶分支，并关闭 optional name，让 `if let` 走到 `else if`。
+
+## 运行
+
+```bash
+cargo run --example control_flow
+```
+
+按 `j/k` 改变 count 和高亮行，按 `n` 切换可选 name，按 `q` 退出。
+
+## 分支可以返回不同元素
+
+`if / else` 的两侧不需要是同一个组件类型。下面这个分支一边返回 `Text`，另一边返回带边框的 `Border` 子树：
+
+```rust title="examples/core/control_flow.rs"
+if count_value % 2 == 0 {
+    Text(
+        text: format!("if branch: count {count_value} is even"),
+        style: Style::new().green().bold(),
+    )
+} else {
+    Border(borders: Borders::ALL, height: Constraint::Length(3)) {
+        Text(text: format!("else branch: count {count_value} is odd"))
+    }
+}
+```
+
+宏会把这些分支收敛成框架可协调的 element 声明。你只需要让每个分支产出一个合法元素。
+
+## if let 适合可选数据
+
+可选数据可以直接在树里展开：
+
+```rust title="examples/core/control_flow.rs"
+if let Some(name) = maybe_name {
+    Text(text: format!("if let branch: optional name = {name}"))
+} else if count_value > 4 {
+    Text(text: "else if branch: no name, but count is high")
+} else {
+    Text(text: "else branch: no name yet")
+}
+```
+
+这类写法适合加载态、空态、权限分支和可选上下文。不要为了渲染一个可选块先把它塞进临时 `Vec`，直接写在 `element!` 里通常更清楚。
+
+## for 循环仍然需要稳定 key
+
+`for` 可以直接生成多行元素，但列表项仍然要给稳定 key：
+
+```rust title="examples/core/control_flow.rs"
+for (index, (label, detail)) in ROWS.iter().enumerate() {
+    Text(
+        key: index,
+        text: format!("{label:<10} {detail}"),
+    )
+}
+```
+
+示例里 `ROWS` 是静态数组，所以 `index` 足够稳定。真实业务列表如果会插入、删除或重排，优先使用业务 id 做 key，避免状态被复用到错误的行。
+
+## match 适合状态机视图
+
+当页面状态天然是枚举、步骤或模式时，`match` 会比多个布尔值更容易读：
+
+```rust title="examples/core/control_flow.rs"
+match selected_value {
+    0 => { Text(text: "match branch 0: simple Text") }
+    1 => { Border(borders: Borders::LEFT) {
+        Text(text: "match branch 1: wrapped in a left border")
+    } }
+    2 => { Text(text: "match branch 2: rows come from a for loop") }
+    _ => { Text(text: "match default: every branch can have its own element type") }
+}
+```
+
+每个 `match` 分支都用 `{ ... }` 包住元素，可以让复杂子树保持清楚，也能避免宏解析时的歧义。
+
+## 和组件模型的关系
+
+`element!` 每帧重新构造的是轻量声明；真正持久的是协调后的 `Component` 实例。控制流改变时，运行时会按 `ElementKey + TypeId` 判断哪些节点能复用、哪些节点应该重建。
+
+下一步可以回到 [组件模型](/ratatui-kit/core/component-model/) 理解 key 和实例复用，或者继续看 [Hooks](/ratatui-kit/core/hooks/) 了解状态为什么能跨分支重绘保持稳定。

@@ -5,8 +5,8 @@
 //! ## 用法示例
 //! ```rust
 //! let scroll_state = hooks.use_state(ScrollViewState::default);
-//! element!(ScrollView(scroll_view_state: scroll_state.get()) { ... })
-//! // 在事件处理器中调用 scroll_state.write().handle_event(&event)
+//! element!(ScrollView(scroll_view_state: scroll_state) { ... })
+//! // 在事件处理器中调用 `scroll_state.write().handle_event(&event)`。
 //! ```
 //! 支持上下左右/翻页/鼠标滚轮等多种滚动方式。
 

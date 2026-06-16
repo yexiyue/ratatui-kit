@@ -22,10 +22,7 @@ pub struct InsertBeforeHandler {
 }
 
 impl Hook for InsertBeforeHandler {
-    fn poll_change(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context,
-    ) -> std::task::Poll<()> {
+    fn poll_change(&mut self, cx: &mut std::task::Context) -> std::task::Poll<()> {
         let mut waker = self.waker.lock().unwrap();
         let mut queue = self.queue.lock().unwrap();
         if queue.is_empty() {

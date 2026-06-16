@@ -1,0 +1,7 @@
+error: lifetime may not live long enough
+ --> tests/ui/fail/any_props_borrow_escape.rs:4:5
+  |
+3 | fn leak_any_props<'short>(element: &'short mut Element<'static, View>) -> AnyProps<'static> {
+  |                   ------ lifetime `'short` defined here
+4 |     element.props_mut()
+  |     ^^^^^^^^^^^^^^^^^^^ returning this value requires that `'short` must outlive `'static`

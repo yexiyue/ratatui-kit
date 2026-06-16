@@ -28,13 +28,6 @@ impl DerefMut for TextParagraph<'_> {
     }
 }
 
-// 让 TextParagraph 自身成为可渲染 widget,从而可经 `widget(expr)` 直接嵌入元素树。
-impl Widget for TextParagraph<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        self.inner.render(area, buf);
-    }
-}
-
 // 让 `&TextParagraph` 也成为 Widget,以匹配 WidgetAdapter 的 `for<'a> &'a T: Widget`
 // 约束(去 clone 后按引用渲染)。`&Paragraph` 0.30 起本就是 Widget,直接转发。
 impl Widget for &TextParagraph<'_> {

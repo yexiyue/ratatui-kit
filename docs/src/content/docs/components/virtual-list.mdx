@@ -1,0 +1,105 @@
+---
+title: VirtualList 虚拟列表
+description: 用内置 VirtualList 处理长列表、窗口化渲染和自定义行。
+sidebar:
+  order: 5
+---
+
+`VirtualList` 是长列表和自定义行渲染的底层组件，启用 `virtual-list` feature 后可用。它复用 `tui-widget-list`，只根据可见窗口调用 `render_item`，因此可以面对几千、几万行数据，而不需要先构造完整的 `ListItem` 集合。
+
+![virtual list demo](/ratatui-kit/recordings/virtual-list.gif)
+
+这个录屏由 `docs/tapes/virtual-list.tape` 生成。示例加载 10,000 行，`default_index` 把光标恢复到第 43 行；随后连续移动、提交当前行，再切换到空列表状态。
+
+## 运行
+
+```bash
+cargo run --example virtual_list
+```
+
+按 `j/k` 移动，按 `Home/End` 跳到首尾，按 `Enter` 提交当前索引，按 `e` 切换空态，按 `q` 退出。
+
+## Feature
+
+`VirtualList` 位于 `virtual-list` feature 下：
+
+```toml
+ratatui-kit = { version = "...", features = ["virtual-list"] }
+```
+
+examples 使用 `full` feature，所以可以直接运行。库默认 feature 为空；验证这类组件时必须带 `--all-features`。
+
+## 最小形态
+
+```rust title="examples/components/virtual_list.rs"
+use ratatui_kit::components::tui_widget_list::ListBuildContext;
+
+VirtualList<Line<'static>>(
+    item_count: 10_000,
+    default_index: Some(42),
+    render_item: |context: &ListBuildContext| {
+        let row = context.index + 1;
+        let style = if context.is_selected {
+            Style::new().fg(Color::Black).bg(Color::Green)
+        } else {
+            Style::new()
+        };
+
+        (Line::styled(format!("row {row:05}"), style), 1u16)
+    },
+    on_select: move |index: usize| {
+        submitted.set(format!("selected row {}", index + 1));
+    },
+)
+```
+
+`render_item` 返回 `(widget, main_axis_size)`。竖向列表里 `main_axis_size` 是行高；横向列表里它是列宽。组件会按可见区域请求需要的行，因此 `render_item` 里适合做轻量、确定性的行构造。
+
+## 外部状态
+
+默认情况下，`VirtualList` 自己保存 `tui_widget_list::ListState`。如果页面需要显示当前光标、做虚拟多选、或让父级处理额外键位，可以传入外部状态：
+
+```rust title="examples/components/virtual_list.rs"
+let list_state = hooks.use_state(ListState::default);
+let cursor = cursor_label(list_state.read().selected);
+
+VirtualList<Line<'static>>(
+    state: list_state,
+    item_count: item_count,
+    default_index: Some(42),
+    on_select: move |index| {
+        submitted.set(format!("selected row {}", index + 1));
+    },
+)
+```
+
+`on_select` 返回的是当前索引，而不是行数据。这样组件不需要拥有你的业务集合；你可以用索引从自己的数据源读取、跳转详情、或更新选择集合。
+
+## 默认光标
+
+`default_index` 是索引，不是值。它支持先空后加载：列表为空时不会永久吞掉默认光标；数据回来且当前没有光标时，会补选默认索引。用户已经移动过光标后，列表长度变化不会强制把光标重置回默认值。
+
+当 `item_count` 变短时，组件会把越界光标夹回最后一个有效项；`item_count` 为 0 时，不消费导航键或确认键，父组件仍然可以处理页面级快捷键。
+
+## 布局和样式
+
+`VirtualList` 可以直接接收 `width`、`height`、`margin` 和 `offset`。边框仍然使用 `tui-widget-list` 原生的 `Block`：
+
+```rust
+VirtualList<Line<'static>>(
+    width: Constraint::Length(42),
+    block: Block::bordered()
+        .border_style(Style::new().fg(Color::Cyan))
+        .title_top(Line::from(" build log ").centered()),
+    scroll_padding: 2,
+    infinite_scrolling: false,
+)
+```
+
+`scroll_padding` 可以让光标靠近边缘前提前滚动；`infinite_scrolling` 控制是否允许首尾循环。
+
+## 组合多选
+
+普通多选优先用 [MultiSelect](/ratatui-kit/components/multi-select/)。当列表很长、行需要自定义渲染、或选择集合需要完全由业务控制时，用 `VirtualList` 加外部 `HashSet<usize>` 组合即可；[Virtual Multi Select](/ratatui-kit/components/virtual-multi-select/) 展示了这个模式。
+
+`VirtualList` 不内置 loading/empty 文案或业务主题。这些应该由页面自己组合：加载时传 `item_count: 0` 并在外层显示状态，数据回来后恢复真实数量。

@@ -1,3 +1,5 @@
+use std::any::TypeId;
+
 use ratatui_kit_macros::Props;
 
 /// 组件属性 trait，所有可作为组件 props 的类型都需实现此 trait。
@@ -13,11 +15,11 @@ trait DropRaw {
 
 // 类型擦除的具体实现
 // 使用PhantomData标记实际类型T
-struct DropRowImpl<T> {
+struct DropRawImpl<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T> DropRaw for DropRowImpl<T> {
+impl<T> DropRaw for DropRawImpl<T> {
     // 实际执行内存释放的方法
     // 将原始指针转换为Box后释放
     fn drop_raw(&self, raw: *mut ()) {
@@ -34,6 +36,7 @@ impl<T> DropRaw for DropRowImpl<T> {
 // _marker: 生命周期标记
 pub struct AnyProps<'a> {
     raw: *mut (),
+    type_id: TypeId,
     drop: Option<Box<dyn DropRaw + 'a>>,
     _marker: std::marker::PhantomData<&'a mut ()>,
 }
@@ -41,7 +44,7 @@ pub struct AnyProps<'a> {
 impl<'a> AnyProps<'a> {
     // 创建拥有所有权的AnyProps实例
     // T: 实现Props trait的类型
-    pub(crate) fn owned<T>(props: T) -> Self
+    pub(crate) fn owned<T>(props: T, type_id: TypeId) -> Self
     where
         T: Props + 'a,
     {
@@ -49,8 +52,9 @@ impl<'a> AnyProps<'a> {
         let raw = Box::into_raw(Box::new(props));
         Self {
             raw: raw as *mut (),
+            type_id,
             // 保存对应的drop处理实现
-            drop: Some(Box::new(DropRowImpl::<T> {
+            drop: Some(Box::new(DropRawImpl::<T> {
                 _marker: std::marker::PhantomData,
             })),
             _marker: std::marker::PhantomData,
@@ -59,9 +63,10 @@ impl<'a> AnyProps<'a> {
 
     // 创建借用的AnyProps实例
     // 不持有所有权，不负责内存释放
-    pub(crate) fn borrowed<T: Props>(props: &'a mut T) -> Self {
+    pub(crate) fn borrowed<T: Props>(props: &'a mut T, type_id: TypeId) -> Self {
         Self {
             raw: props as *const _ as *mut (),
+            type_id,
             drop: None, // 不负责内存释放
             _marker: std::marker::PhantomData,
         }
@@ -69,9 +74,10 @@ impl<'a> AnyProps<'a> {
 
     // 创建只读借用版本
     // drop字段设为None表示不处理内存释放
-    pub(crate) fn borrow(&mut self) -> Self {
+    pub(crate) fn borrow(&mut self) -> AnyProps<'_> {
         Self {
             raw: self.raw,
+            type_id: self.type_id,
             drop: None,
             _marker: std::marker::PhantomData,
         }
@@ -79,13 +85,24 @@ impl<'a> AnyProps<'a> {
 
     // 不安全的下转型方法（不可变引用）
     // 调用者必须确保实际类型与T匹配
-    pub(crate) unsafe fn downcast_ref_unchecked<T: Props>(&self) -> &T {
+    pub(crate) unsafe fn downcast_ref_unchecked<T: Props>(&self, expected_type_id: TypeId) -> &T {
+        debug_assert_eq!(
+            self.type_id, expected_type_id,
+            "AnyProps type mismatch before immutable downcast"
+        );
         unsafe { &*(self.raw as *const T) }
     }
 
     // 不安全的下转型方法（可变引用）
     // 调用者必须确保实际类型与T匹配
-    pub(crate) unsafe fn downcast_mut_unchecked<T: Props>(&mut self) -> &mut T {
+    pub(crate) unsafe fn downcast_mut_unchecked<T: Props>(
+        &mut self,
+        expected_type_id: TypeId,
+    ) -> &mut T {
+        debug_assert_eq!(
+            self.type_id, expected_type_id,
+            "AnyProps type mismatch before mutable downcast"
+        );
         unsafe { &mut *(self.raw as *mut T) }
     }
 }

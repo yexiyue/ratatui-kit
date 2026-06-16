@@ -1,60 +1,17 @@
-use generational_box::{
-    AnyStorage, BorrowError, BorrowMutError, GenerationalBox, Owner, SyncStorage,
-};
-use std::collections::HashMap;
 use std::sync::{LazyLock, OnceLock};
-use std::{
-    cmp,
-    fmt::{self, Debug, Display, Formatter},
-    hash::{Hash, Hasher},
-    ops::{Deref, DerefMut},
-    task::Waker,
-};
 
-use crate::ElementKey;
+use generational_box::{Owner, SyncStorage};
+
+use crate::{ReactiveHandle, ReactiveMutRef, ReactiveRef, WakerMap};
 
 mod use_atom;
 pub use use_atom::UseAtom;
 
-static OWNER: LazyLock<Owner<SyncStorage>> = LazyLock::new(Owner::default);
+pub(crate) static OWNER: LazyLock<Owner<SyncStorage>> = LazyLock::new(Owner::default);
 
-struct AtomValue<T> {
-    value: T,
-    is_changed: bool,
-    wakers: HashMap<ElementKey, Waker>,
-}
-
-pub struct AtomState<T>
-where
-    T: Send + Sync + 'static,
-{
-    inner: GenerationalBox<AtomValue<T>, SyncStorage>,
-}
-
-impl<T> AtomState<T>
-where
-    T: Send + Sync + 'static,
-{
-    pub fn new(value: T) -> Self {
-        AtomState {
-            inner: OWNER.insert(AtomValue {
-                value,
-                is_changed: false,
-                wakers: HashMap::new(),
-            }),
-        }
-    }
-
-    fn same_storage(&self, other: &Self) -> bool {
-        self.inner.ptr_eq(&other.inner)
-    }
-
-    fn remove_waker(&self, key: &ElementKey) {
-        if let Ok(mut value) = self.inner.try_write() {
-            value.wakers.remove(key);
-        }
-    }
-}
+pub type AtomState<T> = ReactiveHandle<T, WakerMap>;
+pub type AtomStateRef<'a, T> = ReactiveRef<'a, T, WakerMap>;
+pub type AtomStateMut<'a, T> = ReactiveMutRef<'a, T, WakerMap>;
 
 /// 全局响应式原子（类 Jotai/Recoil）。
 ///
@@ -104,176 +61,6 @@ where
     }
 }
 
-pub struct AtomStateRef<'a, T>
-where
-    T: 'static,
-{
-    inner: <SyncStorage as AnyStorage>::Ref<'a, AtomValue<T>>,
-}
-
-impl<T> Deref for AtomStateRef<'_, T>
-where
-    T: 'static,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.value
-    }
-}
-
-pub struct AtomStateMut<'a, T>
-where
-    T: 'static,
-{
-    inner: <SyncStorage as AnyStorage>::Mut<'a, AtomValue<T>>,
-    is_deref_mut: bool,
-}
-
-impl<T> Deref for AtomStateMut<'_, T>
-where
-    T: 'static,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.value
-    }
-}
-
-impl<T> DerefMut for AtomStateMut<'_, T>
-where
-    T: 'static,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.is_deref_mut = true;
-        &mut self.inner.value
-    }
-}
-
-impl<T> Drop for AtomStateMut<'_, T>
-where
-    T: 'static,
-{
-    fn drop(&mut self) {
-        if self.is_deref_mut {
-            self.inner.is_changed = true;
-            for waker in self.inner.wakers.values() {
-                waker.wake_by_ref();
-            }
-        }
-    }
-}
-
-impl<T> AtomState<T>
-where
-    T: Send + Sync + 'static,
-{
-    pub fn try_read(&'_ self) -> Option<AtomStateRef<'_, T>> {
-        loop {
-            match self.inner.try_read() {
-                Ok(inner) => return Some(AtomStateRef { inner }),
-                Err(BorrowError::Dropped(_)) => {
-                    return None;
-                }
-                Err(BorrowError::AlreadyBorrowedMut(_)) => match self.inner.try_write() {
-                    Err(BorrowMutError::Dropped(_)) => {
-                        return None;
-                    }
-                    _ => continue,
-                },
-            }
-        }
-    }
-
-    pub fn read(&'_ self) -> AtomStateRef<'_, T> {
-        self.try_read()
-            .expect("attempt to read state after owner was dropped")
-    }
-
-    pub fn try_write(&'_ self) -> Option<AtomStateMut<'_, T>> {
-        self.inner
-            .try_write()
-            .map(|inner| AtomStateMut {
-                inner,
-                is_deref_mut: false,
-            })
-            .ok()
-    }
-
-    pub fn write(&'_ self) -> AtomStateMut<'_, T> {
-        self.try_write()
-            .expect("attempt to write state after owner was dropped")
-    }
-
-    pub fn set(&mut self, value: T) {
-        if let Some(mut v) = self.try_write() {
-            *v = value;
-        }
-    }
-}
-
-impl<T: Send + Sync + 'static> Clone for AtomState<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T: Send + Sync + 'static> Copy for AtomState<T> {}
-
-impl<T: Send + Sync + Copy + 'static> AtomState<T> {
-    pub fn get(&self) -> T {
-        *self.read()
-    }
-}
-
-impl<T: Debug + Sync + Send + 'static> Debug for AtomState<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.read().fmt(f)
-    }
-}
-
-impl<T: Display + Sync + Send + 'static> Display for AtomState<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.read().fmt(f)
-    }
-}
-
-// 算术运算符重载：与 State 同构，由单一宏生成（见 reactive_ops.rs）。
-crate::reactive_ops::impl_reactive_ops!(AtomState);
-
-impl<T: Hash + Sync + Send> Hash for AtomState<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.read().hash(state)
-    }
-}
-
-impl<T: cmp::PartialEq<T> + Sync + Send + 'static> cmp::PartialEq<T> for AtomState<T> {
-    fn eq(&self, other: &T) -> bool {
-        *self.read() == *other
-    }
-}
-
-impl<T: cmp::PartialOrd<T> + Sync + Send + 'static> cmp::PartialOrd<T> for AtomState<T> {
-    fn partial_cmp(&self, other: &T) -> Option<cmp::Ordering> {
-        self.read().partial_cmp(other)
-    }
-}
-
-impl<T: cmp::PartialEq<T> + Sync + Send + 'static> cmp::PartialEq<AtomState<T>> for AtomState<T> {
-    fn eq(&self, other: &AtomState<T>) -> bool {
-        *self.read() == *other.read()
-    }
-}
-
-impl<T: cmp::PartialOrd<T> + Sync + Send + 'static> cmp::PartialOrd<AtomState<T>> for AtomState<T> {
-    fn partial_cmp(&self, other: &AtomState<T>) -> Option<cmp::Ordering> {
-        self.read().partial_cmp(&other.read())
-    }
-}
-
-impl<T: cmp::Eq + Sync + Send + 'static> cmp::Eq for AtomState<T> {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282,36 +69,33 @@ mod tests {
 
     #[test]
     fn add_and_sub_assign_mutate_value() {
-        let mut s = AtomState::new(0i32);
-        s += 5;
-        assert_eq!(s.get(), 5);
-        s -= 2;
-        assert_eq!(s.get(), 3);
+        let mut state = AtomState::new(0i32);
+        state += 5;
+        assert_eq!(state.get(), 5);
+        state -= 2;
+        assert_eq!(state.get(), 3);
     }
 
     #[test]
     fn set_overwrites_and_get_reads() {
-        let mut s = AtomState::new(10i32);
-        s.set(42);
-        assert_eq!(s.get(), 42);
+        let mut state = AtomState::new(10i32);
+        state.set(42);
+        assert_eq!(state.get(), 42);
     }
 
     #[test]
     fn copy_handles_share_storage() {
-        let mut s = AtomState::new(1i32);
-        let s2 = s; // Copy:同一底层 box
-        s += 41;
-        assert_eq!(s.get(), 42);
-        assert_eq!(s2.get(), 42);
+        let mut state = AtomState::new(1i32);
+        let state2 = state;
+        state += 41;
+        assert_eq!(state.get(), 42);
+        assert_eq!(state2.get(), 42);
     }
-
-    // ---- Atom（全局原子声明）----
 
     static A: Atom<i32> = Atom::new(|| 7);
 
     #[test]
     fn atom_lazy_init_and_get_set() {
-        // 首次访问才以 init() 初始化。
         assert_eq!(A.get(), 7);
         A.set(10);
         assert_eq!(A.get(), 10);
@@ -320,9 +104,8 @@ mod tests {
     #[test]
     fn atom_state_handle_shares_value() {
         static B: Atom<i32> = Atom::new(|| 0);
-        // 多次 state()/get 指向同一底层 box（同一 atom）。
-        let mut h = B.state();
-        h += 5;
+        let mut handle = B.state();
+        handle += 5;
         assert_eq!(B.get(), 5);
         assert_eq!(B.state().get(), 5);
     }

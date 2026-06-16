@@ -1,0 +1,11 @@
+error: `#[with_layout_style]` 只能用于具名字段结构体
+ --> tests/ui/fail/with_layout_style_non_named.rs:5:8
+  |
+5 | struct TupleProps(u8);
+  |        ^^^^^^^^^^
+
+error: `#[with_layout_style]` 只能用于具名字段结构体
+ --> tests/ui/fail/with_layout_style_non_named.rs:9:8
+  |
+9 | struct UnitProps;
+  |        ^^^^^^^^^

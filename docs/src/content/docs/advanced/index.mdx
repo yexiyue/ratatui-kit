@@ -1,0 +1,57 @@
+---
+title: 高级自定义
+description: 自定义 Hook、手写 Component、原生 widget 桥接和 Provider 扩展。
+sidebar:
+  order: 1
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+高级自定义是 ratatui-kit 的逃生口，不是学习路径的起点。React 把这类内容放在 Escape Hatches，Vue 把组合复用、插件和渲染机制放在更靠后的章节；ratatui-kit 也遵循同样原则：先组合内置组件、hooks、输入层和 Router，只有框架边界已经清楚时，才下沉到自定义能力。
+
+<CardGrid>
+  <Card title="组合优先" icon="puzzle">
+    业务状态、输入互斥、弹窗、列表和长文本先用现有组件与 hooks 组合。能组合出来，就不要急着手写 runtime 能力。
+  </Card>
+  <Card title="边界清楚" icon="setting">
+    自定义 Hook 管逻辑复用，Provider 管作用域依赖，手写 Component 管绘制和布局。不要让一个抽象同时接管所有事情。
+  </Card>
+  <Card title="保留测试面" icon="rocket">
+    高级 example 仍然要能 `cargo run --example ...`，并用 VHS 录出真实运行素材；文档不能只描述一个想象中的 API。
+  </Card>
+</CardGrid>
+
+## 选择哪条路
+
+| 你遇到的问题 | 优先方案 | 继续阅读 |
+| --- | --- |
+| 多个组件重复同一段状态、派生数据、事件处理 | 写组合型 `use_*` 函数 | [自定义 Hook](/ratatui-kit/advanced/custom-hook/) |
+| 一棵子树需要同一份主题、workspace、服务句柄或权限上下文 | 封装 Provider / `ContextProvider` | [自定义 Provider](/ratatui-kit/advanced/custom-provider/) |
+| 现有内置组件不能覆盖某个 ratatui widget 或 stateful widget | 手写 `Component::draw` | [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/) |
+| 子组件区域不再是普通 flex 切分 | 重写 `calc_children_areas` | [渲染循环](/ratatui-kit/internals/render-loop/) |
+| 需要理解为什么状态保留、为什么事件不穿透 | 先回到核心模型 | [组件模型](/ratatui-kit/core/component-model/) / [输入层](/ratatui-kit/core/input-layers/) |
+
+## 不要过早自定义
+
+很多看起来“需要扩展框架”的需求，其实是作用域选错了：
+
+- 页面私有状态优先放在 `use_state`，不要默认升到 Atom。
+- 跨子树配置优先用 Provider，不要因为“传得远”就用进程级全局状态。
+- 弹窗、搜索输入、确认流程优先用内置组件，不要重新发明输入互斥。
+- 派生数据优先用 `use_memo`，不要复制成第二份可变状态。
+- draw 阶段只渲染，不要在那里触发响应式写入。
+
+如果一个自定义抽象需要同时改状态模型、输入模型、布局模型和绘制模型，通常说明它还没有被切小。先把问题拆成可测试的 hook、provider 或组件，再决定是否需要框架级 API。
+
+## 高级 example 的标准
+
+这里的每条高级教程都必须满足同一组约束：
+
+- 有真实源码，位于 `examples/advanced/`。
+- 有稳定命令，例如 `cargo run --example custom_hook`。
+- 有 VHS tape，位于 `docs/tapes/`。
+- 有真实运行素材，位于 `docs/public/recordings/`。
+- 文档先展示运行结果，再解释抽象边界。
+- 如果文档暴露出 API 不顺或语义不清，先修框架，再补文档。
+
+下一步可以从 [自定义 Hook](/ratatui-kit/advanced/custom-hook/) 开始。它是最常见、风险最低的扩展方式，也最适合从业务代码里沉淀经验。

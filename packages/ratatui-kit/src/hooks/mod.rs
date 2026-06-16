@@ -32,13 +32,12 @@ use crate::{
 };
 use std::{
     any::Any,
-    pin::Pin,
     task::{Context, Poll},
 };
 mod use_context;
 pub use use_context::*;
-mod use_events;
-pub use use_events::*;
+mod use_input;
+pub use use_input::*;
 mod use_future;
 pub use use_future::*;
 mod use_state;
@@ -47,6 +46,8 @@ mod use_memo;
 pub use use_memo::*;
 mod use_effect;
 pub use use_effect::*;
+mod use_async_state;
+pub use use_async_state::*;
 mod use_insert_before;
 pub use use_insert_before::*;
 mod use_size;
@@ -69,7 +70,7 @@ pub use use_router::*;
 ///
 /// 通常无需手动实现，除非自定义复杂 hook。
 pub trait Hook: Unpin {
-    fn poll_change(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
+    fn poll_change(&mut self, _cx: &mut Context) -> Poll<()> {
         Poll::Pending
     }
 
@@ -93,10 +94,10 @@ impl<T: Hook + 'static> AnyHook for T {
 }
 
 impl Hook for Vec<Box<dyn AnyHook>> {
-    fn poll_change(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<()> {
+    fn poll_change(&mut self, _cx: &mut Context) -> Poll<()> {
         let mut is_ready = false;
         for hook in self.iter_mut() {
-            if Pin::new(&mut **hook).poll_change(_cx).is_ready() {
+            if hook.poll_change(_cx).is_ready() {
                 is_ready = true;
             }
         }

@@ -9,7 +9,10 @@ use uuid::Uuid;
 use crate::adapter::ParsedAdapter;
 
 /// 单个子节点：嵌套元素 / adapter / 任意表达式、或一等控制流(if/for/match)。
-enum ParsedElementChild {
+///
+/// `pub(crate)`：`ParsedElementHead::to_element_expr` 以 `&[ParsedElementChild]` 接收
+/// children 参数,该方法对 `router.rs` 可见(`pub(crate)`),故本类型也需 crate 级可见。
+pub(crate) enum ParsedElementChild {
     Element(ElementOrAdapter),
     Expr(Expr),
     // ControlFlow 装箱:If/For 内联持有 syn 的 Expr/Pat,是本枚举最大的变体,
@@ -21,7 +24,9 @@ enum ParsedElementChild {
 ///
 /// 相比把条件渲染塞进表达式插槽,一等控制流让每个分支独立把自己的
 /// 子节点 `extend` 进 children——故各分支可返回不同元素类型,无需 `.into_any()` 统一类型。
-enum ControlFlow {
+///
+/// `pub(crate)`:随 [`ParsedElementChild`] 经 `to_element_expr` 的 crate 级签名传染而来。
+pub(crate) enum ControlFlow {
     If {
         cond: Expr,
         then_branch: Vec<ParsedElementChild>,
@@ -39,12 +44,12 @@ enum ControlFlow {
 }
 
 /// `else if ...` 或 `else { ... }`。
-enum ElseBranch {
+pub(crate) enum ElseBranch {
     If(Box<ControlFlow>),
     Block(Vec<ParsedElementChild>),
 }
 
-struct MatchArm {
+pub(crate) struct MatchArm {
     pat: Pat,
     guard: Option<Expr>,
     body: Vec<ParsedElementChild>,
@@ -246,16 +251,34 @@ impl PropsItem {
             PropsItem::Rest(expr) => expr.span(),
         }
     }
+
+    /// 若本项是保留的 `key:` 字段(元素身份键),返回其 `FieldValue`。
+    ///
+    /// 单一真源:`ToTokens` 的 key 构造与 props 过滤、`ParsedElement::key_span` 都经此查找——
+    /// 避免「`Member::Named("key")` 匹配 + 魔法串 `"key"`」散落多处、改名时需多处同步。
+    fn as_key_field(&self) -> Option<&FieldValue> {
+        match self {
+            PropsItem::FieldValue(fv) if matches!(&fv.member, Member::Named(ident) if ident == "key") => {
+                Some(fv)
+            }
+            _ => None,
+        }
+    }
 }
 
-pub struct ParsedElement {
+/// element 的「头部」:类型路径 + 可选 `(props)`,**不含 children**。
+///
+/// 把「头部解析 + element codegen」与「children」在类型上分离——`element!` 与 `routes!`
+/// 都基于 head 构建,但 `{}` 的归属由各自决定(`element!` 当子节点、`routes!` 当子路由)。
+/// head 没有 children 字段,故「解析阶段触及 `{}`」在类型层面无法表达,无需注释约定护栏。
+pub struct ParsedElementHead {
     ty: TypePath,
     props: Punctuated<PropsItem, Comma>,
-    children: Vec<ParsedElementChild>,
 }
 
-impl Parse for ParsedElement {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+impl Parse for ParsedElementHead {
+    /// 只解析类型路径 + 可选 `(props)`。**不 peek/消费 `Brace`**——`{}` 留给调用方。
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         let ty: TypePath = input.parse()?;
         let props = if input.peek(syn::token::Paren) {
             let props_input;
@@ -278,60 +301,57 @@ impl Parse for ParsedElement {
             ));
         }
 
-        let children = if input.peek(syn::token::Brace) {
-            let children_input;
-            braced!(children_input in input);
-            parse_children(&children_input)?
-        } else {
-            Vec::new()
-        };
-
-        Ok(Self {
-            ty,
-            props,
-            children,
-        })
+        Ok(Self { ty, props })
     }
 }
 
-impl ToTokens for ParsedElement {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+impl ParsedElementHead {
+    /// 返回 `key:` 字段的 span(若存在)。`routes!` 借此拒绝路由元素上的 `key:`——
+    /// 路由身份由 path 决定,元素 key 在路由场景下无意义(详见 `router.rs`)。
+    pub fn key_span(&self) -> Option<Span> {
+        self.props
+            .iter()
+            .find_map(PropsItem::as_key_field)
+            .map(|fv| fv.member.span())
+    }
+
+    /// 生成构造 `Element<Ty>` 的表达式 token——element codegen 的**单一真源**。
+    ///
+    /// `children` 作为参数注入(而非读取持有状态):`element!` 传实际子节点切片,
+    /// `routes!` 传空切片。输出**带外层括号**的块表达式 `({ … _element })`,使调用方
+    /// 可直接 `.into_any()` 或作为实参,无需自己补括号、无需知道内部是块——token 形状
+    /// 知识收归本模块,`router.rs` 不再依赖它。
+    pub(crate) fn to_element_expr(
+        &self,
+        children: &[ParsedElementChild],
+    ) -> proc_macro2::TokenStream {
         let ty = &self.ty;
         let decl_key = Uuid::new_v4().as_u128();
-        let mut has_rest = false;
+        let has_rest = self
+            .props
+            .iter()
+            .any(|item| matches!(item, PropsItem::Rest(_)));
         // 有用户 `key:` → User((decl_key, expr)) 单次堆分配;否则 Decl(decl_key) 零堆分配。
         let key = self
             .props
             .iter()
-            .find_map(|props_item: &PropsItem| match props_item {
-                PropsItem::FieldValue(FieldValue { member, expr, .. }) => match member {
-                    Member::Named(ident) if ident == "key" => {
-                        Some(quote!(::ratatui_kit::ElementKey::user((#decl_key, #expr))))
-                    }
-                    _ => None,
-                },
-                PropsItem::Rest(_) => {
-                    has_rest = true;
-                    None
-                }
+            .find_map(PropsItem::as_key_field)
+            .map(|fv| {
+                let expr = &fv.expr;
+                quote!(::ratatui_kit::ElementKey::user((#decl_key, #expr)))
             })
             .unwrap_or_else(|| quote!(::ratatui_kit::ElementKey::decl(#decl_key)));
 
         let props_assignments = self
             .props
             .iter()
-            .filter_map(|props_item: &PropsItem| match props_item {
-                PropsItem::FieldValue(FieldValue { member, .. }) => match member {
-                    Member::Named(ident) if ident == "key" => None,
-                    _ => Some(quote!(#props_item)),
-                },
-                _ => Some(quote!(#props_item)),
-            })
+            .filter(|item| item.as_key_field().is_none())
+            .map(|props_item| quote!(#props_item))
             .collect::<Vec<_>>();
 
-        let set_children = if !self.children.is_empty() {
+        let set_children = if !children.is_empty() {
             let dest = quote!(_element.props.children);
-            let stmts = self.children.iter().map(|child| child.to_extend(&dest));
+            let stmts = children.iter().map(|child| child.to_extend(&dest));
             Some(quote! {
                 #(#stmts)*
             })
@@ -352,36 +372,72 @@ impl ToTokens for ParsedElement {
             }
         };
 
+        let element_binding = if set_children.is_some() {
+            quote!(let mut _element=::ratatui_kit::Element::<#ty>{
+                key: #key,
+                props: _props,
+            };)
+        } else {
+            quote!(let _element=::ratatui_kit::Element::<#ty>{
+                key: #key,
+                props: _props,
+            };)
+        };
+
+        // 外层括号 load-bearing:块表达式 `{ … }` 须加括号方能在实参位继续 `.into_any()`。
         if has_props_assignments {
-            tokens.extend(quote! {
-                {
+            quote! {
+                ({
                     type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
-                    let mut _props = Props{
+                    // 用户填满全部字段时,兜底的 `..Default::default()` 会触发 needless_update;
+                    // element! 统一以 Default 补未填字段,此处多余属预期(宏无从得知字段总数),显式 allow。
+                    #[allow(clippy::needless_update)]
+                    let _props = Props{
                         #default_rest
                     };
 
-                    let mut _element=::ratatui_kit::Element::<#ty>{
-                        key: #key,
-                        props: _props,
-                    };
+                    #element_binding
                     #set_children
                     _element
-                }
-            });
+                })
+            }
         } else {
-            tokens.extend(quote! {
-                {
+            quote! {
+                ({
                     type Props<'a>= <#ty as ::ratatui_kit::ElementType>::Props<'a>;
-                    let mut _props = Props::default();
-                    let mut _element=::ratatui_kit::Element::<#ty>{
-                        key: #key,
-                        props: _props,
-                    };
+                    let _props = Props::default();
+                    #element_binding
                     #set_children
                     _element
-                }
-            });
+                })
+            }
         }
+    }
+}
+
+/// 完整的声明式元素:头部 + 子节点。`element!` 用,`ToTokens` 委托 head 的 codegen。
+pub struct ParsedElement {
+    head: ParsedElementHead,
+    children: Vec<ParsedElementChild>,
+}
+
+impl Parse for ParsedElement {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let head = input.parse::<ParsedElementHead>()?;
+        let children = if input.peek(syn::token::Brace) {
+            let children_input;
+            braced!(children_input in input);
+            parse_children(&children_input)?
+        } else {
+            Vec::new()
+        };
+        Ok(Self { head, children })
+    }
+}
+
+impl ToTokens for ParsedElement {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        tokens.extend(self.head.to_element_expr(&self.children));
     }
 }
 

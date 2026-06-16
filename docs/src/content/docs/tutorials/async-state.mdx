@@ -1,0 +1,92 @@
+---
+title: 异步数据三态
+description: 用 use_async_state 管理 data、loading 和 error。
+sidebar:
+  order: 2
+---
+
+import Mermaid from '../../../components/Mermaid.astro';
+
+`use_async_state` 来自 TRNovel 中反复出现的页面加载模式：发起请求、显示 loading、成功写 data、失败写 error。框架侧只保留通用骨架，不引入业务文案、debounce 或 tokio timer 依赖。
+
+![async state demo](/ratatui-kit/recordings/async-state.gif)
+
+这个例子会刷新几次数据，并在第四次请求模拟失败。失败时旧数据仍然留在界面里，error 只表达当前请求失败。
+
+## 运行
+
+```bash
+cargo run --example async_state
+```
+
+按 `r` 刷新数据，按 `q` 退出。
+
+## 状态流
+
+<Mermaid
+	chart={`
+flowchart LR
+    deps["deps changed"] --> loading["loading = true"]
+    loading --> run["run future"]
+    run --> ok["Ok(data)"]
+    run --> err["Err(error)"]
+    ok --> data["data = Some(value)"]
+    err --> error["error = Some(error)"]
+    data --> done["loading = false"]
+    error --> done
+	`}
+	caption="use_async_state 的依赖变化会启动一次新 future，并把结果写回三个 State。"
+/>
+
+## 代码
+
+```rust title="examples/hooks/async_state.rs"
+let result = hooks.use_async_state(
+    move || async move {
+        tokio::time::sleep(Duration::from_millis(700)).await;
+
+        if request_id % 4 == 3 {
+            return Err(format!("request #{} failed", request_id + 1));
+        }
+
+        Ok::<_, String>(
+            (1..=5)
+                .map(|index| format!("task {} from request #{}", index, request_id + 1))
+                .collect::<Vec<_>>(),
+        )
+    },
+    request_id,
+);
+
+if result.loading.get() {
+    // render loading row
+}
+
+if let Some(error) = result.error.read().as_ref() {
+    // render error row
+}
+
+if let Some(items) = result.data.read().as_ref() {
+    // render data rows
+}
+```
+
+`use_async_state` 返回的是三个响应式句柄：
+
+- `data: State<Option<T>>`
+- `loading: State<bool>`
+- `error: State<Option<E>>`
+
+依赖 `request_id` 变化时，旧 future 会被替换，新 future 会把 loading 置为 `true`。成功时写入 `data`，失败时写入 `error`。无论成功还是失败，最后都会把 loading 置回 `false`。
+
+## 为什么保留旧 data
+
+默认行为是刷新期间保留旧 `data`。这对终端列表很有用：用户仍然能看到上一次结果，同时 loading 和 error 明确表达当前请求状态。失败不是空列表，失败是“这次刷新没有拿到新结果”。
+
+如果业务需要刷新时清空旧数据，可以在外层组合自己的状态策略，或者以后为 hook 增加明确的 reset 选项。默认不清空，是为了让终端界面少闪烁。
+
+## 不要直接 spawn
+
+不要在组件函数体顶层直接 `tokio::spawn` 请求再写 state。那会绕过依赖比较，每帧都可能启动新任务。
+
+下一步可以继续看 [输入层](/ratatui-kit/core/input-layers/)，理解弹窗和搜索框为什么不会再和背景组件抢事件。

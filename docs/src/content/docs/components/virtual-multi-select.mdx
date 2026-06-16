@@ -1,0 +1,122 @@
+---
+title: Virtual Multi Select 虚拟多选
+description: 用 VirtualList 和外部 HashSet 组合长列表多选，而不是新增一个业务化组件。
+sidebar:
+  order: 6
+---
+
+`Virtual Multi Select` 不是单独的内置组件，而是一个推荐组合模式：`VirtualList` 负责光标、窗口化渲染和确认键，业务代码用外部 `HashSet<usize>` 保存多选集合。这样长列表、多选状态和行展示都能各自保持清晰边界。
+
+![virtual multi select demo](/ratatui-kit/recordings/virtual-multi-select.gif)
+
+这个录屏由 `docs/tapes/virtual-multi-select.tape` 生成，运行的是 `examples/components/virtual_multi_select.rs`。示例先等待 10,000 行加载，默认光标恢复到第 6 行；随后用 `Space` 勾选多行，用 `Enter` 提交当前选择数量。
+
+## 运行
+
+```bash
+cargo run --example virtual_multi_select
+```
+
+按 `j/k` 移动，按 `Space` 切换当前行选中，按 `Enter` 提交选中数量，按 `q` 退出。
+
+## 什么时候用这个模式
+
+普通多选优先用 [MultiSelect](/ratatui-kit/components/multi-select/)。只有出现下面任一情况时，才需要 `VirtualList + 外部选择集`：
+
+- 列表很长，需要窗口化渲染。
+- 每一行需要自定义 widget 或复杂样式。
+- 选择集合属于业务模型，需要跨面板读取、批量提交或持久化。
+- 行数据来自外部数据源，不希望组件持有完整集合。
+
+这个模式刻意不沉淀成 `VirtualMultiSelect` 组件。长列表里的“选中”往往和业务强绑定：可能按 id 选、按过滤结果选、按分页选、按权限禁用项选。框架只提供可组合的低层能力，避免把这些策略固化到内置组件里。
+
+## 状态边界
+
+示例有三份关键状态：
+
+```rust title="examples/components/virtual_multi_select.rs"
+let mut loaded = hooks.use_state(|| false);
+let list_state = hooks.use_state(ListState::default);
+let selected = hooks.use_state(HashSet::<usize>::default);
+```
+
+`loaded` 控制数据是否就绪；`list_state` 交给 `VirtualList` 管理光标；`selected` 是业务拥有的多选集合。`VirtualList` 不知道哪些行被勾选，它只在 `render_item` 时接收一个快照，并把可见行画出来。
+
+## 切换选择
+
+多选快捷键注册在页面层，而不是 `VirtualList` 内部：
+
+```rust title="examples/components/virtual_multi_select.rs"
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    let Event::Key(key) = event else {
+        return EventResult::Ignored;
+    };
+    if key.kind != KeyEventKind::Press {
+        return EventResult::Ignored;
+    }
+
+    match key.code {
+        KeyCode::Char(' ') if loaded.get() => {
+            if let Some(index) = list_state.read().selected {
+                let mut selected_items = selected.write();
+                if !selected_items.insert(index) {
+                    selected_items.remove(&index);
+                }
+            }
+            EventResult::Consumed
+        }
+        KeyCode::Enter if loaded.get() => {
+            let count = selected.read().len();
+            message.set(format!("Submitted {count} selected row(s)"));
+            EventResult::Consumed
+        }
+        _ => EventResult::Ignored,
+    }
+});
+```
+
+`Space` 只操作 `selected`，不会改变 `VirtualList` 的内部行为。`Enter` 在这里提交选中数量；如果你希望 `Enter` 仍然触发 `VirtualList(on_select)`，也可以把提交逻辑放进 `on_select`，但要确保同一个键不会被两个 handler 重复消费。
+
+## 渲染勾选状态
+
+`render_item` 闭包用选中集合的快照决定当前行怎么画：
+
+```rust title="examples/components/virtual_multi_select.rs"
+let selected_snapshot = selected.read().clone();
+
+VirtualList<Line<'static>>(
+    state: list_state,
+    item_count: item_count,
+    default_index: Some(5usize),
+    render_item: move |context: &ListBuildContext| {
+        let checked = if selected_snapshot.contains(&context.index) {
+            "[x]"
+        } else {
+            "[ ]"
+        };
+        let label = format!("{checked} Row {:05}", context.index + 1);
+        let style = if context.is_selected {
+            Style::default().black().on_cyan()
+        } else if selected_snapshot.contains(&context.index) {
+            Style::default().fg(Color::Yellow)
+        } else {
+            Style::default()
+        };
+
+        (Line::styled(label, style), 1u16)
+    },
+)
+```
+
+这里 clone 一个 `HashSet<usize>` 是为了给本帧的 `render_item` 一个稳定快照。真实应用如果选择集合很大，可以把业务选择改成 `HashSet<ItemId>`，或在外层维护更轻的查询结构；组件 API 仍然只需要当前索引和可见行上下文。
+
+## 和 MultiSelect 的区别
+
+| 需求 | 选择 |
+| --- | --- |
+| 小到中等列表，多选集合只服务当前控件 | [MultiSelect](/ratatui-kit/components/multi-select/) |
+| 长列表，需要窗口化渲染 | `VirtualList + HashSet` |
+| 行高、样式或 widget 完全自定义 | `VirtualList + render_item` |
+| 需要按业务 id 跨页面保存选择 | 外部业务状态 + `VirtualList` |
+
+下一步看 [VirtualList](/ratatui-kit/components/virtual-list/) 了解窗口化列表本身的 API；如果不需要虚拟化，回到 [MultiSelect](/ratatui-kit/components/multi-select/) 会更简单。

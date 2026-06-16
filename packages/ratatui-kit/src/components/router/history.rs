@@ -1,7 +1,7 @@
 use super::RouteContext;
 use std::collections::VecDeque;
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub(crate) struct RouterHistory {
     pub current: usize,
     pub history: VecDeque<RouteContext>,
@@ -9,7 +9,20 @@ pub(crate) struct RouterHistory {
 }
 
 impl RouterHistory {
+    pub fn new(initial_context: RouteContext, max_length: usize) -> Self {
+        Self {
+            current: 0,
+            history: VecDeque::from([initial_context]),
+            max_length: Self::normalize_max_length(max_length),
+        }
+    }
+
+    fn normalize_max_length(max_length: usize) -> usize {
+        max_length.max(1)
+    }
+
     pub fn push(&mut self, context: RouteContext) {
+        self.max_length = Self::normalize_max_length(self.max_length);
         if self.history.len() >= self.max_length {
             self.history.pop_front();
             // 队首被移除后所有下标左移一位，`current` 必须同步回退，
@@ -40,7 +53,7 @@ impl RouterHistory {
     }
 
     pub fn forward(&mut self) -> bool {
-        if self.current < self.history.len() - 1 {
+        if self.current + 1 < self.history.len() {
             self.current += 1;
             true
         } else {
@@ -76,13 +89,7 @@ mod tests {
     }
 
     fn new_history(max_length: usize) -> RouterHistory {
-        let mut history = VecDeque::new();
-        history.push_back(ctx("/"));
-        RouterHistory {
-            current: 0,
-            history,
-            max_length,
-        }
+        RouterHistory::new(ctx("/"), max_length)
     }
 
     /// 回归:历史栈达到 `max_length` 后继续 push 不再越界 panic
@@ -151,5 +158,75 @@ mod tests {
         // 范围内成功。
         assert!(h.go(-2));
         assert_eq!(h.current, before - 2);
+    }
+
+    #[test]
+    fn replace_overwrites_current_and_truncates_forward() {
+        let mut h = new_history(10);
+        h.push(ctx("/a")); // [/, /a], current=1
+        h.push(ctx("/b")); // [/, /a, /b], current=2
+        h.back(); // current=1
+        h.replace(ctx("/x")); // history[1]=/x, truncate(2)
+        assert_eq!(h.current_context().path, "/x");
+        assert_eq!(h.history.len(), 2);
+        // 前进栈已被截断。
+        assert!(!h.forward());
+    }
+
+    #[test]
+    fn push_in_middle_truncates_forward() {
+        let mut h = new_history(10);
+        h.push(ctx("/a"));
+        h.push(ctx("/b")); // [/, /a, /b], current=2
+        h.back();
+        h.back(); // current=0
+        h.push(ctx("/c")); // 从中部 push:截断 /a、/b
+        assert_eq!(h.current_context().path, "/c");
+        assert_eq!(h.history.len(), 2);
+        assert!(!h.forward(), "前进栈应被截断");
+    }
+
+    #[test]
+    fn go_zero_stays_put() {
+        let mut h = new_history(10);
+        h.push(ctx("/a")); // current=1
+        assert!(h.go(0)); // 原地,仍在范围内
+        assert_eq!(h.current_context().path, "/a");
+    }
+
+    #[test]
+    fn max_length_one_keeps_only_latest() {
+        let mut h = new_history(1);
+        for i in 0..5 {
+            h.push(ctx(&format!("/r{i}")));
+            assert!(h.history.len() <= 1, "step {i} 超出 max_length=1");
+        }
+        assert_eq!(h.current_context().path, "/r4");
+        assert_eq!(h.current, 0);
+    }
+
+    #[test]
+    fn max_length_zero_is_clamped_to_one() {
+        let mut h = new_history(0);
+        assert_eq!(h.max_length, 1);
+        for i in 0..5 {
+            h.push(ctx(&format!("/r{i}")));
+            assert!(h.current < h.history.len(), "step {i} 越界");
+            assert!(h.history.len() <= 1, "step {i} 超出 clamp 后的长度");
+        }
+        assert_eq!(h.current_context().path, "/r4");
+        assert_eq!(h.current, 0);
+    }
+
+    #[test]
+    fn current_context_tracks_current_pointer() {
+        let mut h = new_history(10);
+        h.push(ctx("/a"));
+        h.push(ctx("/b"));
+        assert_eq!(h.current_context().path, "/b");
+        h.back();
+        assert_eq!(h.current_context().path, "/a");
+        h.forward();
+        assert_eq!(h.current_context().path, "/b");
     }
 }

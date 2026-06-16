@@ -1,17 +1,12 @@
-use crate::{
-    AnyProps, Component, ComponentHelper, ComponentHelperExt, CrossTerminal, Terminal,
-    tree::render_loop,
-};
-use std::io;
+use crate::{AnyProps, Component, ComponentHelper, ComponentHelperExt};
 mod key;
 pub use key::ElementKey;
 mod any_element;
 pub use any_element::AnyElement;
 mod element_ext;
-pub use element_ext::ElementExt;
+pub use element_ext::{ElementExt, ElementRepr};
 mod extend_with_elements;
 pub use extend_with_elements::{ExtendWithElements, extend_with_elements};
-use ratatui::TerminalOptions;
 
 pub trait ElementType {
     type Props<'a>
@@ -34,7 +29,7 @@ where
     }
 }
 
-impl<'a, T> ElementExt for Element<'a, T>
+impl<'a, T> ElementRepr for Element<'a, T>
 where
     T: Component,
 {
@@ -47,47 +42,6 @@ where
     }
 
     fn props_mut(&'_ mut self) -> AnyProps<'_> {
-        AnyProps::borrowed(&mut self.props)
-    }
-
-    async fn render_loop(&mut self, options: TerminalOptions) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
-        render_loop(self, terminal).await?;
-        Ok(())
-    }
-
-    async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new()?)?;
-        render_loop(self, terminal).await?;
-        Ok(())
-    }
-}
-
-impl<'a, T> ElementExt for &mut Element<'a, T>
-where
-    T: Component,
-{
-    fn key(&self) -> &ElementKey {
-        &self.key
-    }
-
-    fn helper(&self) -> Box<dyn ComponentHelperExt> {
-        ComponentHelper::<T>::boxed()
-    }
-
-    fn props_mut(&'_ mut self) -> AnyProps<'_> {
-        AnyProps::borrowed(&mut self.props)
-    }
-
-    async fn render_loop(&mut self, options: TerminalOptions) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
-        render_loop(&mut **self, terminal).await?;
-        Ok(())
-    }
-
-    async fn fullscreen(&mut self) -> io::Result<()> {
-        let terminal = Terminal::new(CrossTerminal::new()?)?;
-        render_loop(&mut **self, terminal).await?;
-        Ok(())
+        AnyProps::borrowed(&mut self.props, ComponentHelper::<T>::props_type_id())
     }
 }

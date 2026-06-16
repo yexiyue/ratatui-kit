@@ -57,7 +57,30 @@ impl Default for ScrollBars<'_> {
     }
 }
 
+pub(crate) struct ScrollbarLayout {
+    pub show_horizontal: bool,
+    pub show_vertical: bool,
+    pub visible_area: Rect,
+}
+
 impl ScrollBars<'_> {
+    pub(crate) fn layout_for(&self, area: Rect, content_size: Size) -> ScrollbarLayout {
+        let horizontal_space = area.width as i32 - content_size.width as i32;
+        let vertical_space = area.height as i32 - content_size.height as i32;
+        let (show_horizontal, show_vertical) =
+            self.visible_scrollbars(horizontal_space, vertical_space);
+
+        ScrollbarLayout {
+            show_horizontal,
+            show_vertical,
+            visible_area: Rect {
+                width: area.width.saturating_sub(show_vertical as u16),
+                height: area.height.saturating_sub(show_horizontal as u16),
+                ..area
+            },
+        }
+    }
+
     fn render_visible_area(
         &self,
         area: Rect,
@@ -158,10 +181,7 @@ impl ScrollBars<'_> {
         scroll_buffer: &Buffer,
     ) -> Rect {
         let size: ratatui::prelude::Size = scroll_buffer.area.as_size();
-        // 每个方向的适配值
-        //   > 0 => 适配
-        //  == 0 => 完全适配
-        //   < 0 => 不适配
+        let layout = self.layout_for(area, size);
         let horizontal_space = area.width as i32 - size.width as i32;
         let vertical_space = area.height as i32 - size.height as i32;
 
@@ -173,32 +193,28 @@ impl ScrollBars<'_> {
             state.offset.y = 0;
         }
 
-        let (show_horizontal, show_vertical) =
-            self.visible_scrollbars(horizontal_space, vertical_space);
-
-        let new_height = if show_horizontal {
+        if layout.show_horizontal {
             // 如果两个滚动条都渲染，避免角落重叠
-            let width = area.width.saturating_sub(show_vertical as u16);
+            let width = area.width.saturating_sub(layout.show_vertical as u16);
             let render_area = Rect { width, ..area };
             // 渲染滚动条，更新可用空间
             self.render_horizontal_scrollbar(render_area, buf, state, size);
-            area.height.saturating_sub(1)
-        } else {
-            area.height
-        };
+        }
 
-        let new_width = if show_vertical {
+        if layout.show_vertical {
             // 如果两个滚动条都渲染，避免角落重叠
-            let height = area.height.saturating_sub(show_horizontal as u16);
+            let height = area.height.saturating_sub(layout.show_horizontal as u16);
             let render_area = Rect { height, ..area };
             // 渲染滚动条，更新可用空间
             self.render_vertical_scrollbar(render_area, buf, state, size);
-            area.width.saturating_sub(1)
-        } else {
-            area.width
-        };
+        }
 
-        Rect::new(state.offset.x, state.offset.y, new_width, new_height)
+        Rect::new(
+            state.offset.x,
+            state.offset.y,
+            layout.visible_area.width,
+            layout.visible_area.height,
+        )
     }
 
     pub fn render_ref(

@@ -1,0 +1,117 @@
+---
+title: WrappedText 长文本
+description: 用硬换行把长正文变成 ScrollView 能测量的内容高度。
+sidebar:
+  order: 3
+---
+
+import Mermaid from '../../../components/Mermaid.astro';
+
+`WrappedText` 用来渲染纯文本长正文。它会先按指定宽度把文本硬换行，再把换行后的真实行数写回布局高度，所以外层 `ScrollView` 可以正确计算滚动范围。
+
+![wrapped text demo](/ratatui-kit/recordings/wrapped-text.gif)
+
+这个录屏由 `docs/tapes/wrapped-text.tape` 生成。示例把一段中英文说明文本放进 `ScrollView`：按 `j/k` 逐行滚动，按 `PageDown/PageUp` 翻页，底部标题会显示当前 offset。
+
+## 运行
+
+```bash
+cargo run --example wrapped_text
+```
+
+按 `j/k` 或方向键逐行滚动，按 `PageDown/PageUp` 翻页，按 `Home/End` 跳到顶部或底部，按 `q` 退出。
+
+## 为什么不是 Text wrap
+
+`Text(wrap: true)` 适合短句、标签、提示语和富文本片段。它在绘制时软换行，但布局阶段仍然很难知道最终会占多少行。
+
+长正文不一样。阅读器、日志详情、帮助文档、说明面板都需要一个稳定的内容高度，否则滚动条、`End`、`PageDown` 和外部状态面板都会失真。
+
+<Mermaid
+	chart={`
+flowchart LR
+    source["plain text"] --> width["wrap_width"]
+    width --> wrap["textwrap fill"]
+    wrap --> lines["measured line_count"]
+    lines --> layout["height = line_count"]
+    layout --> scroll["ScrollView range"]
+	`}
+	caption="WrappedText 在布局前完成硬换行，让 ScrollView 拿到真实内容高度。"
+/>
+
+## 最小形态
+
+```rust title="examples/components/wrapped_text.rs"
+ScrollView(
+    flex_direction: Direction::Vertical,
+    scroll_view_state: scroll_state,
+    scroll_bars: ScrollBars {
+        vertical_scrollbar_visibility: ScrollbarVisibility::Always,
+        horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
+        ..Default::default()
+    },
+    block: Block::bordered()
+        .title(Line::from(" measured prose ").cyan().centered()),
+) {
+    WrappedText(
+        text: BODY,
+        wrap_width: 72,
+        style: Style::new().white(),
+    )
+}
+```
+
+`text` 是纯文本。组件不会内置章节、搜索命中、高亮或阅读进度，这些都应该由页面自己组合。
+
+## 宽度和高度
+
+`wrap_width` 表示换行宽度，单位是终端列。长正文放在 `ScrollView` 里时，优先显式传入它：
+
+```rust
+WrappedText(
+    text: body,
+    wrap_width: 72,
+)
+```
+
+这是因为当前组件更新阶段还拿不到最终绘制宽度；显式宽度能让 `WrappedText` 在布局前算出准确行数。
+
+如果没有传 `wrap_width`，组件会尝试从 `width: Constraint::Length(...)` 推导。两个都没有时会使用保守的默认宽度，适合临时预览，不适合作为滚动容器里的最终写法。
+
+`auto_height` 默认开启。关闭后组件仍然会硬换行，但不会自动把高度改成行数，适合你想用固定高度截断内容的特殊场景：
+
+```rust
+WrappedText(
+    text: body,
+    wrap_width: 72,
+    auto_height: false,
+    height: Constraint::Length(8),
+)
+```
+
+## 和 ScrollView 配合
+
+`WrappedText` 只负责正文测量。滚动键位、滚动条和外部 offset 仍然由 `ScrollView` 或页面 handler 处理：
+
+```rust
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    let Event::Key(key) = &event else {
+        scroll_state.write().handle_event(&event);
+        return EventResult::Ignored;
+    };
+
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down | KeyCode::PageDown => {
+            scroll_state.write().handle_event(&event);
+            EventResult::Consumed
+        }
+        KeyCode::Char('k') | KeyCode::Up | KeyCode::PageUp => {
+            scroll_state.write().handle_event(&event);
+            EventResult::Consumed
+        }
+        _ => EventResult::Ignored,
+    }
+});
+```
+
+如果你需要逐行高亮、选择、虚拟化或按索引跳转，看 [VirtualList](/ratatui-kit/components/virtual-list/)。如果只是短文本展示，继续使用 `Text`。

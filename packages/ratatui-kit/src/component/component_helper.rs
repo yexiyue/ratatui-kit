@@ -36,6 +36,10 @@ where
             _marker: std::marker::PhantomData,
         })
     }
+
+    pub(crate) fn props_type_id() -> TypeId {
+        TypeId::of::<T::Props<'static>>()
+    }
 }
 
 impl<T> ComponentHelperExt for ComponentHelper<T>
@@ -43,7 +47,9 @@ where
     T: Component,
 {
     fn new_component(&self, props: AnyProps) -> Box<dyn AnyComponent> {
-        Box::new(T::new(unsafe { props.downcast_ref_unchecked() }))
+        Box::new(T::new(unsafe {
+            props.downcast_ref_unchecked(Self::props_type_id())
+        }))
     }
     fn copy(&self) -> Box<dyn ComponentHelperExt> {
         Self::boxed()

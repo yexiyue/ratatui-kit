@@ -1,12 +1,6 @@
-use futures::{Stream, StreamExt, stream::BoxStream};
+use futures::{StreamExt, stream::BoxStream};
 use ratatui::buffer::Buffer;
-use std::{
-    collections::VecDeque,
-    fmt::Debug,
-    io,
-    sync::{Arc, Mutex, Weak},
-    task::{Poll, Waker},
-};
+use std::{fmt::Debug, io};
 
 mod cross_terminal;
 pub use cross_terminal::CrossTerminal;
@@ -24,53 +18,17 @@ pub trait TerminalImpl: Send {
         F: FnOnce(&mut Buffer);
 }
 
-// ================== 发布订阅模式核心组件 ==================
-
-// 事件队列内部结构，支持异步唤醒机制
-// pending: 待处理事件队列
-// waker: 异步任务唤醒器，用于事件到达时唤醒等待的任务
-struct TerminalEventsInner<T> {
-    pending: VecDeque<T>,
-    waker: Option<Waker>,
-}
-
-// 事件流封装结构
-// inner: 使用Arc+Mutex实现线程安全的事件队列共享
-pub struct TerminalEvents<T> {
-    inner: Arc<Mutex<TerminalEventsInner<T>>>,
-}
-
-// 实现异步Stream接口，支持事件监听
-impl<T> Stream for TerminalEvents<T> {
-    type Item = T;
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        let mut inner = self.inner.lock().unwrap();
-        if let Some(event) = inner.pending.pop_front() {
-            Poll::Ready(Some(event)) // 有事件立即返回
-        } else {
-            inner.waker = Some(cx.waker().clone()); // 无事件时注册唤醒器
-            Poll::Pending
-        }
-    }
-}
-
-// ================== 事件分发核心逻辑 ==================
-
-// 异步事件分发器
-// subscribers: 订阅者列表（使用Weak指针避免循环引用）
-// event_stream: 输入事件流
-// received_ctrl_c: Ctrl+C事件标记
+/// 终端封装：纯 raw event source。
+///
+/// 事件分发已从「发布订阅广播」迁移到中央 `InputRuntime`（见 [`crate::input`]):
+/// 渲染循环经 [`Terminal::next_event`] 取单个 raw 事件,先经 [`TerminalImpl::received_ctrl_c`]
+/// 判定退出,否则交 `system_context.input.dispatch(event)` 分层投递。
 pub struct Terminal<T = CrossTerminal>
 where
     T: TerminalImpl,
 {
     inner: Box<T>,
     event_stream: BoxStream<'static, T::Event>,
-    subscribers: Vec<Weak<Mutex<TerminalEventsInner<T::Event>>>>,
-    received_ctrl_c: bool,
 }
 
 impl<T> Terminal<T>
@@ -81,14 +39,8 @@ where
         let mut inner = Box::new(inner);
         Ok(Self {
             event_stream: inner.event_stream()?,
-            subscribers: Vec::new(),
-            received_ctrl_c: false,
             inner,
         })
-    }
-
-    pub fn received_ctrl_c(&self) -> bool {
-        self.received_ctrl_c
     }
 
     pub fn draw<F>(&mut self, f: F) -> io::Result<()>
@@ -105,47 +57,11 @@ where
         self.inner.insert_before(height, draw_fn)
     }
 
-    // 事件订阅方法
-    pub fn events(&mut self) -> io::Result<TerminalEvents<T::Event>> {
-        // 创建新的事件队列实例
-        let inner = Arc::new(Mutex::new(TerminalEventsInner {
-            pending: VecDeque::new(),
-            waker: None,
-        }));
-
-        // 添加弱引用订阅者
-        self.subscribers.push(Arc::downgrade(&inner));
-
-        Ok(TerminalEvents { inner })
-    }
-
-    // 异步事件分发主循环
-    pub async fn wait(&mut self) {
-        while let Some(event) = self.event_stream.next().await {
-            // 检查是否收到Ctrl+C
-            self.received_ctrl_c = T::received_ctrl_c(event.clone());
-            if self.received_ctrl_c {
-                return; // 终止循环
-            }
-
-            // 遍历所有订阅者分发事件
-            self.subscribers.retain(|subscriber| {
-                if let Some(subscriber) = subscriber.upgrade() {
-                    let mut subscriber = subscriber.lock().unwrap();
-                    // 将事件加入订阅者队列
-                    subscriber.pending.push_back(event.clone());
-
-                    // 唤醒订阅者任务
-                    if let Some(waker) = subscriber.waker.take() {
-                        waker.wake(); // 触发任务继续执行
-                    }
-
-                    true // 保留有效订阅者
-                } else {
-                    false // 移除失效订阅者
-                }
-            });
-        }
+    /// 异步等待下一个 raw 事件。`None` 表示事件流结束。
+    ///
+    /// 不做 ctrl_c 检测(交调用方经 [`TerminalImpl::received_ctrl_c`] 判定)、不广播。
+    pub async fn next_event(&mut self) -> Option<T::Event> {
+        self.event_stream.next().await
     }
 }
 
@@ -153,19 +69,16 @@ where
 ///
 /// `ComponentUpdater` 持 `&mut dyn UpdaterTerminal` 而非具体 `Terminal<CrossTerminal>`——
 /// 因 `update_component` 经 `dyn` 分发,`ComponentUpdater` 必须非泛型,故把终端能力擦除成
-/// 对象安全 trait。这使 update 能在无头测试里用 no-op 终端驱动(渲染 harness)。仅暴露 update
-/// 真正用到的两项:
-/// - `insert_before`:闭包 box 化(`TerminalImpl::insert_before` 泛型闭包不对象安全);
-/// - `events`:固定 `crossterm::event::Event`(`use_events`/`CrossTerminal` 本就 crossterm-only)。
+/// 对象安全 trait。这使 update 能在无头测试里用 no-op 终端驱动(渲染 harness)。
 ///
-/// 多后端仍由泛型 `Terminal<T>` 承载:任何 `T::Event = crossterm Event` 的后端都自动满足本 trait。
+/// 事件订阅已移除（改由 `InputRuntime` 中央分发),故此 trait 仅暴露 update 真正用到的 `insert_before`
+/// （闭包 box 化,因 `TerminalImpl::insert_before` 泛型闭包不对象安全)。
 pub trait UpdaterTerminal {
     fn insert_before(
         &mut self,
         height: u16,
         draw_fn: Box<dyn FnOnce(&mut Buffer)>,
     ) -> io::Result<()>;
-    fn events(&mut self) -> io::Result<TerminalEvents<crossterm::event::Event>>;
 }
 
 impl<T> UpdaterTerminal for Terminal<T>
@@ -179,22 +92,5 @@ where
     ) -> io::Result<()> {
         // 转发到 Terminal 的固有泛型 insert_before（Box<dyn FnOnce> 本身即 FnOnce）。
         Terminal::insert_before(self, height, draw_fn)
-    }
-
-    fn events(&mut self) -> io::Result<TerminalEvents<crossterm::event::Event>> {
-        Terminal::events(self)
-    }
-}
-
-#[cfg(test)]
-impl<T> TerminalEvents<T> {
-    /// 空事件流（无 pending、不唤醒），供测试 no-op 终端使用。
-    pub(crate) fn empty() -> Self {
-        TerminalEvents {
-            inner: Arc::new(Mutex::new(TerminalEventsInner {
-                pending: VecDeque::new(),
-                waker: None,
-            })),
-        }
     }
 }

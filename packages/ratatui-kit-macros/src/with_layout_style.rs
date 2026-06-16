@@ -91,9 +91,14 @@ pub fn impl_layout_style(
 
     match &mut ast.data {
         syn::Data::Struct(struct_data) => {
-            if let syn::Fields::Named(fields) = &mut struct_data.fields {
-                fields.named.extend(layout_style_fields.iter().cloned());
-            }
+            let syn::Fields::Named(fields) = &mut struct_data.fields else {
+                return syn::Error::new_spanned(
+                    &ast.ident,
+                    "`#[with_layout_style]` 只能用于具名字段结构体",
+                )
+                .to_compile_error();
+            };
+            fields.named.extend(layout_style_fields.iter().cloned());
 
             let struct_name = &ast.ident;
 
@@ -113,6 +118,7 @@ pub fn impl_layout_style(
                 }
             }
         }
-        _ => panic!("`with_layout_style_props` can only be used with structs "),
+        _ => syn::Error::new_spanned(&ast.ident, "`#[with_layout_style]` 只能用于具名字段结构体")
+            .to_compile_error(),
     }
 }

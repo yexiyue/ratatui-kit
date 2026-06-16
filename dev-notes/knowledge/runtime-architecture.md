@@ -32,7 +32,12 @@
 `render/tree.rs` 的 `render_loop` 骨架：
 
 ```text
-loop { render(); if should_exit || ctrl_c break; select(component.wait(), terminal.wait()).await }
+loop {
+  render();
+  if should_exit break;
+  select(component.wait(), terminal.next_event()).await;
+  if event { ctrl_c ? break : input.dispatch(event); continue; }
+}
 ```
 
 `render()` 先自顶向下 `update`（跑组件函数体、跑 hooks、协调子树），再 `terminal.draw` 自顶向下 `draw`。然后 `select` 在「组件树有变化」与「终端有事件」之间阻塞，任一就绪即重渲染。
@@ -64,3 +69,58 @@ loop { render(); if should_exit || ctrl_c break; select(component.wait(), termin
 **不要做**：在 `element!` 里给一个函数组件包装器直接挂布局属性并指望它形成独立布局区——它是透明的，属性会被忽略/穿透。
 
 **相关文件**：`packages/ratatui-kit-macros/src/component.rs`（`set_transparent_layout`）、`packages/ratatui-kit/src/components/view.rs`
+
+### 组件树运行时契约
+
+透明布局组件如果本帧没有子节点，`layout_style` 必须重置为 `LayoutStyle::default()`，不能沿用上一帧从子节点继承的旧布局。`Component::calc_children_areas` 的返回区域数必须等于子节点数；draw 路径会在 debug 下断言这个契约，避免 `zip` 静默丢子节点。
+
+**正确做法**：
+- 自定义 `calc_children_areas` 时始终按 children 数量返回区域。
+- 条件渲染可能返回空子树的透明组件不需要手动清布局，运行时会重置。
+
+**相关文件**：`packages/ratatui-kit/src/component/mod.rs`、`packages/ratatui-kit/src/component/instantiated_component.rs`
+
+### poll_change 必须三路全 poll
+
+`InstantiatedComponent::poll_change` 会对组件自身、子节点、hooks 三路全部求值。不要把它改成 `||` 短路形式；即使某一路已经 `Ready`，其余 `Pending` 路也需要在本轮注册 waker，否则后续变化可能不会唤醒渲染循环。
+
+**正确做法**：改 poll 聚合逻辑时先保存三路结果，再统一判断是否有 `Ready`。
+
+**相关文件**：`packages/ratatui-kit/src/component/instantiated_component.rs`
+
+### ScrollView 内容尺寸与滚动条判定共用公式
+
+`ScrollView` 的子区域计算和滚动条渲染都通过 `ScrollBars::layout_for` 判断是否预留滚动条并缩小可见区域。尺寸推导中的 `Fill`/`Percentage`/`Ratio` 使用高位宽计算并饱和到 `u16`，负 `gap` 会饱和为 0，避免 debug 溢出或 release 回绕。
+
+**正确做法**：改 ScrollView 显隐或尺寸公式时同时走 `layout_for`，不要在 `calc_children_areas` 和 `render_scrollbars` 分叉维护两套 ±1 规则。
+
+**相关文件**：`packages/ratatui-kit/src/components/scroll_view/mod.rs`、`packages/ratatui-kit/src/components/scroll_view/scrollbars.rs`
+
+### Context 查找区分「已借用」与「未找到」三态
+
+`ContextStack::get_context(_mut)` 返回三态 `ContextLookup`（`Found` / `AlreadyBorrowed` / `NotFound`），而非 `Option`。断言型 `use_context(_mut)` 据此分别给「已被借用」（持守卫重入）与「未找到」（Provider 未注入）两种精确 panic 诊断；`try_use_context(_mut)` 与 `ComponentUpdater::get_context` 则把非 `Found` 一律降级为 `None`，**保持 try_/Option 接口永不 panic**。
+
+`Context` 构造入口按所有权语义命名：`Context::owned(value)`、`Context::from_ref(&value)`、`Context::from_mut(&mut value)`。不要再写旧拼写 `form_ref` / `form_mut`。
+
+**正确做法**：改 context 查找逻辑时保留三态——断言型给诊断、try_/Option 型安全降级。这与响应式状态的 `try_*` 约定一致（见 `hooks-and-state.md`）：`try_` 系列绝不 panic，只有断言型（`use_*` / `read` / `write`）才 panic。
+
+**不要做**：把「已借用」的 panic 放进 `get_context` 这种被 `try_use_context` 复用的共享方法——会让 try_ 变体跟着 panic，破坏其非 panic 契约。
+
+**相关文件**：`packages/ratatui-kit/src/context.rs`、`packages/ratatui-kit/src/hooks/use_context.rs`、`packages/ratatui-kit/src/render/updater.rs`
+
+## 输入事件分发
+
+### 中央 InputRuntime 分发取代广播订阅
+
+事件系统从「广播订阅」(每个 `use_events` 各自订阅、所有 handler 平等收到同一事件)重写为「单 raw 源 + 中央 `InputRuntime` 分发」(`input/mod.rs`)。`Terminal` 退化为纯 raw source（`next_event`,删 `events()`/`wait()`/订阅者)；`render_loop`（`tree.rs`)取一个事件 → `CrossTerminal::received_ctrl_c` 先判退出 → 否则 `system_context.input.dispatch(event)`。
+
+**正确做法**：理解三个不变量——
+- **每帧重建**：`update_once` 开头 `input.begin_frame()` 清空层/handler 并铸造 root 层,组件 update 期间经 `use_input_layer`/`use_event_handler` 重新登记。无跨帧持久状态 → 关闭的弹窗/卸载的组件下一帧自动退出,无泄漏、无 id 串号。`begin_frame` 必须在 `ContextStack::root` 借走 `&mut system_context` **之前**调。
+- **dispatch 在非借用期**：发生在 render（update+draw)完整返回后,此时 `ContextStack` 已 drop,闭包写 `State` 经 `try_write` 必成功 + Drop 唤醒 waker。事件分发与重绘解耦：重绘唤醒仍走 `use_state` 的 `poll_change`(与事件无关),故把 handler 从 poll_change 抽到中央分发器不破坏重绘。
+- **dispatch 后无条件 continue**：复查 `should_exit`;纯副作用/退出型 handler 不写 State 不唤醒,否则 `select` 永久阻塞、exit 失效。退出经 `State<bool>` + `use_exit`(闭包 'static,捕获不到 `SystemContext`)。
+
+**分层有序投递**：从层栈顶遇首个 `blocks_lower` 截断求活跃集;Phase 1 跑 `Global`(可 `Consumed` 截断、`Resize` 返 `Ignored` 不截断),Phase 2 层内按 `(z-order desc, priority desc, order asc)`——**z-order 第一键、不跨层比 priority**(否则下层 high 抢消费上层浮层)。
+
+**不要做**：恢复 `Terminal` 的 `events()`/`wait()` 广播;在 update/draw 借用期 dispatch;把 z-order 排在 priority 之后。
+
+**相关文件**：`packages/ratatui-kit/src/input/mod.rs`、`packages/ratatui-kit/src/hooks/use_input.rs`、`packages/ratatui-kit/src/render/tree.rs`、`packages/ratatui-kit/src/terminal/mod.rs`

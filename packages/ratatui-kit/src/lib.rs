@@ -7,9 +7,10 @@ mod context;
 mod element;
 mod handler;
 mod hooks;
+mod input;
 mod multimap;
 mod props;
-mod reactive_ops;
+mod reactive_handle;
 mod render;
 mod terminal;
 
@@ -21,7 +22,9 @@ mod flatten_export {
     pub use crate::element::*;
     pub use crate::handler::*;
     pub use crate::hooks::*;
+    pub use crate::input::*;
     pub use crate::props::*;
+    pub use crate::reactive_handle::*;
     pub use crate::render::*;
     pub use crate::terminal::*;
 }

@@ -54,22 +54,12 @@ impl<T> Hook for UseAtomImpl<T>
 where
     T: Unpin + Send + Sync + 'static,
 {
-    fn poll_change(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context) -> Poll<()> {
+    fn poll_change(&mut self, cx: &mut std::task::Context) -> Poll<()> {
         let Some(key) = self.key.clone() else {
             return Poll::Pending;
         };
 
-        if let Ok(mut value) = self.state.inner.try_write() {
-            if value.is_changed {
-                value.is_changed = false;
-                value.wakers.clear();
-
-                return Poll::Ready(());
-            } else {
-                value.wakers.insert(key, cx.waker().clone());
-            }
-        }
-        Poll::Pending
+        self.state.poll_change(Some(&key), cx)
     }
 
     fn post_component_update(&mut self, updater: &mut crate::ComponentUpdater) {
@@ -95,7 +85,7 @@ mod tests {
     fn poll_once(hook: &mut UseAtomImpl<i32>) {
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);
-        assert!(std::pin::Pin::new(hook).poll_change(&mut cx).is_pending());
+        assert!(hook.poll_change(&mut cx).is_pending());
     }
 
     #[test]
@@ -109,25 +99,11 @@ mod tests {
         };
 
         poll_once(&mut hook);
-        assert!(
-            old_state
-                .inner
-                .try_read()
-                .unwrap()
-                .wakers
-                .contains_key(&key)
-        );
+        assert!(old_state.has_waker(&key));
 
         hook.set_state(new_state);
 
-        assert!(
-            !old_state
-                .inner
-                .try_read()
-                .unwrap()
-                .wakers
-                .contains_key(&key)
-        );
+        assert!(!old_state.has_waker(&key));
         assert!(hook.state.same_storage(&new_state));
     }
 
@@ -141,10 +117,10 @@ mod tests {
         };
 
         poll_once(&mut hook);
-        assert!(state.inner.try_read().unwrap().wakers.contains_key(&key));
+        assert!(state.has_waker(&key));
 
         hook.on_drop();
 
-        assert!(!state.inner.try_read().unwrap().wakers.contains_key(&key));
+        assert!(!state.has_waker(&key));
     }
 }

@@ -3,23 +3,23 @@ use ratatui::widgets::Widget;
 
 pub struct WidgetAdapterProps<T>
 where
-    T: Widget + 'static,
+    T: 'static,
 {
     pub inner: T,
 }
 
-impl<T: Widget + 'static> Props for WidgetAdapterProps<T> {}
+impl<T: 'static> Props for WidgetAdapterProps<T> {}
 
 pub struct WidgetAdapter<T>
 where
-    T: Widget + 'static,
+    T: 'static,
 {
     inner: T,
 }
 
 impl<T> Component for WidgetAdapter<T>
 where
-    T: Widget + 'static + Unpin + Clone,
+    T: 'static + Unpin + Clone,
     // 0.30 起所有内置 widget 都实现了 `Widget for &T`(ratatui 官方推荐写法,
     // 见 ratatui-core widget.rs 文档)。借此约束即可在 draw 里按引用渲染。
     for<'a> &'a T: Widget,

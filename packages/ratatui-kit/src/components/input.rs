@@ -1,6 +1,6 @@
 use crate::{
     AnyElement, Hooks, UsePreviousSize,
-    prelude::{Fragment, Positioned, Text, View},
+    prelude::{Fragment, Positioned, Text},
 };
 use ratatui::{style::Style, text::Span};
 use ratatui_kit_macros::{Props, component, element};
@@ -19,7 +19,12 @@ pub struct InputProps {
 pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let size = hooks.use_previous_size();
     let input = &props.input;
-    let scroll = input.visual_scroll(size.width.saturating_sub(1) as usize);
+    let input_width = size.width.saturating_sub(1) as usize;
+    let scroll = if props.hide_cursor || input_width == 0 {
+        0
+    } else {
+        input.visual_scroll(input_width)
+    };
     let text = if input.value().is_empty() {
         props.placeholder.clone()
     } else {
@@ -30,19 +35,7 @@ pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'stat
 
     let position = (size.x + x as u16, size.y);
 
-    element!(View{
-        Fragment{
-            if !props.hide_cursor {
-                Positioned(
-                    x: position.0.min(size.x + size.width.saturating_sub(1)),
-                    y: position.1.min(size.y + size.height),
-                    width: 1u16,
-                    height: 1u16,
-                ){
-                    widget(Span::from(" ").style(props.cursor_style))
-                }
-            }
-        }
+    element!(Fragment {
         Text(
             text:text,
             style: if input.value().is_empty() {
@@ -52,5 +45,15 @@ pub fn Input(props: &InputProps, mut hooks: Hooks) -> impl Into<AnyElement<'stat
             },
             scroll:(0, scroll as u16),
         )
+        if !props.hide_cursor {
+            Positioned(
+                x: position.0.min(size.x + size.width.saturating_sub(1)),
+                y: position.1.min(size.y + size.height),
+                width: 1u16,
+                height: 1u16,
+            ){
+                widget(Span::from(" ").style(props.cursor_style))
+            }
+        }
     })
 }
