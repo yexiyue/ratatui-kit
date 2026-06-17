@@ -63,6 +63,23 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 
 **相关文件**：`docs/package.json`、`docs/src/components/HomePage.astro`、`docs/astro.config.mjs`
 
+### docs Pages 部署对 Node / pnpm 版本敏感（withastro/action）
+
+`.github/workflows/pages.yml` 用 `withastro/action@v3` + `package-manager: pnpm@latest`。升级 astro 6 / pnpm 后暴露两个连环坑，且 **Pages 部署是独立于 CI(Rust) 的 workflow，CI 绿不代表部署绿**（#6/#7/#8 都是 CI 成功、Deploy 失败）：
+
+- **Node 必须 ≥22**：`pnpm@latest`(11.x) 依赖 Node 22 才有的 `node:sqlite` 内置模块；action 默认 Node 20 会直接 `ERR_UNKNOWN_BUILTIN_MODULE` 崩在 setup 阶段。在 `with:` 里显式写 `node-version: 22`。
+- **放行 build script 用 `allowBuilds`（不是 `onlyBuiltDependencies`）**：pnpm 11 默认 `strictDepBuilds=true`，遇到 esbuild/sharp 这类带安装脚本的依赖会报 `ERR_PNPM_IGNORED_BUILDS` 退出 1。pnpm 11 **移除了** `onlyBuiltDependencies`，也**不再读 `package.json` 的 `pnpm` 字段**，settings 全迁到 `docs/pnpm-workspace.yaml`，且字段改成 map 形式的 `allowBuilds`：
+  ```yaml
+  allowBuilds:
+    esbuild: true
+    sharp: true
+  ```
+  本地 pnpm 10.x 仍用旧的 `onlyBuiltDependencies`，但本地 `astro build` 即便 build script 被忽略也能过（sharp 走预编译 binary），所以排障一律以 CI 的 pnpm 11 日志为准。
+
+**正确做法**：动 docs 依赖或 Pages workflow 后，`gh run watch <id>` 真盯一次部署到绿，别只看 CI。actions（checkout/setup-node/upload-artifact/action-setup）目前还是 Node 20 版，GitHub 已标记 deprecation，后续可升到支持 Node 24 的版本。
+
+**相关文件**：`.github/workflows/pages.yml`、`docs/pnpm-workspace.yaml`
+
 ### VHS 录制必须显式设置彩色终端环境
 
 Codex / CI shell 可能带 `TERM=dumb` 或 `NO_COLOR=1`。裸 ANSI `printf` 仍会显示颜色，但 ratatui/crossterm 会按环境降级，导致 example 真实运行有颜色，VHS GIF 却只剩灰度样式。
