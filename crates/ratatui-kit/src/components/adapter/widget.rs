@@ -19,10 +19,13 @@ where
 
 impl<T> Component for WidgetAdapter<T>
 where
-    T: 'static + Unpin + Clone,
-    // 0.30 起所有内置 widget 都实现了 `Widget for &T`(ratatui 官方推荐写法,
-    // 见 ratatui-core widget.rs 文档)。借此约束即可在 draw 里按引用渲染。
-    for<'a> &'a T: Widget,
+    // 约束改为**按值** `Widget`(而非旧的 `for<'a> &'a T: Widget`)。这是一笔**双向取舍**,非纯扩展:
+    // - 纳入:0.30 起内置 widget 多同时实现按值与按引用 `Widget`,但不少第三方/纯按值 widget
+    //   (如 `tui-big-text` 的 `BigText`)只实现按值 `Widget`,旧约束会把它们挡在 `widget(...)` 之外。
+    // - 失去:**只实现按引用 `impl Widget for &T` 的 widget**(如 `ratatui-widgets` 的 `Shadow`——
+    //   亦 ratatui 官方为无状态 widget 推荐的写法)在新约束下不再被接纳;如需用可自行 wrap 成按值 widget。
+    // 组件已要求 `Clone`(new/update 从借用 props 拷入),draw 里再 clone 一次按值渲染,代价对 TUI 可忽略。
+    T: 'static + Unpin + Clone + Widget,
 {
     type Props<'a> = WidgetAdapterProps<T>;
 
@@ -42,8 +45,7 @@ where
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
-        // 按引用渲染,免去每帧一次 clone(渲染热路径)。new/update 仍需 Clone 从
-        // 借用的 props 把 widget 拷进持久组件,无法省去。
-        drawer.render_widget(&self.inner, drawer.area);
+        // 按值渲染:克隆持久持有的 widget 交给消费式 `Widget::render`。
+        drawer.render_widget(self.inner.clone(), drawer.area);
     }
 }

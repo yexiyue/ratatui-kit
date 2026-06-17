@@ -28,11 +28,11 @@ impl DerefMut for TextParagraph<'_> {
     }
 }
 
-// 让 `&TextParagraph` 也成为 Widget,以匹配 WidgetAdapter 的 `for<'a> &'a T: Widget`
-// 约束(去 clone 后按引用渲染)。`&Paragraph` 0.30 起本就是 Widget,直接转发。
-impl Widget for &TextParagraph<'_> {
+// 让 `TextParagraph` 成为**按值** `Widget`,以匹配 WidgetAdapter 改后的 `T: Widget` 约束。
+// `Paragraph` 0.30 起本就是按值 Widget,直接消费式转发。
+impl Widget for TextParagraph<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        (&self.inner).render(area, buf);
+        self.inner.render(area, buf);
     }
 }
 
