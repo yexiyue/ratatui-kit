@@ -1,0 +1,74 @@
+---
+title: Select 单选
+description: 用内置 Select 处理普通列表选择、空态和默认游标。
+sidebar:
+  order: 2
+---
+
+`Select` 是普通单选列表组件。它内部持有 `ListState`，注册当前输入层的键盘 handler，并把 `j/k`、方向键、`Home/End` 和 `Enter` 变成列表导航与选择回调。
+
+![select demo](/ratatui-kit/zh-cn/recordings/select.gif)
+
+这个录屏由 `docs/tapes/select.tape` 生成。示例先等待数据加载，`default_index` 把游标恢复到 Staging；随后移动到 Preview、按 Enter 触发 `on_select`，再切到空态。
+
+## 运行
+
+```bash
+cargo run --example select
+```
+
+按 `j/k` 移动，按 `Enter` 选择，按 `e` 切换空态，按 `q` 退出。
+
+## 最小形态
+
+```rust title="examples/components/select.rs"
+Select<&'static str>(
+    items: items,
+    default_index: Some(1),
+    highlight_symbol: "> ",
+    empty_message: "No environments",
+    on_select: move |item: &'static str| {
+        selected.set(item);
+    },
+)
+```
+
+`default_index` 是索引，不是值。它只负责设置默认游标：当列表先为空、稍后加载数据时，组件会在有数据后补选这个索引；如果用户已经移动过游标，列表长度变化不会强行重置用户位置。
+
+## 空态与输入
+
+空列表时，`Select` 只渲染 `empty_message`，不会消费导航键或确认键。这样父组件仍然可以处理其它快捷键，例如示例里的 `e` 和 `q`。
+
+```rust title="examples/components/select.rs"
+let items = if empty.get() || !loaded.get() {
+    Vec::new()
+} else {
+    ENVIRONMENTS.to_vec()
+};
+
+Select<&'static str>(
+    items: items,
+    empty_message: empty_message,
+    on_select: move |item| {
+        message.set(format!("on_select: {item}"));
+    },
+)
+```
+
+`Select` 的 handler 使用 `EventScope::Current`。如果它放在 `Modal` 子树里，handler 会自动归属弹窗层；如果放在普通页面里，就归属当前页面层。多个选择器同时存在时，用 `active: false` 关闭暂时不该响应输入的那一个。
+
+## 布局和样式
+
+`Select` 可以直接接收 `width`、`height`、`margin` 和 `offset`，不需要额外包一层布局容器。
+
+```rust
+Select<&'static str>(
+    width: Constraint::Length(34),
+    top_title: Line::from(" environment ").centered(),
+    bottom_title: Line::from(" default_index: 1 ").centered(),
+    border_style: Style::new().fg(Color::Cyan),
+    highlight_style: Style::new().fg(Color::Black).bg(Color::Green),
+)
+```
+
+如果业务需要完全控制游标，可以传入外部 `state: State<ListState>`；否则组件会用自己的内部状态。普通多选看 [MultiSelect](/ratatui-kit/zh-cn/components/multi-select/)；长列表和自定义行渲染看后续 `VirtualList` 文档。

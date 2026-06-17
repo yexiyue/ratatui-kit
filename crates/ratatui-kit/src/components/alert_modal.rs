@@ -1,4 +1,4 @@
-//! AlertModal 组件：带输入互斥的提示弹窗。
+// AlertModal 组件：带输入互斥的提示弹窗。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{

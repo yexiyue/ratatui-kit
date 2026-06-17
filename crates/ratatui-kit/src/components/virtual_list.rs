@@ -1,4 +1,4 @@
-//! VirtualList 组件：基于 `tui-widget-list` 的虚拟列表。
+// VirtualList 组件：基于 `tui-widget-list` 的虚拟列表。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
@@ -16,7 +16,7 @@ use tui_widget_list::{
 
 type VirtualItemRenderer<'a, W> = dyn Fn(&ListBuildContext) -> (W, u16) + Send + Sync + 'a;
 
-/// 虚拟列表 item 渲染器。返回值是 `(widget, main_axis_size)`。
+// 虚拟列表 item 渲染器。返回值是 `(widget, main_axis_size)`。
 pub struct RenderVirtualItem<'a, W>(Option<Box<VirtualItemRenderer<'a, W>>>);
 
 impl<W> RenderVirtualItem<'_, W> {
@@ -115,7 +115,7 @@ fn sync_default_selection(
     }
 }
 
-/// 基于虚拟渲染的列表组件。
+// 基于虚拟渲染的列表组件。
 pub struct VirtualList<W>
 where
     W: Widget + 'static,

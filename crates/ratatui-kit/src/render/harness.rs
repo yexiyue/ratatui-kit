@@ -1,9 +1,9 @@
-//! 组件渲染测试 harness：把一个元素的组件树**单次离屏渲染**到 ratatui `TestBackend` 的
-//! `Buffer`，用于断言组件输出。
-//!
-//! 关键：`update` 经对象安全的 `&mut dyn UpdaterTerminal` 驱动，故可用 no-op 终端（无真实
-//! TTY）跑 update；draw 则用 `ratatui::Terminal<TestBackend>` 取 `Frame`。只覆盖一次渲染的
-//! 静态输出，不轮询 future/事件。
+// 组件渲染测试 harness：把一个元素的组件树**单次离屏渲染**到 ratatui `TestBackend` 的
+// `Buffer`，用于断言组件输出。
+//
+// 关键：`update` 经对象安全的 `&mut dyn UpdaterTerminal` 驱动，故可用 no-op 终端（无真实
+// TTY）跑 update；draw 则用 `ratatui::Terminal<TestBackend>` 取 `Frame`。只覆盖一次渲染的
+// 静态输出，不轮询 future/事件。
 
 use crate::{
     AnyElement, ComponentDrawer, ElementRepr, render::tree::Tree, terminal::UpdaterTerminal,
@@ -11,8 +11,8 @@ use crate::{
 use ratatui::buffer::Buffer;
 use std::io;
 
-/// no-op 终端：`insert_before` 空操作。仅供驱动 update。事件不再经终端订阅（改由 `InputRuntime`)，
-/// harness 跑 `update_once`(含 `begin_frame`)建注册表但永不 `dispatch`。
+// no-op 终端：`insert_before` 空操作。仅供驱动 update。事件不再经终端订阅（改由 `InputRuntime`)，
+// harness 跑 `update_once`(含 `begin_frame`)建注册表但永不 `dispatch`。
 struct NoopTerminal;
 
 impl UpdaterTerminal for NoopTerminal {
@@ -25,12 +25,12 @@ impl UpdaterTerminal for NoopTerminal {
     }
 }
 
-/// 单次离屏渲染：建树 → no-op 跑 update → `TestBackend` 跑 draw → 返回 `Buffer` 克隆。
+// 单次离屏渲染：建树 → no-op 跑 update → `TestBackend` 跑 draw → 返回 `Buffer` 克隆。
 fn render_to_buffer(el: impl Into<AnyElement<'static>>, width: u16, height: u16) -> Buffer {
     render_to_buffer_frames(el, width, height, 1)
 }
 
-/// 多帧离屏渲染：用于依赖上一帧布局信息的组件，例如 `Input::use_previous_size`。
+// 多帧离屏渲染：用于依赖上一帧布局信息的组件，例如 `Input::use_previous_size`。
 fn render_to_buffer_frames(
     el: impl Into<AnyElement<'static>>,
     width: u16,
@@ -59,12 +59,12 @@ fn render_to_buffer_frames(
     terminal.backend().buffer().clone()
 }
 
-/// 把 Buffer 第 `y` 行拼成字符串，便于断言。
+// 把 Buffer 第 `y` 行拼成字符串，便于断言。
 fn row(buf: &Buffer, y: u16) -> String {
     (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect()
 }
 
-/// 在整个 Buffer 里找某字符的首个位置（列, 行）。
+// 在整个 Buffer 里找某字符的首个位置（列, 行）。
 fn find(buf: &Buffer, ch: &str) -> Option<(u16, u16)> {
     (0..buf.area.height)
         .flat_map(|y| (0..buf.area.width).map(move |x| (x, y)))
@@ -266,8 +266,8 @@ mod scroll_view_tests {
     }
 }
 
-/// 路由渲染链路集成测试:验证 `RouterProvider` + `Outlet` 按 `index_path` 选中并
-/// 渲染正确组件,以及嵌套 `Outlet` 消费剩余 path。仅在 `router` 特性下编译。
+// 路由渲染链路集成测试:验证 `RouterProvider` + `Outlet` 按 `index_path` 选中并
+// 渲染正确组件,以及嵌套 `Outlet` 消费剩余 path。仅在 `router` 特性下编译。
 #[cfg(feature = "router")]
 mod router_tests {
     use super::{render_to_buffer, row};

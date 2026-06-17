@@ -1,0 +1,51 @@
+---
+title: 心智模型
+description: 用最少概念理解 Element、Component、Hook 和 Waker 如何协作。
+sidebar:
+  order: 4
+---
+
+Ratatui Kit 的写法像声明式 UI，但运行时仍然是终端里的一个渲染循环。入门阶段不需要先读完整 API，只要先抓住这条主线：
+
+```text
+声明这一帧要什么 UI
+        ↓
+运行时复用上一帧的组件实例
+        ↓
+状态变化唤醒下一帧
+        ↓
+ratatui 把组件画进终端缓冲区
+```
+
+这里有四个名字会反复出现：
+
+- `Element` 是每帧重建的声明。
+- `Component` 是运行时持久化的实例。
+- `Hooks` 挂在组件实例上，按调用顺序保存状态。
+- `State` 写入会唤醒 waker，让渲染循环进入下一帧。
+
+```text
+event / state change
+        ↓
+render loop wakes
+        ↓
+component update runs hooks
+        ↓
+element tree reconciles components
+        ↓
+draw writes ratatui buffer
+```
+
+这解释了两个规则：
+
+1. Hook 调用顺序必须稳定。不要把 `use_state`、`use_effect`、`use_event_handler` 放进条件分支或循环里。
+2. UI 变化要经过能唤醒运行时的通道，比如 `State`、`AtomState`、`use_future`、终端事件。
+
+## 现在读到哪里就够了
+
+你还不需要掌握协调算法、布局分发或内部 `poll_change`。继续教程时，只需要按下面的顺序补概念：
+
+1. 写交互时，看 [计数器教程](/ratatui-kit/zh-cn/tutorials/counter/) 和 [Hooks 参考](/ratatui-kit/zh-cn/core/hooks/)。
+2. 写弹窗、输入框或快捷键时，看 [输入互斥教程](/ratatui-kit/zh-cn/tutorials/input-mutex/) 和 [输入层参考](/ratatui-kit/zh-cn/core/input-layers/)。
+3. 写多页面应用时，看 [Router 教程](/ratatui-kit/zh-cn/tutorials/router/) 和 [路由参考](/ratatui-kit/zh-cn/core/routing/)。
+4. 需要彻底理解状态为什么保留时，再读 [组件模型](/ratatui-kit/zh-cn/core/component-model/)。

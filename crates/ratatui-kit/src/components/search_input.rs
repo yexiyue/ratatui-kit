@@ -1,7 +1,7 @@
-//! SearchInput 组件：带局部输入互斥的单行搜索框。
-//!
-//! 组件内部维护编辑态：默认按 `s` 进入输入层，输入层打开时会截断更低层 handler，
-//! `Enter` 提交、`Esc` 取消，避免背景列表/页面同时响应键盘事件。
+// SearchInput 组件：带局部输入互斥的单行搜索框。
+//
+// 组件内部维护编辑态：默认按 `s` 进入输入层，输入层打开时会截断更低层 handler，
+// `Enter` 提交、`Esc` 取消，避免背景列表/页面同时响应键盘事件。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
@@ -21,25 +21,25 @@ use crate::{
 #[with_layout_style(margin, offset, width)]
 #[derive(Props)]
 pub struct SearchInputProps {
-    /// 外部受控值。
+    // 外部受控值。
     pub value: String,
-    /// 空值时展示的占位文案。
+    // 空值时展示的占位文案。
     pub placeholder: String,
-    /// 是否允许进入编辑态。父级可用它在页面级状态中禁用搜索。
+    // 是否允许进入编辑态。父级可用它在页面级状态中禁用搜索。
     pub is_editing: bool,
-    /// 从非编辑态进入编辑态的快捷键，默认 `s`。
+    // 从非编辑态进入编辑态的快捷键，默认 `s`。
     pub activate_key: KeyCode,
-    /// 输入变更回调。
+    // 输入变更回调。
     pub on_change: Handler<'static, String>,
-    /// 提交回调。返回 `false` 可阻止关闭输入态。
+    // 提交回调。返回 `false` 可阻止关闭输入态。
     pub on_submit: Handler<'static, String, bool>,
-    /// 清空回调。
+    // 清空回调。
     pub on_clear: Handler<'static, ()>,
-    /// 同步校验回调，返回 `(是否有效, 状态文案)`。
+    // 同步校验回调，返回 `(是否有效, 状态文案)`。
     pub validate: Handler<'static, String, (bool, String)>,
-    /// 提交成功后是否清空输入。
+    // 提交成功后是否清空输入。
     pub clear_on_submit: bool,
-    /// `Esc` 取消时是否清空输入。
+    // `Esc` 取消时是否清空输入。
     pub clear_on_escape: bool,
     pub border_style: Style,
     pub active_border_style: Style,

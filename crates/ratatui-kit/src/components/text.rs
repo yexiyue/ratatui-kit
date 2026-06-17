@@ -82,7 +82,7 @@ pub struct TextProps {
     pub style: Style,
     pub alignment: ratatui::layout::Alignment,
     pub scroll: Position,
-    /// 是否换行(trim)。可直接传 `bool`(自动 `Some`)或 `Option<bool>`。
+    // 是否换行(trim)。可直接传 `bool`(自动 `Some`)或 `Option<bool>`。
     pub wrap: Option<bool>,
 }
 

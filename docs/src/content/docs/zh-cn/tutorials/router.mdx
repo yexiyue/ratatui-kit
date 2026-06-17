@@ -1,0 +1,148 @@
+---
+title: 路由工作台
+description: 用 RouterProvider、Outlet 和 Navigate 组合一个多页面终端应用。
+sidebar:
+  order: 4
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+
+前两个教程都只有一个主要组件。这个例子开始进入应用结构：外层 shell 保持挂载，右侧内容由 `Outlet` 根据路径切换，页面之间通过 `Navigate` 写入本地 history。
+
+![router demo](/ratatui-kit/zh-cn/recordings/router.gif)
+
+这个录屏由 `docs/tapes/router.tape` 生成，运行的是 `examples/routing/router.rs`。录屏会进入项目列表，打开动态详情页，再用 history 返回和前进。
+
+## 运行
+
+```bash
+cargo run --example router
+```
+
+按 `1`、`2`、`3` 切换页面；在项目列表里按 `j/k` 移动，按 `Enter` 打开详情；按 `b/f` 后退和前进；按 `r` 把当前历史项替换成首页；按 `q` 退出。
+
+## 路由树
+
+<Mermaid
+	chart={`
+flowchart TD
+    keys["key events"] --> navigate["Navigate"]
+    navigate --> history["RouterHistory"]
+    history --> provider["RouterProvider"]
+    provider --> shell["AppShell"]
+    shell --> outlet["Outlet"]
+    outlet --> home["/"]
+    outlet --> projects["/projects"]
+    outlet --> detail["/projects/:slug"]
+    outlet --> activity["/activity"]
+	`}
+	caption="RouterProvider 持有 history；Outlet 消费当前 path；Navigate 写入新的历史项。"
+/>
+
+## 路由声明
+
+`routes!` 使用和 `element!` 接近的声明式语法。父路由渲染 shell，子路由交给 shell 内部的 `Outlet`。
+
+```rust title="examples/routing/router.rs"
+let routes = routes! {
+    "/" => AppShell {
+        "/" => OverviewPage,
+        "/projects/:slug" => ProjectDetailPage,
+        "/projects" => ProjectsPage,
+        "/activity" => ActivityPage,
+    },
+};
+
+element!(RouterProvider(
+    routes: routes,
+    index_path: "/",
+))
+.fullscreen()
+.await
+.expect("Failed to run the application");
+```
+
+动态路由放在静态前缀路由之前。`/projects/:slug` 要先于 `/projects`，否则 `/projects/boreal` 会先命中 `/projects` 这个前缀。
+
+## Shell 保持挂载
+
+`AppShell` 注册全局导航键，并在右侧放一个 `Outlet`。当路径变化时，shell 不需要卸载，只有 `Outlet` 的子页面变化。下面摘出关键结构，省略了样式和导航列表。
+
+```rust title="examples/routing/router.rs"
+#[component]
+fn AppShell(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut navigate = hooks.use_navigate();
+    let mut exit = hooks.use_exit();
+
+    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+        let Event::Key(key) = event else {
+            return EventResult::Ignored;
+        };
+        if key.kind != KeyEventKind::Press {
+            return EventResult::Ignored;
+        }
+
+        match key.code {
+            KeyCode::Char('1') => navigate.push("/"),
+            KeyCode::Char('2') => navigate.push("/projects"),
+            KeyCode::Char('3') => navigate.push("/activity"),
+            KeyCode::Char('b') => navigate.back(),
+            KeyCode::Char('f') => navigate.forward(),
+            KeyCode::Char('r') => navigate.replace("/"),
+            KeyCode::Char('q') | KeyCode::Char('Q') => exit(),
+            _ => return EventResult::Ignored,
+        }
+
+        EventResult::Consumed
+    });
+
+    element!(
+        View(flex_direction: Direction::Horizontal) {
+            Border { /* navigation */ }
+            View(width: Constraint::Fill(1)) {
+                Outlet
+            }
+        }
+    )
+}
+```
+
+这里 `push` 会新增历史项，`replace` 会覆盖当前历史项，`back` 和 `forward` 只移动当前指针。history 的生命周期跟随 `RouterProvider`，不是进程级全局状态。
+
+## 动态参数和 state
+
+项目列表页把选中的项目写进路径，并用 `push_with_state` 携带一次导航状态：
+
+```rust title="examples/routing/router.rs"
+let project = PROJECTS[selected.get()];
+navigate.push_with_state(
+    &format!("/projects/{}", project.slug),
+    RouteNotice {
+        message: format!("selected: {}", project.name),
+    },
+);
+```
+
+详情页从 path 里读 `slug`，再尝试读取这次导航携带的 `RouteState`：
+
+```rust title="examples/routing/router.rs"
+let slug = {
+    let params = hooks.use_params();
+    params.get("slug").cloned().unwrap_or_default()
+};
+
+let notice = hooks
+    .try_use_route_state::<RouteNotice>()
+    .map(|state| state.message.clone())
+    .unwrap_or_else(|| "opened without route state".to_string());
+```
+
+`RouteState` 是“这次导航附带的上下文”，适合列表进入详情时传递选择来源、临时提示或轻量 payload。它不是全局 store，也不应该替代 URL 参数。
+
+## 为什么默认不带 state
+
+`navigate.push(path)` 和 `navigate.replace(path)` 会清空当前 route state。只有 `push_with_state` 和 `replace_with_state` 会显式携带 state。
+
+这个语义很重要：从带 state 的详情页跳到普通页面时，不应该把旧 state 泄漏过去。路由状态应该像导航参数一样被主动携带，而不是从上一页隐式继承。
+
+下一步可以看 [路由核心模型](/ratatui-kit/zh-cn/core/routing/)，那里会拆开 `RouterHistory`、`RouteContext` 和 `Route` 的边界。

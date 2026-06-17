@@ -1,23 +1,23 @@
 ---
-title: 声明式语法
-description: element!、#[component]、Props、key、with_layout_style 和 widget adapter 的规则。
+title: Declarative syntax
+description: Rules for element!, #[component], Props, key, with_layout_style, and widget adapters.
 sidebar:
   order: 2
 ---
 
-Ratatui Kit 的日常写法由几组宏支撑：
+Ratatui Kit's everyday syntax is built on several macros:
 
-- `element!`：声明本帧 UI 树。
-- `#[component]`：把函数变成持久 `Component`。
-- `#[derive(Props)]`：让 props 能进入运行时类型擦除系统。
-- `#[with_layout_style]`：给组件 props 注入布局字段。
-- `routes!`：声明 Router 路由表。
+- `element!`: declare this frame's UI tree.
+- `#[component]`: turn a function into a persistent `Component`.
+- `#[derive(Props)]`: let props participate in runtime type erasure.
+- `#[with_layout_style]`: inject layout fields into component props.
+- `routes!`: declare a Router route table.
 
-这页是语法参考。想先看它在运行时如何保留状态，读 [组件模型](/ratatui-kit/core/component-model/)；想看 `if / for / match` 的真实例子，读 [控制流语法](/ratatui-kit/core/control-flow/)。
+This page is a syntax reference. To see how state is preserved at runtime, read the [component model](/ratatui-kit/core/component-model/). To see real `if / for / match` examples, read [control flow syntax](/ratatui-kit/core/control-flow/).
 
 ## element!
 
-最常见的形式是：
+The most common form is:
 
 ```rust
 element!(
@@ -28,18 +28,18 @@ element!(
 )
 ```
 
-圆括号里是 props，花括号里是 children。没有 props 时可以省略圆括号；没有 children 时可以省略花括号。
+Parentheses contain props; braces contain children. If there are no props, omit the parentheses. If there are no children, omit the braces.
 
-字段值会统一走 `.into()`，所以很多 props 能接收比字段类型更轻的写法：
+Field values go through `.into()`, so many props accept lighter call-site syntax than their field type:
 
 ```rust
-Border(top_title: Line::from("title")) // Option<Line> 字段接收裸 Line
-Text(text: "ready")                    // TextParagraph 字段接收 &str
+Border(top_title: Line::from("title")) // Option<Line> receives a bare Line
+Text(text: "ready")                    // TextParagraph receives &str
 ```
 
-`element!` 会用 `Default::default()` 补齐未传字段。这意味着用字段语法构造的自定义 props 需要实现 `Default`。
+`element!` fills omitted fields with `Default::default()`. That means custom props constructed through field syntax must implement `Default`.
 
-如果 props 无法提供合理默认值，可以先在普通 Rust 代码里构造完整 props，再用 `..props` 整体传入：
+If props cannot provide a reasonable default, construct the full props value in ordinary Rust code and pass it with `..props`:
 
 ```rust
 let queue_props = DeployQueueProps { state: list_state };
@@ -49,11 +49,11 @@ element!(
 )
 ```
 
-`..rest` 必须放在 props 列表最后。使用 rest props 时，宏不会再追加 `..Default::default()`。
+`..rest` must be the last item in the props list. When rest props are used, the macro does not append `..Default::default()`.
 
-## 控制流是一等语法
+## Control flow is first-class syntax
 
-children 里可以直接写 `if`、`if let`、`for` 和 `match`：
+Children can contain `if`, `if let`, `for`, and `match` directly:
 
 ```rust
 element!(
@@ -78,9 +78,9 @@ element!(
 )
 ```
 
-不同分支可以返回不同组件类型，不需要手写 `.into_any()`。这是声明层控制流；不要把 hook 调用放进这些分支里。Hook 调用顺序属于组件实例，必须每帧稳定。
+Different branches may return different component types without manually calling `.into_any()`. This is declaration-layer control flow; do not call hooks inside those branches. Hook call order belongs to the component instance and must be stable every frame.
 
-复杂动态表达式仍然可以用 `{ expr }` 嵌入：
+More complex dynamic expressions can still be embedded with `{ expr }`:
 
 ```rust
 element!(
@@ -91,11 +91,11 @@ element!(
 )
 ```
 
-优先使用一等控制流；只有当表达式已经天然返回 `Option`、`Vec`、iterator 或 element 时，再用 `{ expr }`。
+Prefer first-class control flow. Use `{ expr }` only when the expression naturally returns `Option`, `Vec`, an iterator, or an element.
 
 ## key
 
-`key:` 是保留字段，不会进入 props。它只影响 element 身份：
+`key:` is a reserved field and does not enter props. It only affects element identity:
 
 ```rust
 for task in tasks.iter() {
@@ -103,13 +103,13 @@ for task in tasks.iter() {
 }
 ```
 
-运行时按 `ElementKey + TypeId` 复用上一帧组件实例。列表会插入、删除或重排时，用业务 id；只有静态数组或顺序永远不变的小列表，才适合用 index。
+The runtime reuses previous-frame component instances by `ElementKey + TypeId`. Use business IDs when list items can be inserted, deleted, or reordered. Use indices only for static arrays or small lists whose order never changes.
 
-`routes!` 里不能给路由组件写 `key:`。路由身份由 path 决定，宏会明确拒绝这种写法。
+You cannot write `key:` on route components inside `routes!`. Route identity is determined by path, and the macro rejects this explicitly.
 
 ## #[component]
 
-函数组件用 `#[component]`：
+Function components use `#[component]`:
 
 ```rust
 #[component]
@@ -122,16 +122,16 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 }
 ```
 
-宏只识别这些参数名：
+The macro recognizes only these parameter names:
 
-| 参数名 | 作用 |
+| Parameter name | Purpose |
 | --- | --- |
-| `hooks` / `_hooks` | 接收 `Hooks`，可以按值或引用 |
-| `props` / `_props` | 接收 props 引用，类型必须是引用 |
+| `hooks` / `_hooks` | Receive `Hooks`, by value or by reference |
+| `props` / `_props` | Receive a props reference; the type must be a reference |
 
-其它参数名会报错。这不是风格限制，而是宏靠参数名决定要把什么传给生成的 `implementation`。
+Other parameter names produce an error. This is not a style rule; the macro uses parameter names to decide what to pass to the generated implementation.
 
-函数组件是透明布局组件：它不占独立布局节点，而是把返回的根 element 交给运行时。布局属性应该写在返回的根元素上：
+Function components are transparent layout components: they do not occupy independent layout nodes, and instead pass the returned root element to the runtime. Layout props should be written on the returned root element:
 
 ```rust
 #[component]
@@ -144,11 +144,11 @@ fn Panel(_hooks: Hooks) -> impl Into<AnyElement<'static>> {
 }
 ```
 
-如果你希望父级写 `Panel(width: ...)` 并让它自己占位，就不要把它做成无 props 的透明包装；改成带 props 并把布局字段显式传给内部根元素，或者手写 `Component`。
+If you want a parent to write `Panel(width: ...)` and have `Panel` occupy its own layout slot, do not make it a no-props transparent wrapper. Give it props and explicitly forward layout fields to the internal root, or write `Component` by hand.
 
 ## Props
 
-自定义 props 需要实现 `Props`：
+Custom props must implement `Props`:
 
 ```rust
 #[derive(Default, Props)]
@@ -157,7 +157,7 @@ struct PanelProps {
 }
 ```
 
-不能 `derive(Default)` 时，手写一个语义中性的默认值：
+If `Default` cannot be derived, write a semantically neutral default:
 
 ```rust
 #[derive(Props)]
@@ -176,9 +176,9 @@ impl Default for PanelProps {
 }
 ```
 
-对于没有合理默认值的字段，例如 `State<ListState>`，优先在调用点构造完整 props，然后用 `Component(..props)` 传入。不要为了满足 `Default` 伪造无效状态句柄。
+For fields with no reasonable default, such as `State<ListState>`, prefer constructing the complete props at the call site and passing `Component(..props)`. Do not fabricate an invalid state handle just to satisfy `Default`.
 
-可选字段直接用 `Option<T>`。因为字段值会 `.into()`，下面三种写法都成立：
+Optional fields should use `Option<T>`. Because field values are converted with `.into()`, all three forms below work:
 
 ```rust
 Border(top_title: Line::from("title"))
@@ -186,9 +186,9 @@ Border(top_title: Some(Line::from("title")))
 Border(top_title: None)
 ```
 
-ratatui 0.30 的 `Block<'static>` 可以直接作为 props 字段，例如 `block: Option<Block<'static>>`。不要再引入 Send/Sync 包装；当前运行时是单线程渲染，框架层也不再强制 props 必须 `Send + Sync`。
+Ratatui 0.30's `Block<'static>` can be used directly as a props field, for example `block: Option<Block<'static>>`. Do not reintroduce Send/Sync wrappers; the current runtime is single-threaded for rendering, and the framework no longer forces props to be `Send + Sync`.
 
-无 props 的手写组件用 `NoProps`：
+Hand-written components without props use `NoProps`:
 
 ```rust
 struct Spinner;
@@ -202,13 +202,13 @@ impl Component for Spinner {
 }
 ```
 
-函数组件通常不需要直接写 `NoProps`；`#[component]` 会生成对应的 props 类型。只有手写 `Component`、adapter 或测试 helper 时，才需要显式选择 `NoProps`。
+Function components usually do not need to mention `NoProps`; `#[component]` generates the corresponding props type. Use `NoProps` explicitly only for hand-written `Component`s, adapters, or test helpers.
 
-运行时内部会把不同组件的 props 装进 `AnyProps`。这是类型擦除容器，正确性依赖协调阶段已经确认组件类型和 props 类型匹配。应用代码不应该直接构造或 downcast `AnyProps`；写组件时只暴露具体的 `Props` 类型，让 `element!` 和运行时处理擦除。
+Internally, the runtime stores different component props in `AnyProps`. This is a type-erased container whose correctness depends on reconciliation already having matched component type and props type. Application code should not construct or downcast `AnyProps` directly; expose concrete props types and let `element!` and the runtime handle erasure.
 
-### 回调 Props
+### Callback props
 
-内置组件的 `on_change`、`on_select`、`on_close` 这类回调用 `Handler<'a, T, V = ()>` 表达。调用方通常不需要手写 `Handler::from`，因为 `element!` 会对字段值调用 `.into()`：
+Built-in component callbacks such as `on_change`, `on_select`, and `on_close` use `Handler<'a, T, V = ()>`. Callers usually do not need to write `Handler::from` because `element!` calls `.into()` for field values:
 
 ```rust
 let mut selected = hooks.use_state(String::new);
@@ -221,7 +221,7 @@ element!(
 )
 ```
 
-自定义组件如果要暴露回调，也优先用同一个类型：
+Custom components that expose callbacks should prefer the same type:
 
 ```rust
 #[derive(Props)]
@@ -238,11 +238,11 @@ impl Default for CommandProps {
 }
 ```
 
-`Handler::default()` 是空实现，返回值类型 `V` 需要实现 `Default`。组件内部如果要把回调移进事件闭包，先用 `take()` 取出当前 handler；需要区分用户有没有传回调时，用 `is_default()`。
+`Handler::default()` is an empty implementation, and the return type `V` must implement `Default`. Inside a component, use `take()` before moving a callback into an event closure. Use `is_default()` when you need to distinguish whether the user passed a callback.
 
 ## with_layout_style
 
-组件想支持 `width`、`height`、`margin`、`offset`、`gap`、`flex_direction` 和 `justify_content`，给 props 加 `#[with_layout_style]`：
+If a component should support `width`, `height`, `margin`, `offset`, `gap`, `flex_direction`, and `justify_content`, add `#[with_layout_style]` to its props:
 
 ```rust
 #[with_layout_style]
@@ -252,7 +252,7 @@ pub struct ViewProps<'a> {
 }
 ```
 
-也可以只注入部分布局字段：
+You can also inject only part of the layout fields:
 
 ```rust
 #[with_layout_style(margin, offset, width, height)]
@@ -262,7 +262,7 @@ pub struct VirtualListProps<W> {
 }
 ```
 
-`#[with_layout_style]` 只能用于具名字段结构体。它会生成 `layout_style()` 方法，手写组件需要在 update 里调用：
+`#[with_layout_style]` only works on named-field structs. It generates a `layout_style()` method, which hand-written components should call during update:
 
 ```rust
 fn update(&mut self, props: &mut Self::Props<'_>, _hooks: Hooks, updater: &mut ComponentUpdater) {
@@ -272,7 +272,7 @@ fn update(&mut self, props: &mut Self::Props<'_>, _hooks: Hooks, updater: &mut C
 
 ## widget / stateful adapter
 
-`element!` 可以直接桥接 ratatui widget：
+`element!` can bridge Ratatui widgets directly:
 
 ```rust
 element!(
@@ -283,18 +283,18 @@ element!(
 )
 ```
 
-`widget(expr)` 只接收一个表达式。`stateful(widget, state)` 只接收两个参数：widget 和 state。旧的 `$` / `#(...)` adapter 写法已经移除。
+`widget(expr)` accepts exactly one expression. `stateful(widget, state)` accepts exactly two arguments: the widget and the state. The old `$` / `#(...)` adapter syntax has been removed.
 
-适配器适合简单桥接：
+Adapters are good for simple bridges:
 
-- 原生 `Paragraph`、`Line`、`Block` 等无状态 widget。
-- 原生 `List`、`Table` 等需要 ratatui state 的 widget。
+- Native stateless widgets such as `Paragraph`, `Line`, and `Block`.
+- Native stateful widgets such as `List` and `Table` that need Ratatui state.
 
-如果你需要在组件内部构造复杂 widget、持有 props、接事件或重写布局，就手写 `Component`。完整示例见 [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/)。
+If you need to construct complex widgets inside a component, hold props, register events, or override layout, write `Component` by hand. See [Native widget bridge](/ratatui-kit/advanced/custom-widget/) for the complete example.
 
 ## routes!
 
-`routes!` 复用 `element!` 的 props 头部语法：
+`routes!` reuses the props-head syntax from `element!`:
 
 ```rust
 let routes = routes! {
@@ -305,12 +305,12 @@ let routes = routes! {
 };
 ```
 
-圆括号 `()` 是路由组件 props；花括号 `{}` 是子路由。经 `routes!` 传入的 props 会进入 `'static` 路由表，不能借用栈上临时值。
+Parentheses `()` are route component props; braces `{}` are child routes. Props passed through `routes!` enter a `'static` route table and cannot borrow stack temporaries.
 
-动态数据不要塞进路由 props：
+Do not put dynamic data into route props:
 
-- 路径里的动态段用 `use_params()`。
-- 导航时的轻量上下文用 `push_with_state` / `try_use_route_state::<T>()`。
-- 跨页面业务状态用 Atom 或外层 Provider。
+- Dynamic path segments come from `use_params()`.
+- Lightweight context for one navigation comes from `push_with_state` / `try_use_route_state::<T>()`.
+- Cross-page business state belongs in Atom or an outer Provider.
 
-更多路由边界见 [路由](/ratatui-kit/core/routing/)。
+See [Routing](/ratatui-kit/core/routing/) for more route boundaries.

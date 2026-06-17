@@ -13,7 +13,7 @@ pub struct Positioned {
 
 #[derive(Default, Props)]
 pub struct PositionedProps<'a> {
-    /// 是否在渲染前清除该区域内容，默认为 false。
+    // 是否在渲染前清除该区域内容，默认为 false。
     pub clear: bool,
     pub x: u16,
     pub y: u16,
@@ -23,7 +23,7 @@ pub struct PositionedProps<'a> {
 }
 
 impl Positioned {
-    /// 从 props 派生自身状态的单一构造源（区域/清除标志只写一处，避免 new/update 漂移）。
+    // 从 props 派生自身状态的单一构造源（区域/清除标志只写一处，避免 new/update 漂移）。
     fn from_props(props: &PositionedProps<'_>) -> Self {
         Self {
             area: Rect::new(props.x, props.y, props.width, props.height),

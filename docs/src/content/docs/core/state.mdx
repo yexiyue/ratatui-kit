@@ -1,24 +1,24 @@
 ---
-title: 状态
-description: use_state、Atom、Context 和 RouteState 的作用域边界。
+title: State
+description: The scope boundaries between use_state, Atom, Context, and RouteState.
 sidebar:
   order: 4
 ---
 
 import Mermaid from '../../../components/Mermaid.astro';
 
-Ratatui Kit 里的状态不是“都放进一个 store”。不同状态有不同生命周期：有些跟随组件实例，有些只属于一棵 Provider 子树，有些跟随一次导航，有些才是进程级共享。
+State in Ratatui Kit does not mean “put everything in one store.” Different state has different lifetimes: some follows a component instance, some belongs only to a Provider subtree, some follows one navigation, and only some is process-wide shared state.
 
-想先看运行中的完整例子，可以从 [Atom 全局状态](/ratatui-kit/tutorials/atom-state/) 开始。这个页面则作为 reference，解释每种状态应该放在哪里，以及 `State<T>` / `AtomState<T>` 这些响应式句柄具体怎么工作。
+To see a complete running example first, start with [Atom global state](/ratatui-kit/tutorials/atom-state/). This page is the reference: it explains where each kind of state belongs and how reactive handles such as `State<T>` and `AtomState<T>` work.
 
-## 先选作用域
+## Choose scope first
 
-| 状态 | 优先位置 | 生命周期 |
+| State | Prefer | Lifetime |
 | --- | --- | --- |
-| 输入框草稿、列表游标、弹窗 open | `use_state` | 跟随组件实例 |
-| 子树级主题、workspace、局部服务对象 | `ContextProvider` + `use_state` | 跟随 Provider 子树 |
-| 一次导航携带的临时上下文 | `RouteState` | 跟随 history entry |
-| 当前用户、全局主题、跨页面缓存 | `Atom` / `use_atom` | 跟随进程 |
+| Input draft, list cursor, modal open flag | `use_state` | Follows component instance |
+| Subtree theme, workspace, local service object | `ContextProvider` + `use_state` | Follows Provider subtree |
+| Temporary context carried by one navigation | `RouteState` | Follows history entry |
+| Current user, global theme, cross-page cache | `Atom` / `use_atom` | Follows process |
 
 <Mermaid
 	chart={`
@@ -27,21 +27,21 @@ flowchart TD
     provider --> route["RouteState<br/>history entry"]
     route --> atom["Atom<br/>process scope"]
 	`}
-	caption="状态越往右生命周期越长，影响范围越大；默认从最小作用域开始。"
+	caption="The farther right state moves, the longer it lives and the wider its impact; start with the smallest scope."
 />
 
-状态越全局，越要谨慎。Atom 不是“更强的 State”，而是更长生命周期、更宽作用域的 State。
+The more global state becomes, the more carefully it should be used. Atom is not “stronger State”; it is State with a longer lifetime and a wider scope.
 
 ## use_state
 
-`use_state` 创建组件局部响应式状态：
+`use_state` creates component-local reactive state:
 
 ```rust
 let mut count = hooks.use_state(|| 0i32);
 count += 1;
 ```
 
-返回的 `State<T>` 是一个可复制句柄。你可以把它按值传进事件闭包、子组件 props、手写 `Component`，或异步任务里：
+The returned `State<T>` is a copyable handle. You can pass it by value into event closures, child component props, hand-written components, or async tasks:
 
 ```rust
 let mut draft = hooks.use_state(String::new);
@@ -58,45 +58,45 @@ hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event|
 });
 ```
 
-`State<T>` 要求 `T: Unpin + Send + Sync + 'static`。这个约束让状态句柄可以安全地进入后台任务，并在任务完成后唤醒 UI。
+`State<T>` requires `T: Unpin + Send + Sync + 'static`. That constraint lets state handles safely move into background tasks and wake the UI after the task completes.
 
-## 读写句柄
+## Reading and writing handles
 
-`State<T>` 和 `AtomState<T>` 都基于同一个 `ReactiveHandle`，读写 API 一致：
+`State<T>` and `AtomState<T>` are both based on the same `ReactiveHandle`, so the read/write APIs are consistent:
 
-| API | 用途 | 失败行为 |
+| API | Purpose | Failure behavior |
 | --- | --- | --- |
-| `get()` | 读取 `Copy` 值 | 借用冲突时 panic |
-| `read()` | 获取只读 borrow | 借用冲突时 panic |
-| `try_read()` | 尝试只读 borrow | 返回 `None` |
-| `write()` | 获取可变 borrow，并在变更后唤醒 | 借用冲突时 panic |
-| `try_write()` | 尝试可变 borrow | 返回 `None` |
-| `set(value)` | 覆盖值，并唤醒 | 借用冲突时静默跳过 |
-| `write_no_update()` | 可变 borrow，但不唤醒 | 借用冲突时 panic |
-| `try_write_no_update()` | 尝试可变 borrow，但不唤醒 | 返回 `None` |
-| `set_no_update(value)` | 覆盖值，但不唤醒 | 借用冲突时静默跳过 |
+| `get()` | Read a `Copy` value | Panic on borrow conflict |
+| `read()` | Get an immutable borrow | Panic on borrow conflict |
+| `try_read()` | Try immutable borrow | Return `None` |
+| `write()` | Get mutable borrow and wake after change | Panic on borrow conflict |
+| `try_write()` | Try mutable borrow | Return `None` |
+| `set(value)` | Replace value and wake | Silently skip on borrow conflict |
+| `write_no_update()` | Mutable borrow without wake | Panic on borrow conflict |
+| `try_write_no_update()` | Try mutable borrow without wake | Return `None` |
+| `set_no_update(value)` | Replace value without wake | Silently skip on borrow conflict |
 
-断言型 API 适合普通组件逻辑：借用冲突通常是编程错误，应该快速暴露。`try_*` 适合可选能力、回调里防御性读取，或者你明确知道当前可能被借用。
+Assertion-style APIs fit normal component logic: borrow conflicts are usually programming errors and should surface quickly. `try_*` APIs fit optional capabilities, defensive reads inside callbacks, or code that explicitly knows a value may be borrowed.
 
-写入会在可变借用 drop 时唤醒渲染循环：
+Writes wake the render loop when the mutable borrow drops:
 
 ```rust
 {
     let mut items = list.write();
     items.push("new item".to_string());
-} // 这里 drop，通知 UI 下一帧更新
+} // drop here, notify UI to update next frame
 ```
 
-对于 `Copy` 数值，`+=`、`-=`、`*=`、`/=` 也会触发同样的变更通知：
+For `Copy` numbers, `+=`, `-=`, `*=`, and `/=` trigger the same change notification:
 
 ```rust
 let mut score = hooks.use_state(|| 0i32);
 score += 1;
 ```
 
-## no_update 写入
+## no_update writes
 
-有一种写入不应该触发 UI 更新：draw 阶段把状态交给 ratatui 的 stateful widget 渲染。
+One kind of write should not trigger a UI update: draw-stage state passed to a Ratatui stateful widget.
 
 ```rust
 drawer.render_stateful_widget(
@@ -106,21 +106,21 @@ drawer.render_stateful_widget(
 );
 ```
 
-这类写入只是 ratatui widget 的绘制协议需要 `&mut State`，不是业务状态变化。真正改变选中项的地方应该在事件 handler 里用 `write()`。完整例子见 [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/)。
+This write exists because Ratatui's drawing protocol needs `&mut State`; it is not a business state change. The real selected-item change should happen in an event handler with `write()`. [Native widget bridge](/ratatui-kit/advanced/custom-widget/) shows this boundary.
 
-`try_write_no_update()` 和 `set_no_update()` 是同一条路径的非 panic / 直接赋值版本。它们只适合绘制协议、测试 harness 或非常明确的内部同步场景；普通业务状态写入应该继续用 `write()` / `set()`，让界面能被唤醒。
+`try_write_no_update()` and `set_no_update()` are non-panicking / direct-assignment variants on the same path. They fit drawing protocols, test harnesses, or very explicit internal synchronization. Ordinary business state writes should keep using `write()` / `set()` so the interface can wake.
 
 ## Atom
 
-`Atom` 是 feature-gated 能力，需要开启 `atom` 或 `full`。它适合保存进程级共享状态：主题、当前用户、跨页面缓存、全局选择结果。
+`Atom` is feature-gated; enable `atom` or `full`. It is for process-wide shared state: theme, current user, cross-page cache, and global selection.
 
-Atom 是模块级声明，不需要宏：
+Atoms are module-level declarations and do not need a macro:
 
 ```rust
 static THEME: Atom<String> = Atom::new(|| "dark".to_string());
 ```
 
-组件内用 `use_atom` 订阅：
+Subscribe inside a component with `use_atom`:
 
 ```rust
 #[component]
@@ -131,22 +131,22 @@ fn ThemeLabel(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 }
 ```
 
-`use_atom(&THEME)` 返回 `AtomState<T>`。它和 `State<T>` 一样可读写、可复制、可传进闭包。区别在于唤醒模型：写入 Atom 会唤醒订阅了这个 Atom 的组件；没有订阅它的组件不会因为这次写入重绘。
+`use_atom(&THEME)` returns `AtomState<T>`. Like `State<T>`, it can be read, written, copied, and moved into closures. The difference is the wake model: writing an Atom wakes components subscribed to that Atom; components that did not subscribe are not redrawn for that write.
 
-组件外也可以直接读写 Atom：
+You can also read and write an Atom outside components:
 
 ```rust
 THEME.set("light".to_string());
 let current = THEME.state().read().clone();
 ```
 
-`get()` 只适用于 `T: Copy`；非 Copy 值用 `THEME.state().read()`。
+`get()` is only for `T: Copy`; for non-Copy values, use `THEME.state().read()`.
 
-## Atom 的订阅和退订
+## Atom subscription and unsubscribe
 
-`use_atom` 每帧都会把 hook 内部句柄校准到当前传入的 Atom。组件被卸载，或者同一个 hook 位置开始订阅另一个 Atom 时，旧 Atom 上以组件 key 注册的 waker 会被移除。
+Every frame, `use_atom` calibrates its internal handle to the Atom passed at that hook position. When a component unmounts, or when the same hook position starts subscribing to a different Atom, the waker registered on the old Atom under that component key is removed.
 
-这意味着可以安全写这种“参数决定订阅哪个 Atom”的 hook，但仍然要保持 hook 调用顺序稳定：
+That means this “parameter decides which Atom to subscribe to” pattern is safe, as long as hook call order remains stable:
 
 ```rust
 let focus = hooks.use_atom(if compact {
@@ -156,11 +156,11 @@ let focus = hooks.use_atom(if compact {
 });
 ```
 
-不要手动维护 Atom 的订阅表；`use_atom` 会处理注册和退订。
+Do not maintain Atom subscription tables by hand; `use_atom` handles registration and unsubscription.
 
-## 草稿不要进 Atom
+## Drafts should not go into Atom
 
-输入过程中的每个字符通常不该写进 Atom。以 [Atom 全局状态](/ratatui-kit/tutorials/atom-state/) 为例：
+Characters typed during input usually should not be written to an Atom. In [Atom global state](/ratatui-kit/tutorials/atom-state/):
 
 ```rust
 let draft = hooks.use_state(tui_input::Input::default);
@@ -174,11 +174,11 @@ let value = draft.read().value().trim().to_string();
 focus.set(value);
 ```
 
-草稿属于当前编辑页；提交后的值才属于整个应用。把每个按键都写进 Atom，会让无关订阅者频繁醒来，也会让取消编辑变得别扭。
+The draft belongs to the current editor page; the submitted value belongs to the whole app. Writing every keypress into Atom wakes unrelated subscribers frequently and makes canceling an edit awkward.
 
-## Context 不是 Atom
+## Context is not Atom
 
-如果一组数据只应该在某棵子树里可见，优先用 `ContextProvider`。常见例子包括局部主题、workspace 设置、页面级服务对象。
+If data should be visible only inside a subtree, prefer `ContextProvider`. Common examples include local themes, workspace settings, and page-level service objects.
 
 ```rust
 let settings = WorkspaceSettings { /* ... */ };
@@ -191,13 +191,13 @@ element!(
 )
 ```
 
-Context 的价值是“作用域清楚、可局部覆盖”。同一种类型可以在嵌套 Provider 里覆盖，子组件读取到最近那一层。完整例子见 [自定义 Provider](/ratatui-kit/advanced/custom-provider/)。
+Context's value is clear scope and local override. The same type can be overridden in nested Providers, and a child component reads the nearest layer. See [Custom provider](/ratatui-kit/advanced/custom-provider/) for the full example.
 
-不要为了“传得远”把页面级状态默认升到 Atom。先问它有没有天然作用域；有的话，Provider 通常更清楚。
+Do not promote page-level state to Atom just because it needs to travel far. First ask whether it has a natural scope; if it does, Provider is usually clearer.
 
-## RouteState 不是 Atom
+## RouteState is not Atom
 
-Router 是 Provider 作用域状态，不是全局单例。`RouteState` 是单个 history entry 的可选 payload，适合从列表页进入详情页时携带一次性上下文：
+Router is provider-scoped state, not a global singleton. `RouteState` is an optional payload on one history entry, useful for carrying one-shot context when moving from a list page to a detail page:
 
 ```rust
 navigate.push_with_state(
@@ -206,19 +206,19 @@ navigate.push_with_state(
 );
 ```
 
-普通 `push(path)` / `replace(path)` 会清空当前 route state；只有 `push_with_state` / `replace_with_state` 显式携带 state。这样可以避免旧详情页的 payload 泄漏到无关页面。
+Plain `push(path)` / `replace(path)` clears current route state; only `push_with_state` / `replace_with_state` carries state explicitly. This prevents old detail-page payloads from leaking into unrelated pages.
 
-URL 必要信息放进 path params，一次性、非 URL 语义的上下文才放进 `RouteState`。更多细节见 [路由](/ratatui-kit/core/routing/)。
+Information required by the URL belongs in path params. One-shot context without URL semantics belongs in `RouteState`. See [Routing](/ratatui-kit/core/routing/) for details.
 
-## 选择边界
+## Choosing boundaries
 
-| 问题 | 倾向 |
+| Question | Lean toward |
 | --- | --- |
-| 组件卸载后状态是否应该消失？ | `use_state` |
-| 是否只属于某个页面或子树？ | `ContextProvider` + `use_state` |
-| 是否只属于一次导航？ | `RouteState` |
-| 多个页面是否长期读写同一份业务数据？ | `Atom` |
-| 写入是否应该触发当前组件重绘？ | `write()` / `set()` |
-| 只是 draw 阶段满足 stateful widget 协议？ | `write_no_update()` |
+| Should state disappear when the component unmounts? | `use_state` |
+| Does it belong only to one page or subtree? | `ContextProvider` + `use_state` |
+| Does it belong only to one navigation? | `RouteState` |
+| Do multiple pages need to read and write the same long-lived business data? | `Atom` |
+| Should a write trigger this component to redraw? | `write()` / `set()` |
+| Is this only to satisfy a stateful widget protocol during draw? | `write_no_update()` |
 
-一个实用规则：先把状态放在它能正确工作的最小作用域里。只有当多个独立页面、组件或后台任务都需要同一份长期状态时，再把它升到 Atom。
+A practical rule: place state in the smallest scope where it works correctly. Promote it to Atom only when multiple independent pages, components, or background tasks need the same long-lived state.

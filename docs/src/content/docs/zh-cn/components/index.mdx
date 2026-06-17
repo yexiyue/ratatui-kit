@@ -1,0 +1,84 @@
+---
+title: 内置组件
+description: 按布局、文本、输入、弹层、选择和虚拟化场景选择组件。
+sidebar:
+  order: 1
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+内置组件是 ratatui-kit 的参考手册，不是教程的替代品。教程会先带你把状态、输入互斥和路由串起来；当你开始写真实应用，需要查“应该用哪个组件、这个组件负责什么、不负责什么”时，再回到这里。
+
+这些组件遵循同一条边界：业务中立、可组合、输入语义清晰。组件可以帮你处理布局、绘制、输入层和常见交互，但不会拥有你的业务数据模型。
+
+<CardGrid>
+  <Card title="先组合" icon="puzzle">
+    用 `View`、`Text`、`Border`、`ScrollView` 和选择组件搭界面；业务状态留在页面组件或 hook。
+  </Card>
+  <Card title="再独占输入" icon="setting">
+    搜索框和弹窗类组件内部会创建输入层，打开时不会让背景组件继续处理键盘事件。
+  </Card>
+  <Card title="最后虚拟化" icon="rocket">
+    普通列表先用 `Select` / `MultiSelect`；数据量大、行渲染复杂时再用 `VirtualList`。
+  </Card>
+</CardGrid>
+
+## 布局与文本
+
+| 组件 | 用途 | 继续阅读 |
+| --- | --- | --- |
+| `View` | 默认布局容器，负责 flex-like 子区域切分 | [布局与文本基础](/ratatui-kit/zh-cn/components/layout-primitives/) |
+| `Border` | 边框、标题和局部装饰 | [布局与文本基础](/ratatui-kit/zh-cn/components/layout-primitives/) |
+| `Center` | 把子内容居中放进固定区域 | [布局与文本基础](/ratatui-kit/zh-cn/components/layout-primitives/) |
+| `Positioned` | 需要绝对定位的特殊布局 | [布局与文本基础](/ratatui-kit/zh-cn/components/layout-primitives/) |
+| `Fragment` | 透明容器，包住多个子节点但不创建独立布局节点 | [布局与文本基础](/ratatui-kit/zh-cn/components/layout-primitives/) |
+| `Text` | 单段文本、`Line`、`Text` 或字符串展示 | [布局与文本基础](/ratatui-kit/zh-cn/components/layout-primitives/) |
+| [WrappedText](/ratatui-kit/zh-cn/components/wrapped-text/) | 长正文自动换行，并把真实行数交给布局 | 长文本、日志、小说正文 |
+| [ScrollView](/ratatui-kit/zh-cn/components/scroll-view/) | 可滚动内容容器，适合包住长正文或长面板 | 局部滚动区域 |
+
+`WrappedText` 和 `ScrollView` 是长文本体验的组合核心：前者决定内容高度，后者决定可见窗口和滚动条。它们来自真实阅读场景，而不是只为示例存在。
+
+## 输入与弹层
+
+| 组件 | 用途 | 输入语义 |
+| --- | --- | --- |
+| [Input](/ratatui-kit/zh-cn/components/input/) | 单行输入显示与底层编辑状态 | 低层组件，通常由上层组件驱动 |
+| [SearchInput](/ratatui-kit/zh-cn/components/search-input/) | 带激活键、提交、清空和编辑态的搜索/新增输入 | 打开编辑态后独占输入 |
+| [Modal](/ratatui-kit/zh-cn/components/modal/) | 基础弹层、遮罩、定位和 layer 注入 | 需要和 handler 共享同一个 layer |
+| [ConfirmModal](/ratatui-kit/zh-cn/components/confirm-modal/) | 确认/取消流程 | 内部封装独占输入层 |
+| [AlertModal](/ratatui-kit/zh-cn/components/alert-modal/) | 提示信息和关闭键 | 内部封装独占输入层 |
+| [ShortcutInfoModal](/ratatui-kit/zh-cn/components/shortcut-info-modal/) | 可滚动快捷键帮助 | 内部封装独占输入层 |
+
+如果只是业务确认、提示、快捷键帮助，优先使用封装好的 modal 组件。只有弹窗内部有自己的复杂交互时，才手写 `use_input_layer`、`use_event_handler(EventScope::Layer(...))` 和 `Modal(layer: Some(...))`。
+
+## 选择与虚拟化
+
+| 组件或模式 | 用途 | 继续阅读 |
+| --- | --- | --- |
+| [Select](/ratatui-kit/zh-cn/components/select/) | 普通单选列表 | 小到中等列表 |
+| [MultiSelect](/ratatui-kit/zh-cn/components/multi-select/) | 普通多选列表 | 小到中等多选 |
+| [TreeSelect](/ratatui-kit/zh-cn/components/tree-select/) | 通用树形选择，不绑定文件语义 | 分组、层级、目录式数据 |
+| [VirtualList](/ratatui-kit/zh-cn/components/virtual-list/) | 长列表窗口化渲染，自定义行 | 几千到几万行 |
+| [Virtual Multi Select](/ratatui-kit/zh-cn/components/virtual-multi-select/) | `VirtualList + HashSet` 组合出来的长列表多选模式 | 长列表多选、业务自控选择集 |
+
+`Virtual Multi Select` 不是单独组件，而是一个推荐组合模式。这样比把每种业务选择都做成内置组件更稳：`VirtualList` 只负责光标、窗口化和可见行渲染，选择集合仍然由业务代码拥有。
+
+## 真实 examples
+
+| 场景 | example | VHS |
+| --- | --- | --- |
+| 滚动容器 | `cargo run --example scrollview` | `docs/tapes/scrollview.tape` |
+| 自动换行正文 | `cargo run --example wrapped_text` | `docs/tapes/wrapped-text.tape` |
+| 单行输入 | `cargo run --example input` | `docs/tapes/input.tape` |
+| 搜索/新增输入 | `cargo run --example search_input` | `docs/tapes/search-input.tape` |
+| 基础弹层 | `cargo run --example modal` | `docs/tapes/modal.tape` |
+| 确认弹窗 | `cargo run --example confirm_modal` | `docs/tapes/confirm-modal.tape` |
+| 提示弹窗 | `cargo run --example alert_modal` | `docs/tapes/alert-modal.tape` |
+| 快捷键帮助 | `cargo run --example shortcut_info_modal` | `docs/tapes/shortcut-info-modal.tape` |
+| 单选 | `cargo run --example select` | `docs/tapes/select.tape` |
+| 多选 | `cargo run --example multi_select` | `docs/tapes/multi-select.tape` |
+| 树形选择 | `cargo run --example tree_select` | `docs/tapes/tree-select.tape` |
+| 虚拟列表 | `cargo run --example virtual_list` | `docs/tapes/virtual-list.tape` |
+| 虚拟多选模式 | `cargo run --example virtual_multi_select` | `docs/tapes/virtual-multi-select.tape` |
+
+后续新增内置组件时，也应该先补 example、VHS tape 和参考页。文档里出现的组件行为必须能从真实 example 复现。

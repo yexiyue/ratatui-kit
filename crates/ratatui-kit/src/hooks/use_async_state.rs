@@ -7,7 +7,7 @@ mod private {
     impl Sealed for crate::Hooks<'_, '_> {}
 }
 
-/// 异步数据加载的三态结果。
+// 异步数据加载的三态结果。
 pub struct AsyncState<T, E>
 where
     T: Unpin + Send + Sync + 'static,
@@ -19,7 +19,7 @@ where
 }
 
 pub trait UseAsyncState: private::Sealed {
-    /// 依赖变化时运行异步任务，并维护 data/loading/error 三态。
+    // 依赖变化时运行异步任务，并维护 data/loading/error 三态。
     fn use_async_state<F, Fut, D, T, E>(&mut self, f: F, deps: D) -> AsyncState<T, E>
     where
         F: FnOnce() -> Fut + 'static,

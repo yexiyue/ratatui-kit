@@ -1,0 +1,91 @@
+---
+title: Input 单行输入
+description: 用底层 Input 渲染 tui_input 状态，并把键盘事件交给页面控制。
+sidebar:
+  order: 3
+---
+
+`Input` 是单行输入框的底层显示组件。它不自己接管键盘，也不内置输入互斥；你把 `tui_input::Input` 状态传给它渲染，再在页面 handler 里决定哪些按键写入、哪些按键提交、哪些按键退出。
+
+![input demo](/ratatui-kit/zh-cn/recordings/input.gif)
+
+这个录屏由 `docs/tapes/input.tape` 生成。示例展示一个受控 note 输入框：输入 `ratatui` 后提交，再输入 `manual control` 提交，最后输入草稿并用 `Esc` 清空。
+
+## 运行
+
+```bash
+cargo run --example input
+```
+
+输入文本后按 `Enter` 提交；有草稿时按 `Esc` 清空，空输入时按 `Esc` 退出。
+
+## 最小形态
+
+`Input` 的核心 prop 是 `input: tui_input::Input`。通常用 `use_state` 持有真实状态，渲染时传入一个快照：
+
+```rust title="examples/components/input.rs"
+let input = hooks.use_state(tui_input::Input::default);
+
+Border(height: Constraint::Length(3)) {
+    Input(
+        input: input.read().clone(),
+        placeholder: "Type a note and press Enter".to_string(),
+        placeholder_style: Style::new().dark_gray(),
+        cursor_style: Style::new().bg(Color::Yellow),
+    )
+}
+```
+
+`Input` 只需要一个单行区域。示例把它放进 3 行高的 `Border`，边框占上下两行，中间留给输入内容。
+
+## 事件转发
+
+键盘处理由页面负责。`tui-input` 已经提供 crossterm backend，只要在 handler 里调用 `handle_event`：
+
+```rust title="examples/components/input.rs"
+use ratatui_kit::prelude::tui_input::backend::crossterm::EventHandler;
+
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    let Event::Key(key) = &event else {
+        return EventResult::Ignored;
+    };
+
+    match key.code {
+        KeyCode::Enter => {
+            let submitted = input.read().value().trim().to_string();
+            input.write().reset();
+            status.set(format!("submitted {submitted}"));
+            EventResult::Consumed
+        }
+        _ => {
+            input.write().handle_event(&event);
+            EventResult::Consumed
+        }
+    }
+});
+```
+
+低层 `Input` 不知道你的提交规则，所以 `Enter`、`Esc`、`Tab` 是否消费事件都由外层决定。示例中所有编辑键都返回 `Consumed`，避免同一层其它 handler 同时把输入键当成页面快捷键。
+
+## 样式和光标
+
+`Input` 暴露四类视觉 prop：
+
+```rust
+Input(
+    style: Style::new().white(),
+    placeholder_style: Style::new().dark_gray(),
+    cursor_style: Style::new().bg(Color::Yellow),
+    hide_cursor: false,
+)
+```
+
+当 `input.value()` 为空时显示 `placeholder` 和 `placeholder_style`；有值时显示 `style`。光标由一个绝对定位的单格 `Span` 渲染，水平滚动位置来自 `tui_input::Input::visual_scroll`，所以长文本会保持光标可见。
+
+如果你需要只读展示、录屏或失焦态，可以传 `hide_cursor: true`。
+
+## 与 SearchInput 的边界
+
+直接用 `Input` 时，你拥有所有输入语义：什么时候激活、如何校验、是否清空、是否打开独占 input layer。这个低层形态适合自定义命令行、编辑器状态栏、过滤器、表单字段。
+
+如果只是普通搜索框，优先用 [SearchInput](/ratatui-kit/zh-cn/components/search-input/)。它已经封装了激活键、提交、清空、校验提示和输入互斥。

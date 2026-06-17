@@ -8,10 +8,10 @@ use uuid::Uuid;
 
 use crate::adapter::ParsedAdapter;
 
-/// 单个子节点：嵌套元素 / adapter / 任意表达式、或一等控制流(if/for/match)。
-///
-/// `pub(crate)`：`ParsedElementHead::to_element_expr` 以 `&[ParsedElementChild]` 接收
-/// children 参数,该方法对 `router.rs` 可见(`pub(crate)`),故本类型也需 crate 级可见。
+// 单个子节点：嵌套元素 / adapter / 任意表达式、或一等控制流(if/for/match)。
+//
+// `pub(crate)`：`ParsedElementHead::to_element_expr` 以 `&[ParsedElementChild]` 接收
+// children 参数,该方法对 `router.rs` 可见(`pub(crate)`),故本类型也需 crate 级可见。
 pub(crate) enum ParsedElementChild {
     Element(ElementOrAdapter),
     Expr(Expr),
@@ -20,12 +20,12 @@ pub(crate) enum ParsedElementChild {
     ControlFlow(Box<ControlFlow>),
 }
 
-/// element! 子节点块内的一等控制流。分支体本身又是一组子节点。
-///
-/// 相比把条件渲染塞进表达式插槽,一等控制流让每个分支独立把自己的
-/// 子节点 `extend` 进 children——故各分支可返回不同元素类型,无需 `.into_any()` 统一类型。
-///
-/// `pub(crate)`:随 [`ParsedElementChild`] 经 `to_element_expr` 的 crate 级签名传染而来。
+// element! 子节点块内的一等控制流。分支体本身又是一组子节点。
+//
+// 相比把条件渲染塞进表达式插槽,一等控制流让每个分支独立把自己的
+// 子节点 `extend` 进 children——故各分支可返回不同元素类型,无需 `.into_any()` 统一类型。
+//
+// `pub(crate)`:随 [`ParsedElementChild`] 经 `to_element_expr` 的 crate 级签名传染而来。
 pub(crate) enum ControlFlow {
     If {
         cond: Expr,
@@ -43,7 +43,7 @@ pub(crate) enum ControlFlow {
     },
 }
 
-/// `else if ...` 或 `else { ... }`。
+// `else if ...` 或 `else { ... }`。
 pub(crate) enum ElseBranch {
     If(Box<ControlFlow>),
     Block(Vec<ParsedElementChild>),
@@ -55,7 +55,7 @@ pub(crate) struct MatchArm {
     body: Vec<ParsedElementChild>,
 }
 
-/// 解析一段子节点序列(用于元素的 `{}` 块,以及控制流的各分支体)。
+// 解析一段子节点序列(用于元素的 `{}` 块,以及控制流的各分支体)。
 fn parse_children(input: ParseStream) -> syn::Result<Vec<ParsedElementChild>> {
     let mut children = Vec::new();
     while !input.is_empty() {
@@ -147,7 +147,7 @@ fn parse_match(input: ParseStream) -> syn::Result<ControlFlow> {
 }
 
 impl ParsedElementChild {
-    /// 生成「把本子节点 extend 进 `dest`」的语句。控制流会把内层 extend 包进 if/for/match。
+    // 生成「把本子节点 extend 进 `dest`」的语句。控制流会把内层 extend 包进 if/for/match。
     fn to_extend(&self, dest: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
         match self {
             ParsedElementChild::Element(element) => {
@@ -252,10 +252,10 @@ impl PropsItem {
         }
     }
 
-    /// 若本项是保留的 `key:` 字段(元素身份键),返回其 `FieldValue`。
-    ///
-    /// 单一真源:`ToTokens` 的 key 构造与 props 过滤、`ParsedElement::key_span` 都经此查找——
-    /// 避免「`Member::Named("key")` 匹配 + 魔法串 `"key"`」散落多处、改名时需多处同步。
+    // 若本项是保留的 `key:` 字段(元素身份键),返回其 `FieldValue`。
+    //
+    // 单一真源:`ToTokens` 的 key 构造与 props 过滤、`ParsedElement::key_span` 都经此查找——
+    // 避免「`Member::Named("key")` 匹配 + 魔法串 `"key"`」散落多处、改名时需多处同步。
     fn as_key_field(&self) -> Option<&FieldValue> {
         match self {
             PropsItem::FieldValue(fv) if matches!(&fv.member, Member::Named(ident) if ident == "key") => {
@@ -266,18 +266,18 @@ impl PropsItem {
     }
 }
 
-/// element 的「头部」:类型路径 + 可选 `(props)`,**不含 children**。
-///
-/// 把「头部解析 + element codegen」与「children」在类型上分离——`element!` 与 `routes!`
-/// 都基于 head 构建,但 `{}` 的归属由各自决定(`element!` 当子节点、`routes!` 当子路由)。
-/// head 没有 children 字段,故「解析阶段触及 `{}`」在类型层面无法表达,无需注释约定护栏。
+// element 的「头部」:类型路径 + 可选 `(props)`,**不含 children**。
+//
+// 把「头部解析 + element codegen」与「children」在类型上分离——`element!` 与 `routes!`
+// 都基于 head 构建,但 `{}` 的归属由各自决定(`element!` 当子节点、`routes!` 当子路由)。
+// head 没有 children 字段,故「解析阶段触及 `{}`」在类型层面无法表达,无需注释约定护栏。
 pub struct ParsedElementHead {
     ty: TypePath,
     props: Punctuated<PropsItem, Comma>,
 }
 
 impl Parse for ParsedElementHead {
-    /// 只解析类型路径 + 可选 `(props)`。**不 peek/消费 `Brace`**——`{}` 留给调用方。
+    // 只解析类型路径 + 可选 `(props)`。**不 peek/消费 `Brace`**——`{}` 留给调用方。
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let ty: TypePath = input.parse()?;
         let props = if input.peek(syn::token::Paren) {
@@ -306,8 +306,8 @@ impl Parse for ParsedElementHead {
 }
 
 impl ParsedElementHead {
-    /// 返回 `key:` 字段的 span(若存在)。`routes!` 借此拒绝路由元素上的 `key:`——
-    /// 路由身份由 path 决定,元素 key 在路由场景下无意义(详见 `router.rs`)。
+    // 返回 `key:` 字段的 span(若存在)。`routes!` 借此拒绝路由元素上的 `key:`——
+    // 路由身份由 path 决定,元素 key 在路由场景下无意义(详见 `router.rs`)。
     pub fn key_span(&self) -> Option<Span> {
         self.props
             .iter()
@@ -315,12 +315,12 @@ impl ParsedElementHead {
             .map(|fv| fv.member.span())
     }
 
-    /// 生成构造 `Element<Ty>` 的表达式 token——element codegen 的**单一真源**。
-    ///
-    /// `children` 作为参数注入(而非读取持有状态):`element!` 传实际子节点切片,
-    /// `routes!` 传空切片。输出**带外层括号**的块表达式 `({ … _element })`,使调用方
-    /// 可直接 `.into_any()` 或作为实参,无需自己补括号、无需知道内部是块——token 形状
-    /// 知识收归本模块,`router.rs` 不再依赖它。
+    // 生成构造 `Element<Ty>` 的表达式 token——element codegen 的**单一真源**。
+    //
+    // `children` 作为参数注入(而非读取持有状态):`element!` 传实际子节点切片,
+    // `routes!` 传空切片。输出**带外层括号**的块表达式 `({ … _element })`,使调用方
+    // 可直接 `.into_any()` 或作为实参,无需自己补括号、无需知道内部是块——token 形状
+    // 知识收归本模块,`router.rs` 不再依赖它。
     pub(crate) fn to_element_expr(
         &self,
         children: &[ParsedElementChild],
@@ -415,7 +415,7 @@ impl ParsedElementHead {
     }
 }
 
-/// 完整的声明式元素:头部 + 子节点。`element!` 用,`ToTokens` 委托 head 的 codegen。
+// 完整的声明式元素:头部 + 子节点。`element!` 用,`ToTokens` 委托 head 的 codegen。
 pub struct ParsedElement {
     head: ParsedElementHead,
     children: Vec<ParsedElementChild>,

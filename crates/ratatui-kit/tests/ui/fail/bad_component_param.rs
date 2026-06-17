@@ -1,4 +1,4 @@
-//! `#[component]` 只认 props/hooks 参数名：其它参数名应报错。
+// `#[component]` 只认 props/hooks 参数名：其它参数名应报错。
 use ratatui_kit::prelude::*;
 
 #[component]

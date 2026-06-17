@@ -7,8 +7,8 @@ mod private {
 }
 
 pub trait UseAtom: private::Sealed {
-    /// 在组件内订阅一个全局原子：注册本组件的 waker，返回 `Copy + Send` 句柄
-    /// （可移入 `tokio::spawn` 在后台更新）。写入仅唤醒订阅了该 atom 的组件（细粒度）。
+    // 在组件内订阅一个全局原子：注册本组件的 waker，返回 `Copy + Send` 句柄
+    // （可移入 `tokio::spawn` 在后台更新）。写入仅唤醒订阅了该 atom 的组件（细粒度）。
     fn use_atom<T>(&mut self, atom: &'static Atom<T>) -> AtomState<T>
     where
         T: Unpin + Send + Sync + 'static;
@@ -81,7 +81,7 @@ mod tests {
     use futures::task::noop_waker;
     use std::task::Context;
 
-    /// 跑一次 `poll_change`（应 Pending），借此把组件 key 注册进 atom 的 waker 表。
+    // 跑一次 `poll_change`（应 Pending），借此把组件 key 注册进 atom 的 waker 表。
     fn poll_once(hook: &mut UseAtomImpl<i32>) {
         let waker = noop_waker();
         let mut cx = Context::from_waker(&waker);

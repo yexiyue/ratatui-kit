@@ -10,9 +10,9 @@ use crate::element::ParsedElementHead;
 
 pub struct ParsedRoute {
     pub path: LitStr,
-    /// 复用 `element!` 的头部解析:`Component` 或 `Component(prop: val)`。
-    /// 持有不含 children 的 `ParsedElementHead`——路由组件结构上无静态 children,
-    /// `{}` 留给本结构体的 `children` 当嵌套子路由。
+    // 复用 `element!` 的头部解析:`Component` 或 `Component(prop: val)`。
+    // 持有不含 children 的 `ParsedElementHead`——路由组件结构上无静态 children,
+    // `{}` 留给本结构体的 `children` 当嵌套子路由。
     pub element: ParsedElementHead,
     pub children: Routes,
 }

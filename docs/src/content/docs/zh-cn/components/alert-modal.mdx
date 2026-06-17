@@ -1,0 +1,90 @@
+---
+title: AlertModal 提示弹窗
+description: 用内置 AlertModal 封装提示信息、关闭键和弹窗输入互斥。
+sidebar:
+  order: 4
+---
+
+`AlertModal` 是提示型弹窗组件。它没有确认/取消按钮，只负责展示一段信息，并在指定关闭键按下时调用 `on_close`。弹窗打开期间，组件内部的 input layer 会截断更低层 handler，背景列表和页面快捷键不会处理同一个事件。
+
+![alert modal demo](/ratatui-kit/zh-cn/recordings/alert-modal.gif)
+
+这个录屏由 `docs/tapes/alert-modal.tape` 生成。示例先把背景列表移动到 Docs preview，再打开提示弹窗；弹窗打开后按一次 `j`，背景选中项没有继续下移。随后分别用 `Enter` 和 `Esc` 关闭提示。
+
+## 运行
+
+```bash
+cargo run --example alert_modal
+```
+
+背景状态下按 `j/k` 移动，按 `a` 打开提示，弹窗内按 `Enter` 或 `Esc` 关闭，按 `q` 退出。
+
+## 最小形态
+
+```rust title="examples/components/alert_modal.rs"
+AlertModal(
+    open: alert_open.get(),
+    title: Line::from("Workspace is current"),
+    message: format!("{selected_label} is already synchronized."),
+    on_close: move |_: ()| {
+        status.set(format!("closed alert for {selected_label}"));
+        alert_open.set(false);
+    },
+)
+```
+
+`AlertModal` 和其它内置弹窗一样是受控组件：`open` 决定是否显示，`on_close` 只是告诉业务用户触发了关闭。是否真的关闭弹窗，由业务在回调里修改 `open` 的状态。
+
+## 关闭键
+
+默认关闭键是 `Esc` 和 `Enter`：
+
+```rust
+AlertModal(
+    close_keys: vec![KeyCode::Esc, KeyCode::Enter],
+    close_hint: Line::from("Enter / Esc").centered(),
+)
+```
+
+如果业务希望用空格、`q` 或自定义键关闭提示，可以替换 `close_keys`。提示文案不会从 `close_keys` 自动生成，`close_hint` 需要自己传入，这样你可以保持 UI 文案和产品语言一致。
+
+## 输入互斥
+
+`AlertModal` 内部使用和 `ConfirmModal` 相同的 layer 配对：
+
+```rust
+let layer = hooks.use_input_layer(open, true);
+
+hooks.use_event_handler(EventScope::Layer(layer), EventPriority::High, move |event| {
+    if close_keys.contains(&key.code) {
+        on_close(());
+    }
+    EventResult::Consumed
+});
+
+Modal(open: open, layer: Some(layer)) {
+    // alert content
+}
+```
+
+注意最后的 `EventResult::Consumed`：即使按键不是关闭键，提示弹窗也会消费它。这样用户在提示打开时按 `j/k/q`，背景不会移动或退出。录屏里的 `j` 就是这个路径。
+
+## 尺寸和样式
+
+`AlertModal` 直接暴露底层 `Modal` 的尺寸、遮罩和内容样式：
+
+```rust
+AlertModal(
+    width: Constraint::Length(76),
+    height: Constraint::Length(8),
+    style: Style::new().dim(),
+    border_style: Style::new().yellow(),
+    title_style: Style::new().yellow().bold(),
+    message_style: Style::new(),
+    padding: Padding::new(2, 2, 1, 1),
+)
+```
+
+提示内容会居中并启用 wrap。短提示适合用固定宽度，较长信息可以增大 `height` 或改用底层 `Modal` 组合 `ScrollView`。
+
+需要让用户做选择时，用 [ConfirmModal](/ratatui-kit/zh-cn/components/confirm-modal/)；需要展示多组快捷键时，看后续 `ShortcutInfoModal`。

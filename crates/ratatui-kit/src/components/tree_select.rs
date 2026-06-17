@@ -11,42 +11,42 @@ use ratatui_kit::{
 use std::hash::Hash;
 use tui_tree_widget::{TreeItem, TreeState};
 
-/// 树形组件的属性定义
+// 树形组件的属性定义
 #[with_layout_style(margin, offset, width, height)]
 #[derive(Props)]
 pub struct TreeSelectProps<T>
 where
     T: Sync + Send + Clone + Eq + Hash + 'static,
 {
-    /// 树形组件的状态，可选
+    // 树形组件的状态，可选
     pub state: Option<State<TreeState<T>>>,
 
-    /// 树形节点项列表
+    // 树形节点项列表
     pub items: Vec<TreeItem<'static, T>>,
-    /// 是否启用内置键盘交互。默认关闭，以保持原渲染型组件语义。
+    // 是否启用内置键盘交互。默认关闭，以保持原渲染型组件语义。
     pub active: bool,
-    /// 默认选中的节点路径；例如 `["components", "input"]`。
+    // 默认选中的节点路径；例如 `["components", "input"]`。
     pub default_selection: Vec<T>,
-    /// 当前项确认选择时触发。
+    // 当前项确认选择时触发。
     pub on_select: Handler<'static, T>,
 
-    /// 滚动条组件，可选
+    // 滚动条组件，可选
     pub scrollbar: Option<Scrollbar<'static>>,
-    /// 用于组件的基础样式
+    // 用于组件的基础样式
     pub style: Style,
 
-    /// 用于渲染选中项的样式
+    // 用于渲染选中项的样式
     pub highlight_style: Style,
-    /// 显示在选中项前面的符号（会将所有项右移）
+    // 显示在选中项前面的符号（会将所有项右移）
     pub highlight_symbol: &'static str,
 
-    /// 显示在已关闭节点前面的符号（子节点当前不可见）
+    // 显示在已关闭节点前面的符号（子节点当前不可见）
     pub node_closed_symbol: &'static str,
-    /// 显示在已打开节点前面的符号（子节点当前可见）
+    // 显示在已打开节点前面的符号（子节点当前可见）
     pub node_open_symbol: &'static str,
-    /// 显示在没有子节点的节点前面的符号
+    // 显示在没有子节点的节点前面的符号
     pub node_no_children_symbol: &'static str,
-    /// 可选的边框块。
+    // 可选的边框块。
     pub block: Option<Block<'static>>,
 }
 
@@ -105,7 +105,7 @@ where
     }
 }
 
-/// 树形组件实现。
+// 树形组件实现。
 pub struct TreeSelect<T>
 where
     T: Sync + Send + Clone + Eq + Hash + 'static,
@@ -153,7 +153,7 @@ where
     where
         Self: 'a;
 
-    /// 根据属性创建新的树形组件实例
+    // 根据属性创建新的树形组件实例
     fn new(props: &Self::Props<'_>) -> Self {
         Self::from_props(props)
     }
@@ -239,7 +239,7 @@ where
         };
     }
 
-    /// 绘制树形组件
+    // 绘制树形组件
     fn draw(&mut self, drawer: &mut ratatui_kit::ComponentDrawer<'_, '_>) {
         if !self.tree_is_valid {
             if let Some(block) = self.block.as_ref() {

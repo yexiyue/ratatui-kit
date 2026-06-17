@@ -1,7 +1,7 @@
-//! ConfirmModal 组件：带输入互斥的确认弹窗。
-//!
-//! 组件内部自开独占输入层并把同一层传给 `Modal`，封装父级 handler + Modal
-//! 的三件套配对，避免背景组件处理确认弹窗期间的按键。
+// ConfirmModal 组件：带输入互斥的确认弹窗。
+//
+// 组件内部自开独占输入层并把同一层传给 `Modal`，封装父级 handler + Modal
+// 的三件套配对，避免背景组件处理确认弹窗期间的按键。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{

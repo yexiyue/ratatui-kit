@@ -1,0 +1,129 @@
+---
+title: 输入层
+description: 用 Layer、Scope 和 EventResult 解决终端输入互斥。
+sidebar:
+  order: 3
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+
+输入事件不是广播给所有组件，而是交给中央 `InputRuntime` 分发。组件在每帧 update 期间重新登记输入层和 handler；终端事件到来时，运行时只把事件投递给当前活跃层。
+
+想先看完整运行例子，可以从 [输入互斥](/ratatui-kit/zh-cn/tutorials/input-mutex/) 开始。
+
+## 分发顺序
+
+<Mermaid
+	chart={`
+flowchart TD
+    event["raw terminal event"] --> ctrlc["Ctrl+C check"]
+    ctrlc --> global["Global handlers"]
+    global --> layers["active layers"]
+    layers --> top["top z-order first"]
+    top --> priority["priority inside same layer"]
+    priority --> result["EventResult"]
+    result --> consumed["Consumed: stop"]
+    result --> ignored["Ignored: continue"]
+	`}
+	caption="Global 不受 layer 截断；普通 handler 先按层级，再按同层 priority 投递。"
+/>
+
+分发有两个阶段：
+
+| 阶段 | 候选 handler | 排序 |
+| --- | --- | --- |
+| Global | `EventScope::Global` | `priority desc, order asc` |
+| Layer | 活跃输入层内的 handler | `z-order desc, priority desc, order asc` |
+
+`z-order` 优先于 `priority`。上层 `Normal` 会先于下层 `High`，否则弹窗背后的组件仍然可能抢到事件。
+
+## 三个核心类型
+
+`InputLayer` 是当前帧的层句柄：
+
+```rust
+let layer = hooks.use_input_layer(open, true);
+```
+
+`open=false` 时会返回句柄但不入栈，绑定到它的 handler 会静默跳过。`blocks_lower=true` 时，这一层会截断更低层。
+
+`EventScope` 决定 handler 属于哪一层：
+
+```rust
+EventScope::Current
+EventScope::Layer(layer)
+EventScope::Global
+```
+
+`Current` 会解析到 context 中最近的当前层。放在 `Modal` 子树里的组件通常用 `Current` 就够了；父组件想控制 `Modal` 的按键时，用 `Layer(layer)` 显式绑定。
+
+`EventResult` 决定事件是否继续传播：
+
+```rust
+EventResult::Consumed
+EventResult::Ignored
+```
+
+处理了事件就返回 `Consumed`。没有处理就返回 `Ignored`，让同层后续 handler 或更低层继续尝试。
+
+## 命中过滤
+
+默认 handler 会收到所属层里的所有键盘和鼠标事件。需要“只在组件区域内处理鼠标”的场景，用 `use_event_handler_with_options`：
+
+```rust
+hooks.use_event_handler_with_options(
+    EventScope::Current,
+    EventPriority::Normal,
+    EventOptions { hit_test: true },
+    move |event| {
+        // 鼠标事件在组件上一帧区域外时不会调用这个闭包。
+        EventResult::Ignored
+    },
+);
+```
+
+`hit_test` 只影响鼠标事件。键盘事件没有坐标，仍按 layer、priority 和注册顺序投递。命中区域来自 handler 所属组件上一帧的绘制 `Rect`，所以它适合滚轮、点击、拖拽这类局部鼠标交互；不要用它表达模态互斥，模态互斥仍然应该用 `InputLayer`。
+
+## Modal 配对
+
+弹窗互斥的标准模式：
+
+```rust
+let layer = hooks.use_input_layer(open, true);
+
+hooks.use_event_handler(
+    EventScope::Layer(layer),
+    EventPriority::High,
+    move |event| {
+        // handle modal keys
+        EventResult::Consumed
+    },
+);
+
+element!(
+    Modal(open: open, layer: Some(layer)) {
+        // modal content
+    }
+)
+```
+
+`Modal(layer: Some(layer))` 必须和 handler 使用同一个 layer。漏传时，`Modal` 会自开一个新层并截断父级 layer，父级 handler 就收不到事件。
+
+## 生命周期
+
+`InputLayer` 句柄每帧重建，只能在同一帧里传给 handler 或子组件。不要把它存进 `State`，下一帧这个 id 已经不在活跃层栈里。
+
+这也是为什么输入系统不会泄漏：关闭弹窗后下一帧不会再注册它的 layer 和 handler，dispatch 时自然就找不到它。
+
+## 内置组件
+
+普通交互优先用内置组件：
+
+| 需求 | 组件 |
+| --- | --- |
+| 搜索输入 | `SearchInput` |
+| 确认弹窗 | `ConfirmModal` |
+| 提示弹窗 | `AlertModal` |
+| 快捷键帮助 | `ShortcutInfoModal` |
+
+这些组件内部已经配好输入层，业务只需要处理 `open`、回调和展示内容。只有弹窗里有专用复杂交互时，再手写 `use_input_layer`、`use_event_handler(EventScope::Layer(...))` 和 `Modal(layer: Some(...))`。

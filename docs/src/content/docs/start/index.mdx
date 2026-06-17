@@ -1,58 +1,58 @@
 ---
-title: 学习 ratatui-kit
-description: 从第一个终端界面开始，逐步进入状态、输入、路由、内置组件和高级扩展。
+title: Learn ratatui-kit
+description: Start with your first terminal interface, then move step by step into state, input, routing, built-in components, and advanced extension points.
 sidebar:
   order: 1
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-Ratatui Kit 的文档按渐进式学习组织：先写出一个能运行的终端界面，再把交互、状态、路由和组件组合逐层接上，最后进入完整 API、内置组件和高级逃生口。
+Ratatui Kit's documentation is organized as a progressive learning path: first build a terminal interface that actually runs, then layer on interaction, state, routing, and component composition, and finally move into the full API reference, built-in components, and advanced escape hatches.
 
-这个节奏参考 React 的 Learn / Reference，也参考 Vue 的 Guide / API：教程只讲当下需要的 80% 日常概念；参考手册完整展开边界、参数和内部机制。文档里的教程都对应仓库中的真实 example；需要展示运行效果时，只使用 VHS 录制出来的终端素材。
+The pacing is inspired by React's Learn / Reference split and Vue's Guide / API split: tutorials focus on the everyday 80% you need right now, while reference pages spell out boundaries, parameters, and internal mechanics. Every tutorial in these docs maps to a real example in the repository. When a page needs to show runtime behavior, it uses terminal assets recorded with VHS.
 
 <CardGrid>
-  <Card title="跟着教程" icon="rocket">
-    从安装依赖、`hello_world` 和 `counter` 开始，边运行边理解 `element!`、`#[component]`、hooks、输入互斥和路由。
+  <Card title="Follow the tutorials" icon="rocket">
+    Start with installation, `hello_world`, and `counter`; run code as you learn `element!`, `#[component]`, hooks, input isolation, and routing.
   </Card>
-  <Card title="按需查参考" icon="setting">
-    当你开始写真实应用，再进入组件模型、hooks、输入层、状态、路由和内置组件的参考页。
+  <Card title="Use reference when needed" icon="setting">
+    Once you start writing real applications, jump into the component model, hooks, input layers, state, routing, and built-in component reference pages.
   </Card>
-  <Card title="最后用逃生口" icon="puzzle">
-    内置抽象不够时，再看自定义 Hook、Provider、手写 Component 和原生 ratatui widget 桥接。
+  <Card title="Use escape hatches last" icon="puzzle">
+    When the built-in abstractions are not enough, read about custom hooks, providers, hand-written components, and native Ratatui widget bridges.
   </Card>
 </CardGrid>
 
-## 推荐路径
+## Recommended path
 
-1. [安装与功能门控](/ratatui-kit/start/installation/)：把 crate 接进 Cargo 项目，并选择 feature set。
-2. [快速开始](/ratatui-kit/start/quick-start/)：运行第一个应用。
-3. [心智模型](/ratatui-kit/start/mental-model/)：理解声明式 UI 如何变成持久组件树。
-4. [计数器教程](/ratatui-kit/tutorials/counter/)：用一个每秒自增的数字串起组件和异步唤醒。
-5. [异步数据三态](/ratatui-kit/tutorials/async-state/)：把本地状态推进到请求、loading、error 和旧数据保留。
-6. [Atom 全局状态](/ratatui-kit/tutorials/atom-state/)：区分局部草稿、跨页面共享状态和 Router 自身状态。
-7. [输入互斥](/ratatui-kit/tutorials/input-mutex/)：让编辑层和弹窗层独占键盘事件，背景组件不再抢输入。
-8. [路由工作台](/ratatui-kit/tutorials/router/)：进入多页面应用结构、动态参数和 history。
-9. [Todo App](/ratatui-kit/apps/todo-app/)：把状态、输入互斥和内置组件组合成完整工作流。
-10. [核心模型](/ratatui-kit/core/component-model/)：进入参考区，查组件模型、hooks、输入层、状态和路由细节。
-11. [内置组件](/ratatui-kit/components/)：按场景选择输入、弹窗、列表、树形选择和长文本组件。
-12. [高级自定义](/ratatui-kit/advanced/)：学习自定义 Hook、Provider、手写 Component 和原生 widget 桥接。
-13. [示例路线图](/ratatui-kit/examples/)：查看 examples、文档页和 VHS 录制之间的对应关系。
+1. [Installation and feature flags](/ratatui-kit/start/installation/): add the crate to a Cargo project and choose a feature set.
+2. [Quick start](/ratatui-kit/start/quick-start/): run your first application.
+3. [Mental model](/ratatui-kit/start/mental-model/): understand how declarative UI becomes a persistent component tree.
+4. [Counter tutorial](/ratatui-kit/tutorials/counter/): connect components and async wakeups through a number that increments every second.
+5. [Async data states](/ratatui-kit/tutorials/async-state/): move from local state to requests, loading, errors, and keeping stale data.
+6. [Atom global state](/ratatui-kit/tutorials/atom-state/): distinguish local drafts, cross-page shared state, and Router-owned state.
+7. [Input isolation](/ratatui-kit/tutorials/input-mutex/): let edit layers and modal layers own keyboard events so background components stop competing for input.
+8. [Routing workspace](/ratatui-kit/tutorials/router/): enter multi-page app structure, dynamic params, and history.
+9. [Todo App](/ratatui-kit/apps/todo-app/): combine state, input isolation, and built-in components into a complete workflow.
+10. [Core model](/ratatui-kit/core/component-model/): move into the reference section for details on the component model, hooks, input layers, state, and routing.
+11. [Built-in components](/ratatui-kit/components/): choose input, modal, list, tree-select, and long-text components by scenario.
+12. [Advanced customization](/ratatui-kit/advanced/): learn custom hooks, providers, hand-written components, and native widget bridges.
+13. [Examples roadmap](/ratatui-kit/examples/): inspect how examples, docs pages, and VHS recordings map to each other.
 
-## 像 React / Vue 一样读
+## Read it like React / Vue docs
 
-| 你现在想做什么 | 对应文档 | 什么时候读 |
+| What you want to do now | Matching docs | When to read |
 | --- | --- | --- |
-| 建立手感 | `start/*` | 第一次打开文档 |
-| 做一个功能 | `tutorials/*`、`apps/todo-app` | 需要跟着例子写代码 |
-| 查清 API 边界 | `core/*`、`components/*` | 已经知道自己要用什么 |
-| 定制框架能力 | `advanced/*` | 内置组件或 hook 不够用 |
-| 理解为什么这样设计 | `internals/*` | 需要调试运行时或贡献框架 |
+| Build intuition | `start/*` | The first time you open the docs |
+| Implement a feature | `tutorials/*`, `apps/todo-app` | When you want to code along with an example |
+| Clarify API boundaries | `core/*`, `components/*` | Once you know what you want to use |
+| Customize framework capabilities | `advanced/*` | When built-in components or hooks are not enough |
+| Understand the design | `internals/*` | When debugging the runtime or contributing to the framework |
 
-## 文档原则
+## Documentation principles
 
-- 每个教程先出现可运行结果，再解释概念。
-- 每个核心概念都有一个继续深入的参考页。
-- 每个 example 都保持真实可运行，命令不随目录迁移变化。
-- 每个运行截图都来自 VHS，不用手写终端效果图。
-- 流程图优先使用 Mermaid；概念配图可以用 imagegen，但不能替代真实运行素材。
+- Every tutorial shows a runnable result before explaining concepts.
+- Every core concept has a deeper reference page.
+- Every example remains truly runnable; commands stay stable even if source files move.
+- Every runtime screenshot comes from VHS, not hand-drawn terminal mockups.
+- Flowcharts use Mermaid first; conceptual illustrations may use generated images, but they do not replace real runtime assets.

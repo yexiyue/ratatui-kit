@@ -1,0 +1,150 @@
+---
+title: 自定义 Hook
+description: 用组合型 hook 封装状态、派生数据、事件处理和副作用。
+sidebar:
+  order: 3
+---
+
+`custom_hook` 展示一个业务侧最常见的自定义 hook：命令面板的查询、过滤结果、游标夹紧和键盘处理都放进 `use_command_palette`，组件只拿返回的 snapshot 画界面。
+
+![custom hook demo](/ratatui-kit/zh-cn/recordings/custom-hook.gif)
+
+这个录屏由 `docs/tapes/custom-hook.tape` 生成，运行的是 `examples/advanced/custom_hook.rs`。录屏会输入过滤词、移动游标、提交命令，然后清空过滤重新提交另一条命令。
+
+## 运行
+
+```bash
+cargo run --example custom_hook
+```
+
+## 为什么先写组合型 hook
+
+业务自定义 hook 大多不需要实现底层 `Hook` trait。只要它能由内置 hooks 表达，就直接把这些 hooks 固定顺序组合起来：
+
+```rust title="examples/advanced/custom_hook.rs"
+fn use_command_palette(hooks: &mut Hooks, commands: &'static [Command]) -> CommandPalette {
+    let query = hooks.use_state(String::new);
+    let mut cursor = hooks.use_state(|| 0usize);
+    let mut status = hooks.use_state(|| "type to filter commands".to_string());
+
+    let query_text = query.read().clone();
+    let query_deps = query_text.clone();
+    let visible = hooks.use_memo(
+        move || matching_indices(commands, &query_text),
+        query_deps,
+    );
+
+    let visible_len = visible.len();
+    let cursor_value = cursor.get();
+    hooks.use_effect(
+        move || {
+            let next_cursor = if visible_len == 0 {
+                0
+            } else {
+                cursor_value.min(visible_len - 1)
+            };
+            if next_cursor != cursor_value {
+                cursor.set(next_cursor);
+            }
+        },
+        (visible_len, cursor_value),
+    );
+
+    hooks.use_event_handler(EventScope::Current, EventPriority::High, move |event| {
+        // query / cursor / submit key handling
+        EventResult::Consumed
+    });
+
+    CommandPalette { /* snapshot */ }
+}
+```
+
+这个函数虽然只是普通 Rust 函数，但它仍然是 hook：它每帧以固定顺序调用 `use_state`、`use_memo`、`use_effect` 和 `use_event_handler`，并返回组件需要渲染的数据。
+
+## Hook 调用顺序
+
+自定义 hook 内部也要遵守同一条规则：hook 调用不能放进 `if`、`for`、`match` 或早退分支里。下面这种写法不安全：
+
+```rust
+fn use_bad_palette(hooks: &mut Hooks, enabled: bool) {
+    if enabled {
+        hooks.use_state(String::new);
+    }
+
+    hooks.use_state(|| 0usize);
+}
+```
+
+第一帧 `enabled=true`、下一帧 `enabled=false` 时，第二个 `use_state` 的索引会错位，运行时会拿到错误类型的 hook。
+
+## 派生数据用 use_memo
+
+过滤结果不是独立状态，而是从 `query` 和 `commands` 派生出来的数据：
+
+```rust
+let query_text = query.read().clone();
+let query_deps = query_text.clone();
+let visible = hooks.use_memo(
+    move || matching_indices(commands, &query_text),
+    query_deps,
+);
+```
+
+`use_memo` 的依赖使用 `PartialEq` 比较。这里依赖是 `String`，查询不变时直接复用上一次的 `Vec<usize>`，查询变化时重新过滤。
+
+## 状态修正用 use_effect
+
+过滤后结果变短时，旧游标可能越界。这个修正是由 `visible_len` 和当前游标共同决定的副作用：
+
+```rust
+hooks.use_effect(
+    move || {
+        let next_cursor = if visible_len == 0 {
+            0
+        } else {
+            cursor_value.min(visible_len - 1)
+        };
+        if next_cursor != cursor_value {
+            cursor.set(next_cursor);
+        }
+    },
+    (visible_len, cursor_value),
+);
+```
+
+这比在每个按键分支里都手动修正更可靠。状态写入仍然通过 `State` 句柄完成，所以会唤醒下一帧重绘。
+
+## 事件也可以封装
+
+`use_command_palette` 自己注册键盘 handler。命中查询、移动和提交键时返回 `Consumed`；不属于命令面板的键，比如 `q`，返回 `Ignored` 交给外层应用处理。
+
+```rust
+hooks.use_event_handler(EventScope::Current, EventPriority::High, move |event| {
+    match key.code {
+        KeyCode::Char(ch) if !ch.is_control() => {
+            query.write().push(ch);
+            cursor.set(0);
+        }
+        KeyCode::Enter => {
+            status.set(format!("submitted: {}", command.title));
+        }
+        _ => return EventResult::Ignored,
+    }
+
+    EventResult::Consumed
+});
+```
+
+这和输入互斥系统是同一套模型：hook 可以注册 handler，但仍然要明确返回 `Consumed` 或 `Ignored`。
+
+## 什么时候实现 Hook trait
+
+只有当自定义能力需要自己的生命周期回调时，才需要实现底层 `Hook` trait，例如：
+
+- 需要在 `poll_change` 中轮询外部 future 或手动 waker。
+- 需要在 `on_drop` 中退订资源。
+- 需要在 `pre_component_update` / `post_component_update` 里读取框架上下文。
+
+普通业务状态、派生数据、表单输入、选择模型和事件处理，优先写组合型 hook。这样更容易保持调用顺序，也更容易在 example 和文档里验证。
+
+下一步可以看 [Hooks 核心模型](/ratatui-kit/zh-cn/core/hooks/)，或者继续看 [原生 Widget 桥接](/ratatui-kit/zh-cn/advanced/custom-widget/) 了解 draw 阶段如何接入 ratatui widget。

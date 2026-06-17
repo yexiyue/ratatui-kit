@@ -21,7 +21,7 @@ impl<K, V> AppendOnlyMultimap<K, V>
 where
     K: Eq + Hash,
 {
-    /// 向 multimap 末尾追加一个值，关联到指定的键。
+    // 向 multimap 末尾追加一个值，关联到指定的键。
     pub fn push_back(&mut self, key: K, value: V) {
         let index = self.items.len();
         self.items.push(Some(value));

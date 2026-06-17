@@ -13,7 +13,7 @@ mod private {
     impl Sealed for crate::Hooks<'_, '_> {}
 }
 
-/// 获取终端当前尺寸，并在终端尺寸变化时更新，适合响应式布局。
+// 获取终端当前尺寸，并在终端尺寸变化时更新，适合响应式布局。
 pub trait UseTerminalSize: private::Sealed {
     fn use_terminal_size(&mut self) -> (u16, u16);
 }
@@ -29,10 +29,10 @@ impl UseTerminalSize for crate::Hooks<'_, '_> {
     }
 }
 
-/// 终端尺寸监听保留为专用 hook，而不是复用 `use_event_handler(Global, ..)`。
-///
-/// 这样手写 Component 直接调用 `use_terminal_size` 时仍不需要先 `with_context_stack`;
-/// 注册 Resize handler 时由 `post_component_update` 通过 updater 拿根 `SystemContext`。
+// 终端尺寸监听保留为专用 hook，而不是复用 `use_event_handler(Global, ..)`。
+//
+// 这样手写 Component 直接调用 `use_terminal_size` 时仍不需要先 `with_context_stack`;
+// 注册 Resize handler 时由 `post_component_update` 通过 updater 拿根 `SystemContext`。
 struct UseTerminalSizeImpl {
     size: Option<State<(u16, u16)>>,
 }
@@ -69,7 +69,7 @@ impl Hook for UseTerminalSizeImpl {
     }
 }
 
-/// 获取组件当前尺寸，但是是上一帧的尺寸
+// 获取组件当前尺寸，但是是上一帧的尺寸
 pub trait UsePreviousSize: private::Sealed {
     fn use_previous_size(&mut self) -> Rect;
 }

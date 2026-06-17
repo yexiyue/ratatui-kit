@@ -74,7 +74,7 @@ pub struct ReactiveValue<T, N> {
     is_changed: bool,
 }
 
-/// 响应式状态核心句柄。
+// 响应式状态核心句柄。
 pub struct ReactiveHandle<T, N>
 where
     T: Send + Sync + 'static,
@@ -151,7 +151,7 @@ where
         }
     }
 
-    /// 尝试获取只读引用，失败时返回 None。
+    // 尝试获取只读引用，失败时返回 None。
     pub fn try_read(&'_ self) -> Option<ReactiveRef<'_, T, N>> {
         self.inner
             .try_read()
@@ -159,13 +159,13 @@ where
             .map(|inner| ReactiveRef { inner })
     }
 
-    /// 获取只读引用，失败时 panic。
+    // 获取只读引用，失败时 panic。
     pub fn read(&'_ self) -> ReactiveRef<'_, T, N> {
         self.try_read()
             .expect("attempt to read state while unavailable or already mutably borrowed")
     }
 
-    /// 尝试获取可变引用，支持变更通知，失败时返回 None。
+    // 尝试获取可变引用，支持变更通知，失败时返回 None。
     pub fn try_write(&'_ self) -> Option<ReactiveMutRef<'_, T, N>> {
         self.inner
             .try_write()
@@ -176,13 +176,13 @@ where
             .ok()
     }
 
-    /// 获取可变引用，支持变更通知，失败时 panic。
+    // 获取可变引用，支持变更通知，失败时 panic。
     pub fn write(&'_ self) -> ReactiveMutRef<'_, T, N> {
         self.try_write()
             .expect("attempt to write state while unavailable or already borrowed")
     }
 
-    /// 尝试获取可变引用，不触发变更通知，失败时返回 None。
+    // 尝试获取可变引用，不触发变更通知，失败时返回 None。
     pub fn try_write_no_update(&'_ self) -> Option<ReactiveMutNoUpdate<'_, T, N>> {
         self.inner
             .try_write()
@@ -190,20 +190,20 @@ where
             .ok()
     }
 
-    /// 获取可变引用，不触发变更通知，失败时 panic。
+    // 获取可变引用，不触发变更通知，失败时 panic。
     pub fn write_no_update(&'_ self) -> ReactiveMutNoUpdate<'_, T, N> {
         self.try_write_no_update()
             .expect("attempt to write state while unavailable or already borrowed")
     }
 
-    /// 设置状态值，触发变更通知。
+    // 设置状态值，触发变更通知。
     pub fn set(&mut self, value: T) {
         if let Some(mut current) = self.try_write() {
             *current = value;
         }
     }
 
-    /// 设置状态值，不触发变更通知。
+    // 设置状态值，不触发变更通知。
     pub fn set_no_update(&mut self, value: T) {
         if let Some(mut current) = self.try_write_no_update() {
             *current = value;
@@ -243,7 +243,7 @@ where
     }
 }
 
-/// 状态的只读引用。
+// 状态的只读引用。
 pub struct ReactiveRef<'a, T, N>
 where
     T: 'static,
@@ -264,7 +264,7 @@ where
     }
 }
 
-/// 状态的可变引用，支持变更通知。
+// 状态的可变引用，支持变更通知。
 pub struct ReactiveMutRef<'a, T, N>
 where
     T: 'static,
@@ -310,7 +310,7 @@ where
     }
 }
 
-/// 状态的可变引用，不触发变更通知。
+// 状态的可变引用，不触发变更通知。
 pub struct ReactiveMutNoUpdate<'a, T, N>
 where
     T: 'static,

@@ -1,4 +1,4 @@
-//! ShortcutInfoModal 组件：带输入互斥的快捷键帮助弹窗。
+// ShortcutInfoModal 组件：带输入互斥的快捷键帮助弹窗。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{

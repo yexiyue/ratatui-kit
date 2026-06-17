@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 知识库主题：
 
-- `dev-notes/knowledge/toolchain.md` — cargo 命令矩阵、feature flags 门控、lefthook/CI、release.sh 发布、无单元测试约定
+- `dev-notes/knowledge/toolchain.md` — cargo 命令矩阵、feature flags 门控、lefthook/CI、release.sh 发布、单元测试与「编译即基线」约定
 - `dev-notes/knowledge/runtime-architecture.md` — Element/Component、协调(reconciliation)、渲染循环 + Waker 响应式、布局/透明布局
 - `dev-notes/knowledge/hooks-and-state.md` — Hook 顺序规则、自定义 Hook 的 Sealed 约定、use_state vs 全局 Atom、State/AtomState 运算符重载
 - `dev-notes/knowledge/macros-and-props.md` — 过程宏(element!/#[component] 等)、Props 类型擦除、ratatui Block props、AnyProps unsafe
@@ -93,7 +93,7 @@ loop { render(); if should_exit || ctrl_c break; select(component.wait(), termin
 
 [hooks/mod.rs](crates/ratatui-kit/src/hooks/mod.rs)：`Hooks` 管理器按**调用顺序**（`hook_index`）索引 hooks，首帧 `push`、后续帧按序 `downcast` 取回——因此必须遵守 React 式「Hook 调用顺序稳定」规则（勿放进条件/循环）。`Hook` trait 暴露生命周期钩子：`poll_change` / `pre|post_component_update` / `pre|post_component_draw` / `on_drop`。
 
-内置：`use_state` `use_future` `use_events` `use_context` `use_memo` `use_effect` `use_insert_before` `use_size` `use_exit` `use_on_drop`，以及特性门控的 `use_router`/`use_navigate`、`use_atom`。
+内置：`use_state` `use_future` `use_async_state` `use_event_handler`（取代旧 `use_events`/`use_local_events`；配 `use_input_layer`）`use_context` `use_memo` `use_effect`/`use_async_effect` `use_insert_before` `use_terminal_size`/`use_previous_size` `use_exit` `use_on_drop`，以及特性门控的 `use_router`（`use_navigate`/`use_route`/`use_params`）、`use_atom`。
 
 **自定义 hook 约定**：定义实现 `Hook` 的结构体管理状态，再用 `pub trait UseXxx: private::Sealed` 暴露 API（`Sealed` 仅对 `Hooks` 实现，禁止外部实现），方法内通过 `self.use_hook(|| ...)` 注册。
 
@@ -119,4 +119,4 @@ loop { render(); if should_exit || ctrl_c break; select(component.wait(), termin
 - `AnyProps`（[props.rs](crates/ratatui-kit/src/props.rs)）用类型擦除裸指针 + 手动 drop 在借用/拥有两种 props 间转换，`downcast_*_unchecked` 是 unsafe，依赖协调阶段已校验 `TypeId`。
 - props 必须实现安全 trait `Props`，通过 `#[derive(Props)]` 生成；无 props 的组件用 `NoProps`。
 - **ratatui 0.30 起 `Block` 不再 `Send + Sync`**（内含阴影效果）。框架级 `Send + Sync` 已移除，因此 props 中可直接持有 `Option<Block<'static>>`，不要恢复旧的 `SendBlock` 包装。
-- 仓库当前**没有单元测试**，`cargo test` 主要验证示例与文档能编译。
+- 仓库已有针对性**单元测试**（各模块 `#[cfg(test)] mod tests`：`element/key`、`multimap`、`use_state`/`atom`、`input`、`render`、`router`、`wrapped_text`/`list_state`/`virtual_list`/`tree_select` 等），由 CI/lefthook 的 `cargo test --lib --tests` 运行；覆盖面仍有限，故**所有 example + doctest 能编译**仍是回归底线（详见 `dev-notes/knowledge/toolchain.md`）。

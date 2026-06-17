@@ -1,31 +1,31 @@
-//! 输入事件运行时：单一 raw 事件源 → 中央分发器 `InputRuntime`。
-//!
-//! 取代旧的「广播订阅」模型（每个 `use_events` 各自订阅、所有 handler 平等收到同一事件）。
-//! 核心能力：
-//! - **输入层栈**（`InputLayer` + `blocks_lower`）：模态层独占输入，背景层被截断。
-//! - **事件消费**（[`EventResult`]）：`Consumed` 截断后续 handler。
-//! - **优先级 / 作用域**（[`EventPriority`] / [`EventScope`]）：分层有序投递。
-//! - **每帧重建**：`begin_frame` 在每帧 update 开头清空层与 handler，组件在 update 期间重新登记，
-//!   因此关闭的弹窗 / 卸载的组件下一帧自动退出，无跨帧持久状态、无泄漏。
-//!
-//! 运行时单线程渲染，故 handler 闭包不要求 `Send + Sync`。
+// 输入事件运行时：单一 raw 事件源 → 中央分发器 `InputRuntime`。
+//
+// 取代旧的「广播订阅」模型（每个 `use_events` 各自订阅、所有 handler 平等收到同一事件）。
+// 核心能力：
+// - **输入层栈**（`InputLayer` + `blocks_lower`）：模态层独占输入，背景层被截断。
+// - **事件消费**（[`EventResult`]）：`Consumed` 截断后续 handler。
+// - **优先级 / 作用域**（[`EventPriority`] / [`EventScope`]）：分层有序投递。
+// - **每帧重建**：`begin_frame` 在每帧 update 开头清空层与 handler，组件在 update 期间重新登记，
+//   因此关闭的弹窗 / 卸载的组件下一帧自动退出，无跨帧持久状态、无泄漏。
+//
+// 运行时单线程渲染，故 handler 闭包不要求 `Send + Sync`。
 
 use std::{cell::Cell, collections::HashMap, rc::Rc};
 
 use crossterm::event::Event;
 use ratatui::layout::Rect;
 
-/// handler 处理事件后的结果。`Default = Ignored`（让事件继续向后传)。
+// handler 处理事件后的结果。`Default = Ignored`（让事件继续向后传)。
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum EventResult {
-    /// 未消费，继续投递给后续 handler。
+    // 未消费，继续投递给后续 handler。
     #[default]
     Ignored,
-    /// 已消费，停止向后续 handler 传播。
+    // 已消费，停止向后续 handler 传播。
     Consumed,
 }
 
-/// 事件投递优先级。同一层内 `High` 先于 `Normal` 先于 `Low`。
+// 事件投递优先级。同一层内 `High` 先于 `Normal` 先于 `Low`。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
 pub enum EventPriority {
     Low = 0,
@@ -34,65 +34,65 @@ pub enum EventPriority {
     High = 2,
 }
 
-/// 输入层身份。每帧由 [`InputRuntime`] 单调铸造，**跨帧不复用、不稳定**。
-///
-/// [`InputLayer`] 句柄仅在**同一帧**内由父组件传给子组件用于 [`EventScope::Layer`] 显式归属；
-/// **禁止**存入 `use_state` 跨帧使用（下一帧该 id 已不在层栈，对应 handler 会静默失聪）。
+// 输入层身份。每帧由 [`InputRuntime`] 单调铸造，**跨帧不复用、不稳定**。
+//
+// [`InputLayer`] 句柄仅在**同一帧**内由父组件传给子组件用于 [`EventScope::Layer`] 显式归属；
+// **禁止**存入 `use_state` 跨帧使用（下一帧该 id 已不在层栈，对应 handler 会静默失聪）。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct LayerId(u64);
 
-/// 用户持有的输入层句柄（`Copy`）。由 `use_input_layer` 返回。
+// 用户持有的输入层句柄（`Copy`）。由 `use_input_layer` 返回。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct InputLayer {
     pub(crate) id: LayerId,
 }
 
-/// handler 的归属作用域。
+// handler 的归属作用域。
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum EventScope {
-    /// 继承 context 栈中最近的 [`CurrentLayer`]，无则归属 root 层。
-    /// 用于背景组件与 `Modal` 子树内的 handler。
+    // 继承 context 栈中最近的 [`CurrentLayer`]，无则归属 root 层。
+    // 用于背景组件与 `Modal` 子树内的 handler。
     Current,
-    /// 显式绑定到给定层。用于 handler 注册在 `Modal` 父组件、而 `Modal` 经该句柄开层的场景。
+    // 显式绑定到给定层。用于 handler 注册在 `Modal` 父组件、而 `Modal` 经该句柄开层的场景。
     Layer(InputLayer),
-    /// 真全局：不受任何 `blocks_lower` 截断（如 Resize、全局帮助键）。
+    // 真全局：不受任何 `blocks_lower` 截断（如 Resize、全局帮助键）。
     Global,
 }
 
-/// handler 登记选项。
+// handler 登记选项。
 #[derive(Clone, Copy, Default)]
 pub struct EventOptions {
-    /// `true` 时鼠标事件仅在 handler 所属组件区域内命中才调用（键盘等事件不受影响)。
-    /// 复刻旧 `use_local_events` 的命中过滤。
+    // `true` 时鼠标事件仅在 handler 所属组件区域内命中才调用（键盘等事件不受影响)。
+    // 复刻旧 `use_local_events` 的命中过滤。
     pub hit_test: bool,
 }
 
-/// context 注入项：子树据此把 [`EventScope::Current`] 解析到所属层。
-/// 由 `Modal` / `use_input_layer` 经 `update_children(.., Some(Context::owned(CurrentLayer(id))))` 注入。
+// context 注入项：子树据此把 [`EventScope::Current`] 解析到所属层。
+// 由 `Modal` / `use_input_layer` 经 `update_children(.., Some(Context::owned(CurrentLayer(id))))` 注入。
 #[derive(Clone, Copy)]
 pub(crate) struct CurrentLayer(pub(crate) LayerId);
 
-/// 本帧一个输入层的登记。注册序（在 `layers` 中的下标）= update 自顶向下 = z 序：下标越大越靠上。
+// 本帧一个输入层的登记。注册序（在 `layers` 中的下标）= update 自顶向下 = z 序：下标越大越靠上。
 struct LayerEntry {
     id: LayerId,
-    /// `true` 时作为活跃栈顶会截断其下所有非 `Global` handler（模态独占）。
+    // `true` 时作为活跃栈顶会截断其下所有非 `Global` handler（模态独占）。
     blocks_lower: bool,
 }
 
-/// 本帧一个 handler 的登记。
+// 本帧一个 handler 的登记。
 struct HandlerEntry {
-    /// `None` = Global；`Some` = 归属层（`Current` 已解析为具体 `LayerId`）。
+    // `None` = Global；`Some` = 归属层（`Current` 已解析为具体 `LayerId`）。
     layer: Option<LayerId>,
     priority: EventPriority,
-    /// 注册序，作为同层同优先级的稳定 tie-break（自顶向下，父先于子)。
+    // 注册序，作为同层同优先级的稳定 tie-break（自顶向下，父先于子)。
     order: usize,
     options: EventOptions,
-    /// handler 所属组件区域，由 owning hook 在 `pre_component_draw` 经共享句柄回填（上一帧尺寸)。
+    // handler 所属组件区域，由 owning hook 在 `pre_component_draw` 经共享句柄回填（上一帧尺寸)。
     area: Rc<Cell<Rect>>,
     f: Box<dyn FnMut(Event) -> EventResult>,
 }
 
-/// 中央事件运行时，挂在 `SystemContext` 上。每帧重建层与 handler 表。
+// 中央事件运行时，挂在 `SystemContext` 上。每帧重建层与 handler 表。
 #[derive(Default)]
 pub(crate) struct InputRuntime {
     layers: Vec<LayerEntry>,
@@ -102,7 +102,7 @@ pub(crate) struct InputRuntime {
 }
 
 impl InputRuntime {
-    /// 每帧 update 开始时调用：清空上一帧的层与 handler，铸造并压入 root 层（`blocks_lower=false`）。
+    // 每帧 update 开始时调用：清空上一帧的层与 handler，铸造并压入 root 层（`blocks_lower=false`）。
     pub(crate) fn begin_frame(&mut self) {
         self.layers.clear();
         self.handlers.clear();
@@ -114,7 +114,7 @@ impl InputRuntime {
         });
     }
 
-    /// 当前帧 root 层 id。`begin_frame` 后必然存在。
+    // 当前帧 root 层 id。`begin_frame` 后必然存在。
     pub(crate) fn root_layer(&self) -> LayerId {
         self.root_layer.expect("begin_frame 未调用")
     }
@@ -125,10 +125,10 @@ impl InputRuntime {
         id
     }
 
-    /// 组件 update 期登记一个输入层，返回句柄。
-    ///
-    /// `open=false` 时仍铸造并返回 id（供同帧 `use_event_handler(Layer(h))` 绑定），
-    /// 但**不入** `layers` 栈 → 绑定到它的 handler 因不在活跃集而静默跳过。
+    // 组件 update 期登记一个输入层，返回句柄。
+    //
+    // `open=false` 时仍铸造并返回 id（供同帧 `use_event_handler(Layer(h))` 绑定），
+    // 但**不入** `layers` 栈 → 绑定到它的 handler 因不在活跃集而静默跳过。
     pub(crate) fn push_layer(&mut self, open: bool, blocks_lower: bool) -> InputLayer {
         let id = self.mint_layer_id();
         if open {
@@ -137,7 +137,7 @@ impl InputRuntime {
         InputLayer { id }
     }
 
-    /// 组件 update 期登记一个 handler。`layer=None` 表示全局 handler。
+    // 组件 update 期登记一个 handler。`layer=None` 表示全局 handler。
     pub(crate) fn register_handler(
         &mut self,
         layer: Option<LayerId>,
@@ -157,12 +157,12 @@ impl InputRuntime {
         });
     }
 
-    /// 在一次 render（update + draw）完整返回后、非借用期调用：把一个 raw 事件分发给本帧 handler。
-    ///
-    /// 两个 phase：
-    /// 1. **Global**：所有 `layer=None` handler，按 `(priority desc, order asc)`，遇 `Consumed` 终止全程。
-    /// 2. **层内**：活跃层（从栈顶向下遇首个 `blocks_lower` 截断)的 handler，
-    ///    按 `(层 z-order desc, priority desc, order asc)`——**z-order 第一键，不跨层比 priority**，遇 `Consumed` 早停。
+    // 在一次 render（update + draw）完整返回后、非借用期调用：把一个 raw 事件分发给本帧 handler。
+    //
+    // 两个 phase：
+    // 1. **Global**：所有 `layer=None` handler，按 `(priority desc, order asc)`，遇 `Consumed` 终止全程。
+    // 2. **层内**：活跃层（从栈顶向下遇首个 `blocks_lower` 截断)的 handler，
+    //    按 `(层 z-order desc, priority desc, order asc)`——**z-order 第一键，不跨层比 priority**，遇 `Consumed` 早停。
     pub(crate) fn dispatch(&mut self, event: Event) {
         // 活跃层集：从栈顶（末尾)向下，遇首个 blocks_lower=true 截断（含该层)。
         let cut = self
@@ -209,8 +209,8 @@ impl InputRuntime {
         // handlers 在此 drop（即弃)；下一帧 begin_frame 后由组件重建。
     }
 
-    /// 按给定顺序依次调用 handler，遇 `Consumed` 早停并返回 `true`
-    /// （供 Phase 1 决定是否截断 Phase 2）。
+    // 按给定顺序依次调用 handler，遇 `Consumed` 早停并返回 `true`
+    // （供 Phase 1 决定是否截断 Phase 2）。
     fn run_handlers(handlers: &mut [HandlerEntry], order: &[usize], event: &Event) -> bool {
         for &i in order {
             if Self::call_handler(&mut handlers[i], event) == EventResult::Consumed {
@@ -220,8 +220,8 @@ impl InputRuntime {
         false
     }
 
-    /// 调用单个 handler，先做鼠标命中过滤（仅当 `hit_test` 且事件为鼠标事件)。
-    /// 区域外视作未调用，返回 `Ignored` 让分发继续下一个候选。
+    // 调用单个 handler，先做鼠标命中过滤（仅当 `hit_test` 且事件为鼠标事件)。
+    // 区域外视作未调用，返回 `Ignored` 让分发继续下一个候选。
     fn call_handler(h: &mut HandlerEntry, event: &Event) -> EventResult {
         if h.options.hit_test
             && let Event::Mouse(m) = event

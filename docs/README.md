@@ -1,30 +1,40 @@
 # Ratatui Kit Docs
 
-这个目录是 ratatui-kit 的 Astro + Starlight 文档站。线上路径使用 GitHub Pages 项目站点：
+This directory contains the Astro + Starlight documentation site for ratatui-kit.
+The production site is published as a GitHub Pages project site:
 
 ```text
 https://yexiyue.github.io/ratatui-kit/
 ```
 
+The default locale is English at the root path. Simplified Chinese content lives under:
+
+```text
+https://yexiyue.github.io/ratatui-kit/zh-cn/
+```
+
+See [README.zh-CN.md](README.zh-CN.md) for the Chinese version of this file.
+
 ## Commands
 
-在 `docs/` 目录下运行：
+Run these commands from `docs/`:
 
 | Command | Action |
 | --- | --- |
-| `pnpm install --frozen-lockfile` | 安装文档站依赖 |
-| `pnpm dev` | 启动本地开发服务器 |
-| `pnpm build` | 构建静态站点到 `dist/` |
-| `pnpm preview` | 预览构建结果 |
+| `pnpm install --frozen-lockfile` | Install documentation dependencies |
+| `pnpm dev` | Start the local development server |
+| `pnpm build` | Build the static site into `dist/` |
+| `pnpm preview` | Preview the built site |
 
 ## Content
 
-- 文档页面放在 `src/content/docs/`。
-- 可复现的 VHS 脚本放在 `tapes/`。
-- 录制产物放在 `public/recordings/`。
-- Mermaid 流程图通过 `src/components/Mermaid.astro` 显式引入。
+- English docs live in `src/content/docs/`.
+- Simplified Chinese docs live in `src/content/docs/zh-cn/`.
+- Reproducible VHS scripts live in `tapes/`.
+- Recorded assets live in `public/recordings/`.
+- Mermaid diagrams are imported explicitly through `src/components/Mermaid.astro`.
 
-新增教程或组件页时，优先保持这条链路：
+When adding a new tutorial or component page, keep this chain intact:
 
 ```text
 example -> docs/tapes/<name>.tape -> public/recordings/<name>.gif -> docs page

@@ -1,90 +1,92 @@
 ---
-title: 安装与功能门控
-description: 在 Cargo 项目里接入 ratatui-kit，并选择合适的 feature set。
+title: Installation and feature flags
+description: Add ratatui-kit to a Cargo project and choose the right feature set.
 sidebar:
   order: 2
 ---
 
-Ratatui Kit 是一个 Rust crate。最小应用需要两类依赖：`ratatui-kit` 本身，以及一个 async runtime。文档和 examples 使用 Tokio。
+import { Code } from 'astro:components';
+import { RK_VERSION } from '../../../consts';
 
-```toml title="Cargo.toml"
+export const codeThemes = { light: 'github-light-default', dark: 'github-dark-default' };
+
+Ratatui Kit is a Rust crate. A minimal application needs two kinds of dependencies: `ratatui-kit` itself and an async runtime. The docs and examples use Tokio.
+
+<Code lang="toml" themes={codeThemes} code={`# Cargo.toml
 [dependencies]
-ratatui-kit = { version = "0.6.0" }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
-```
+ratatui-kit = { version = "${RK_VERSION}" }
+tokio = { version = "1", features = [
+    "rt-multi-thread", "macros", "time",
+] }`} />
 
-如果你在本仓库里开发 examples，用的是工作区路径依赖：
+If you are developing examples inside this repository, they use a workspace path dependency:
 
 ```toml title="Cargo.toml"
 ratatui-kit = { path = "crates/ratatui-kit", features = ["full"] }
 ```
 
-## 第一次学习用 full
+## Use full while learning
 
-仓库 examples 全部启用 `full`，因为它们要覆盖路由、Atom、输入、树形选择和虚拟列表：
+All repository examples enable `full` because they cover routing, Atom, input, tree selection, and virtual lists:
 
-```toml
-ratatui-kit = { version = "0.6.0", features = ["full"] }
-```
+<Code lang="toml" themes={codeThemes} code={`ratatui-kit = { version = "${RK_VERSION}", features = ["full"] }`} />
 
-`full` 适合：
+`full` is a good fit when you are:
 
-- 跟着文档跑所有 examples。
-- 做原型，不想先思考 feature 边界。
-- 写一个内部工具，二进制大小和依赖数量不是第一优先级。
+- Running every example while following the docs.
+- Prototyping and do not want to decide feature boundaries yet.
+- Writing an internal tool where binary size and dependency count are not the first priority.
 
-当你开始做库、模板或需要控制依赖体积的应用，再按需打开更小的 feature set。
+Once you start building a library, template, or application that needs tighter dependency control, enable smaller feature sets as needed.
 
-## 默认 feature 为空
+## Default features are empty
 
-`ratatui-kit` 的默认 feature 是空的：
+`ratatui-kit` has an empty default feature set:
 
 ```toml
 [features]
 default = []
 ```
 
-这意味着裸依赖只包含核心运行时、组件模型、hooks、布局、文本、滚动和基础组件。高级能力按 feature 打开：
+That means a bare dependency includes only the core runtime, component model, hooks, layout, text, scrolling, and foundational components. Advanced capabilities are enabled by feature flag:
 
-| feature | 解锁内容 | 额外依赖 |
+| feature | Enables | Extra dependencies |
 | --- | --- | --- |
-| `router` | `RouterProvider`、`Outlet`、`routes!`、`use_navigate`、`use_params`、`RouteState` | `regex` |
-| `atom` | `Atom`、`AtomState`、`use_atom` | 无 |
-| `input` | `Input`、`SearchInput` 和 `tui_input` re-export | `tui-input` |
-| `tree` | `TreeSelect` 和 `tui_tree_widget` re-export | `tui-tree-widget` |
-| `virtual-list` | `VirtualList` 和 `tui_widget_list` re-export | `tui-widget-list` |
-| `full` | 上面所有 feature | 上面所有依赖 |
+| `router` | `RouterProvider`, `Outlet`, `routes!`, `use_navigate`, `use_params`, `RouteState` | `regex` |
+| `atom` | `Atom`, `AtomState`, `use_atom` | none |
+| `input` | `Input`, `SearchInput`, and the `tui_input` re-export | `tui-input` |
+| `tree` | `TreeSelect` and the `tui_tree_widget` re-export | `tui-tree-widget` |
+| `virtual-list` | `VirtualList` and the `tui_widget_list` re-export | `tui-widget-list` |
+| `full` | All features above | All dependencies above |
 
-示例：
+Examples:
 
-```toml
-# 只需要搜索输入和确认弹窗
-ratatui-kit = { version = "0.6.0", features = ["input"] }
+<Code lang="toml" themes={codeThemes} code={`# Search input and confirmation modals only
+ratatui-kit = { version = "${RK_VERSION}", features = ["input"] }
 
-# 多页面应用 + 全局业务状态
-ratatui-kit = { version = "0.6.0", features = ["router", "atom"] }
+# Multi-page app + global business state
+ratatui-kit = { version = "${RK_VERSION}", features = ["router", "atom"] }
 
-# 大量数据列表
-ratatui-kit = { version = "0.6.0", features = ["virtual-list"] }
-```
+# Large data lists
+ratatui-kit = { version = "${RK_VERSION}", features = ["virtual-list"] }`} />
 
-## 选择 feature 的经验
+## Choosing features
 
-| 你要做什么 | 建议 |
+| What you want to build | Recommendation |
 | --- | --- |
-| 只写基础界面、计数器、局部状态和普通布局 | 不开 feature |
-| 使用 `Input` / `SearchInput` | 开 `input` |
-| 使用树形选择 | 开 `tree` |
-| 使用虚拟列表或虚拟多选模式 | 开 `virtual-list` |
-| 多页面终端应用 | 开 `router` |
-| 跨页面共享业务状态 | 开 `atom` |
-| 跟完整文档学习 | 开 `full` |
+| Basic UI, counters, local state, and ordinary layout | No feature flags |
+| `Input` / `SearchInput` | Enable `input` |
+| Tree selection | Enable `tree` |
+| Virtual lists or virtual multi-select patterns | Enable `virtual-list` |
+| Multi-page terminal applications | Enable `router` |
+| Cross-page shared business state | Enable `atom` |
+| Following the full docs | Enable `full` |
 
-弹窗组件本身不需要 `input` feature。`Modal`、`ConfirmModal`、`AlertModal` 和 `ShortcutInfoModal` 的输入互斥能力来自框架核心事件层；`input` feature 只控制基于 `tui-input` 的输入框组件。
+Modal components themselves do not need the `input` feature. `Modal`, `ConfirmModal`, `AlertModal`, and `ShortcutInfoModal` get input isolation from the framework's core event layer; the `input` feature only controls the text-input components built on `tui-input`.
 
-## 验证时用 all-features
+## Validate with all-features
 
-因为默认 feature 为空，如果你修改框架源码或 examples，裸 `cargo check` 可能会漏掉门控模块。仓库验证命令必须带 `--all-features`：
+Because the default feature set is empty, a plain `cargo check` can miss gated modules when you change framework source or examples. Repository validation commands must use `--all-features`:
 
 ```bash
 cargo test --locked --all-features --workspace --lib --tests --examples
@@ -92,12 +94,12 @@ cargo clippy --all-targets --all-features --workspace -- -D warnings
 cargo fmt --all --check
 ```
 
-这个规则也影响文档维护：如果一页文档讲 `TreeSelect`、`VirtualList` 或 Router，验证时要确保对应 feature 被编译到。
+This also matters for documentation maintenance: if a page covers `TreeSelect`, `VirtualList`, or Router, verification should compile the corresponding feature.
 
-## textarea 暂时不可用
+## textarea is temporarily unavailable
 
-`textarea` feature 目前没有接入。原因是底层 `tui-textarea` 版本还没有兼容当前 ratatui 0.30 栈。源码保留在仓库里，但未声明为模块，也不会出现在 `full` 中。
+The `textarea` feature is not currently wired in. The underlying `tui-textarea` version does not yet support the current Ratatui 0.30 stack. The source remains in the repository, but it is not declared as a module and is not included in `full`.
 
-多行正文展示优先用 [WrappedText](/ratatui-kit/components/wrapped-text/)；可编辑单行输入用 [Input](/ratatui-kit/components/input/) 或 [SearchInput](/ratatui-kit/components/search-input/)。
+For multi-line body display, prefer [WrappedText](/ratatui-kit/components/wrapped-text/). For editable single-line input, use [Input](/ratatui-kit/components/input/) or [SearchInput](/ratatui-kit/components/search-input/).
 
-下一步进入 [快速开始](/ratatui-kit/start/quick-start/)，跑起第一个终端界面。
+Next, go to [Quick start](/ratatui-kit/start/quick-start/) and run your first terminal interface.

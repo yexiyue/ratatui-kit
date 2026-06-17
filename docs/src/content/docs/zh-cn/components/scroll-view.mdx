@@ -1,0 +1,117 @@
+---
+title: ScrollView 滚动容器
+description: 用 ScrollView 承载超出视口的内容，并在需要时接管滚动状态。
+sidebar:
+  order: 2
+---
+
+`ScrollView` 是可滚动容器。它不会改变子组件的声明方式：你仍然用普通 `View`、`Text`、`Border` 组织内容，只是这些内容会先渲染到一个更大的内部缓冲区，再按当前 offset 显示到可见视口。
+
+![scrollview demo](/ratatui-kit/zh-cn/recordings/scrollview.gif)
+
+这个录屏由 `docs/tapes/scrollview.tape` 生成。示例展示一个受控文档阅读器：左侧是 `ScrollView`，右侧实时显示 `ScrollViewState` 的 offset。按 `j/k` 逐行滚动，按 `PageDown/PageUp` 翻页，状态面板会跟着变化。
+
+## 运行
+
+```bash
+cargo run --example scrollview
+```
+
+按 `j/k` 或方向键逐行滚动，按 `PageDown/PageUp` 翻页，按 `Home/End` 跳到顶部或底部，按 `q` 退出。
+
+## 自动状态
+
+最小形态不需要自己保存滚动状态：
+
+```rust
+ScrollView(
+    flex_direction: Direction::Vertical,
+    block: Block::bordered(),
+) {
+    for (index, row) in rows.into_iter().enumerate() {
+        View(key: index, height: Constraint::Length(1)) {
+            Text(text: row)
+        }
+    }
+}
+```
+
+不传 `scroll_view_state` 时，`ScrollView` 内部会创建自己的 `ScrollViewState`，并在当前 input layer 注册滚动事件。它支持 `j/k`、方向键、`PageUp/PageDown`、`Home/End` 和鼠标滚轮。
+
+内部滚动 handler 返回 `EventResult::Ignored`。这意味着滚动行为不会阻止同一层其它快捷键继续处理，比如页面里的 `q` 退出或 `?` 打开帮助。
+
+## 受控状态
+
+当页面需要读取 offset、重置滚动位置，或把滚动状态和其它 UI 联动时，传入外部 state：
+
+```rust title="examples/components/scrollview.rs"
+let scroll_state = hooks.use_state(ScrollViewState::default);
+
+hooks.use_event_handler_with_options(
+    EventScope::Current,
+    EventPriority::Normal,
+    EventOptions { hit_test: true },
+    move |event| {
+        let Event::Key(key) = &event else {
+            return EventResult::Ignored;
+        };
+
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Up | KeyCode::Char('k') => {
+                scroll_state.write().handle_event(&event);
+                EventResult::Consumed
+            }
+            KeyCode::PageDown | KeyCode::PageUp | KeyCode::Home | KeyCode::End => {
+                scroll_state.write().handle_event(&event);
+                EventResult::Consumed
+            }
+            _ => EventResult::Ignored,
+        }
+    },
+);
+
+ScrollView(
+    scroll_view_state: scroll_state,
+    scroll_bars: ScrollBars {
+        vertical_scrollbar_visibility: ScrollbarVisibility::Always,
+        horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
+        ..Default::default()
+    },
+) {
+    // rows
+}
+```
+
+示例用的就是受控状态：右侧状态面板读取 `scroll_state.get().offset()`，所以录屏里每次滚动都会看到 offset 改变。
+
+受控模式下，滚动事件由业务 handler 调用 `scroll_state.write().handle_event(&event)`。这让你可以决定哪些键消费事件、哪些键继续交给页面其它 handler。
+
+## 内容尺寸
+
+`ScrollView` 的内容尺寸来自子节点的布局约束。示例里每一行都显式设置高度：
+
+```rust
+View(key: index, height: Constraint::Length(1)) {
+    Text(text: row.line())
+}
+```
+
+如果子节点没有稳定高度，滚动距离会变得难预测。长文档、日志、快捷键表、只读详情页这类场景，通常把每一行固定为 `Constraint::Length(1)` 会更容易控制。
+
+`block` 会在滚动视口外绘制边框和标题：
+
+```rust
+ScrollView(
+    block: Block::bordered()
+        .title(Line::from(" controlled document ").centered())
+        .border_style(Style::new().cyan()),
+)
+```
+
+滚动条通过 `ScrollBars` 控制。`Automatic` 只在内容超出时显示；`Always` 会预留稳定空间；`Never` 适合明确不需要某个方向滚动的场景。
+
+## 与输入层组合
+
+`ScrollView` 的 handler 注册在 `EventScope::Current`。放进 `Modal` 或 `ShortcutInfoModal` 时，它会自然归属前景弹层的 current layer，所以弹窗内滚动不会穿透到背景页面。
+
+如果你只需要展示快捷键分组，优先用 [ShortcutInfoModal](/ratatui-kit/zh-cn/components/shortcut-info-modal/)；如果要渲染非常长的、带选择态的列表，看 [VirtualList](/ratatui-kit/zh-cn/components/virtual-list/)。

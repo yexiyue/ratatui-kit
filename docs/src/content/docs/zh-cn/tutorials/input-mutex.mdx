@@ -1,0 +1,141 @@
+---
+title: 输入互斥
+description: 用输入层让编辑框和弹窗独占键盘事件。
+sidebar:
+  order: 3
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+
+终端应用最容易出问题的地方，是“前景正在编辑或弹窗打开，背景列表却还在响应按键”。`input_mutex` 这个例子专门展示 ratatui-kit 的解决方式：背景列表、编辑层、弹窗层各自注册 handler，上层打开时截断下层。
+
+![input mutex demo](/ratatui-kit/zh-cn/recordings/input_mutex.gif)
+
+这个录屏由 `docs/tapes/input_mutex.tape` 生成。录屏中先移动背景列表，再打开编辑层输入 `jk`，最后打开弹窗并按 `j`。这些按键没有继续移动背景列表。
+
+## 运行
+
+```bash
+cargo run --example input_mutex
+```
+
+按 `j/k` 移动背景列表，按 `e` 进入编辑层，按 `Enter` 保存编辑，按 `d` 打开弹窗，按 `y/n` 确认或取消，按 `q` 退出。
+
+## 分发路径
+
+<Mermaid
+	chart={`
+flowchart TD
+    raw["terminal event"] --> global["global handlers"]
+    global --> active["active input layers"]
+    active --> modal["modal layer"]
+    active --> edit["edit layer"]
+    active --> root["background layer"]
+    modal --> consumed["Consumed stops here"]
+    edit --> consumed
+    root --> ignored["Ignored may continue"]
+	`}
+	caption="InputRuntime 先跑 Global，再从最上层向下投递；遇到 blocks_lower 或 Consumed 就停止继续传给背景。"
+/>
+
+旧模型是广播：所有订阅者都收到同一个事件。现在是中央分发：每帧组件重新登记 layer 和 handler，渲染完成后 `InputRuntime` 按层级投递一次事件。
+
+## 背景层
+
+背景列表用 `EventScope::Current` 注册在当前层。没有弹窗或编辑层时，它就是 root 层，可以处理 `j/k`、`e`、`d` 和 `q`。
+
+```rust title="examples/input/input_mutex.rs"
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    let Event::Key(key) = event else {
+        return EventResult::Ignored;
+    };
+    if key.kind != KeyEventKind::Press {
+        return EventResult::Ignored;
+    }
+
+    match key.code {
+        KeyCode::Char('j') if selected.get() + 1 < TASKS.len() => {
+            selected += 1;
+        }
+        KeyCode::Char('e') => editing.set(true),
+        KeyCode::Char('d') => confirm_open.set(true),
+        KeyCode::Char('q') => exit(),
+        _ => return EventResult::Ignored,
+    }
+
+    EventResult::Consumed
+});
+```
+
+`Consumed` 表示这个事件已经被处理，后续同层 handler 不再收到它。没有处理的键返回 `Ignored`，让事件继续寻找其它候选。
+
+## 编辑层
+
+编辑状态打开时，组件声明一个输入层：
+
+```rust
+let edit_layer = hooks.use_input_layer(editing.get(), true);
+```
+
+第二个参数 `true` 是关键：它表示这个层会截断更低层。于是编辑态下按 `j/k` 不再移动背景列表，而是被编辑层当普通字符捕获。
+
+```rust title="examples/input/input_mutex.rs"
+hooks.use_event_handler(
+    EventScope::Layer(edit_layer),
+    EventPriority::High,
+    move |event| {
+        if !editing.get() {
+            return EventResult::Ignored;
+        }
+
+        let Event::Key(key) = event else {
+            return EventResult::Ignored;
+        };
+
+        match key.code {
+            KeyCode::Esc => editing.set(false),
+            KeyCode::Enter => editing.set(false),
+            KeyCode::Char(c) => draft.write().push(c),
+            _ => {}
+        }
+
+        EventResult::Consumed
+    },
+);
+```
+
+`InputLayer` 句柄只在当前帧有效。不要把它存进 `State`，每帧都重新调用 `use_input_layer`。
+
+## 弹窗层
+
+如果弹窗的 handler 写在父组件里，就必须把同一个 layer 同时传给 handler 和 `Modal`：
+
+```rust title="examples/input/input_mutex.rs"
+let modal_layer = hooks.use_input_layer(confirm_open.get(), true);
+
+hooks.use_event_handler(
+    EventScope::Layer(modal_layer),
+    EventPriority::High,
+    move |event| {
+        // handle y / n / Esc
+        EventResult::Consumed
+    },
+);
+
+element!(
+    Modal(
+        open: confirm_open.get(),
+        layer: Some(modal_layer),
+    ) {
+        // modal content
+    }
+)
+```
+
+这里的配对很重要。如果 handler 绑定 `modal_layer`，但 `Modal` 没有收到 `layer: Some(modal_layer)`，`Modal` 会自己开一个新层并截断父级的 layer，结果父级 handler 会失聪。
+
+## 优先用内置组件
+
+普通搜索框、确认弹窗、提示弹窗和快捷键帮助弹窗已经有内置组件：`SearchInput`、`ConfirmModal`、`AlertModal`、`ShortcutInfoModal`。业务里优先使用它们，只有遇到复杂交互时再手写 `use_input_layer` 三件套。
+
+下一步看 [路由工作台](/ratatui-kit/zh-cn/tutorials/router/)，把输入互斥和页面结构组合起来。

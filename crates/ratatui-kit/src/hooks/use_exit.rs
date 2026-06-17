@@ -8,7 +8,7 @@ mod private {
 }
 
 pub trait UseExit: private::Sealed {
-    /// 注册退出回调，组件卸载时调用，适合清理资源、保存状态等场景。
+    // 注册退出回调，组件卸载时调用，适合清理资源、保存状态等场景。
     fn use_exit(&mut self) -> impl FnMut() + 'static;
 }
 

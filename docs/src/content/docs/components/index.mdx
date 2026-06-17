@@ -1,84 +1,84 @@
 ---
-title: 内置组件
-description: 按布局、文本、输入、弹层、选择和虚拟化场景选择组件。
+title: Built-in Components
+description: Choose components by layout, text, input, modal, selection, and virtualization scenarios.
 sidebar:
   order: 1
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-内置组件是 ratatui-kit 的参考手册，不是教程的替代品。教程会先带你把状态、输入互斥和路由串起来；当你开始写真实应用，需要查“应该用哪个组件、这个组件负责什么、不负责什么”时，再回到这里。
+The built-in components are the ratatui-kit reference manual, not a replacement for the tutorials. The tutorials first walk you through state, input exclusivity, and routing. When you start building a real application and need to look up which component to use, what it owns, and what it does not own, come back here.
 
-这些组件遵循同一条边界：业务中立、可组合、输入语义清晰。组件可以帮你处理布局、绘制、输入层和常见交互，但不会拥有你的业务数据模型。
+These components follow the same boundary: business-neutral, composable, and clear about input semantics. Components can help with layout, drawing, input layers, and common interactions, but they do not own your business data model.
 
 <CardGrid>
-  <Card title="先组合" icon="puzzle">
-    用 `View`、`Text`、`Border`、`ScrollView` 和选择组件搭界面；业务状态留在页面组件或 hook。
+  <Card title="Compose first" icon="puzzle">
+    Build the interface with `View`, `Text`, `Border`, `ScrollView`, and selection components. Keep business state in page components or hooks.
   </Card>
-  <Card title="再独占输入" icon="setting">
-    搜索框和弹窗类组件内部会创建输入层，打开时不会让背景组件继续处理键盘事件。
+  <Card title="Then isolate input" icon="setting">
+    Search inputs and modal components create input layers internally. When active, they stop background components from continuing to handle keyboard events.
   </Card>
-  <Card title="最后虚拟化" icon="rocket">
-    普通列表先用 `Select` / `MultiSelect`；数据量大、行渲染复杂时再用 `VirtualList`。
+  <Card title="Virtualize last" icon="rocket">
+    Start ordinary lists with `Select` / `MultiSelect`; move to `VirtualList` when the dataset is large or each row is expensive to render.
   </Card>
 </CardGrid>
 
-## 布局与文本
+## Layout and text
 
-| 组件 | 用途 | 继续阅读 |
+| Component | Purpose | Continue reading |
 | --- | --- | --- |
-| `View` | 默认布局容器，负责 flex-like 子区域切分 | [布局与文本基础](/ratatui-kit/components/layout-primitives/) |
-| `Border` | 边框、标题和局部装饰 | [布局与文本基础](/ratatui-kit/components/layout-primitives/) |
-| `Center` | 把子内容居中放进固定区域 | [布局与文本基础](/ratatui-kit/components/layout-primitives/) |
-| `Positioned` | 需要绝对定位的特殊布局 | [布局与文本基础](/ratatui-kit/components/layout-primitives/) |
-| `Fragment` | 透明容器，包住多个子节点但不创建独立布局节点 | [布局与文本基础](/ratatui-kit/components/layout-primitives/) |
-| `Text` | 单段文本、`Line`、`Text` 或字符串展示 | [布局与文本基础](/ratatui-kit/components/layout-primitives/) |
-| [WrappedText](/ratatui-kit/components/wrapped-text/) | 长正文自动换行，并把真实行数交给布局 | 长文本、日志、小说正文 |
-| [ScrollView](/ratatui-kit/components/scroll-view/) | 可滚动内容容器，适合包住长正文或长面板 | 局部滚动区域 |
+| `View` | Default layout container; splits child regions with flex-like rules | [Layout and text primitives](/ratatui-kit/components/layout-primitives/) |
+| `Border` | Borders, titles, and local decoration | [Layout and text primitives](/ratatui-kit/components/layout-primitives/) |
+| `Center` | Centers child content inside a fixed region | [Layout and text primitives](/ratatui-kit/components/layout-primitives/) |
+| `Positioned` | Special layout for absolute positioning | [Layout and text primitives](/ratatui-kit/components/layout-primitives/) |
+| `Fragment` | Transparent container that wraps multiple child nodes without creating an independent layout node | [Layout and text primitives](/ratatui-kit/components/layout-primitives/) |
+| `Text` | Displays a single text segment, `Line`, `Text`, or string | [Layout and text primitives](/ratatui-kit/components/layout-primitives/) |
+| [WrappedText](/ratatui-kit/components/wrapped-text/) | Automatically wraps long prose and gives the measured line count back to layout | Long text, logs, prose bodies |
+| [ScrollView](/ratatui-kit/components/scroll-view/) | Scrollable content container for long prose or long panels | Local scroll regions |
 
-`WrappedText` 和 `ScrollView` 是长文本体验的组合核心：前者决定内容高度，后者决定可见窗口和滚动条。它们来自真实阅读场景，而不是只为示例存在。
+`WrappedText` and `ScrollView` are the core pair for long-text experiences: the former decides content height, while the latter decides the visible viewport and scrollbars. They come from real reading scenarios, not just examples.
 
-## 输入与弹层
+## Input and modals
 
-| 组件 | 用途 | 输入语义 |
+| Component | Purpose | Input semantics |
 | --- | --- | --- |
-| [Input](/ratatui-kit/components/input/) | 单行输入显示与底层编辑状态 | 低层组件，通常由上层组件驱动 |
-| [SearchInput](/ratatui-kit/components/search-input/) | 带激活键、提交、清空和编辑态的搜索/新增输入 | 打开编辑态后独占输入 |
-| [Modal](/ratatui-kit/components/modal/) | 基础弹层、遮罩、定位和 layer 注入 | 需要和 handler 共享同一个 layer |
-| [ConfirmModal](/ratatui-kit/components/confirm-modal/) | 确认/取消流程 | 内部封装独占输入层 |
-| [AlertModal](/ratatui-kit/components/alert-modal/) | 提示信息和关闭键 | 内部封装独占输入层 |
-| [ShortcutInfoModal](/ratatui-kit/components/shortcut-info-modal/) | 可滚动快捷键帮助 | 内部封装独占输入层 |
+| [Input](/ratatui-kit/components/input/) | Single-line input rendering and low-level editing state | Low-level component, usually driven by a higher-level component |
+| [SearchInput](/ratatui-kit/components/search-input/) | Search/create input with activation key, submit, clear, and editing state | Owns input while editing is open |
+| [Modal](/ratatui-kit/components/modal/) | Base modal layer, mask, positioning, and layer injection | Must share the same layer with the handler |
+| [ConfirmModal](/ratatui-kit/components/confirm-modal/) | Confirm/cancel flows | Wraps an exclusive input layer internally |
+| [AlertModal](/ratatui-kit/components/alert-modal/) | Messages and close key | Wraps an exclusive input layer internally |
+| [ShortcutInfoModal](/ratatui-kit/components/shortcut-info-modal/) | Scrollable shortcut help | Wraps an exclusive input layer internally |
 
-如果只是业务确认、提示、快捷键帮助，优先使用封装好的 modal 组件。只有弹窗内部有自己的复杂交互时，才手写 `use_input_layer`、`use_event_handler(EventScope::Layer(...))` 和 `Modal(layer: Some(...))`。
+If you only need business confirmation, a message, or shortcut help, prefer the packaged modal components. Reach for handwritten `use_input_layer`, `use_event_handler(EventScope::Layer(...))`, and `Modal(layer: Some(...))` only when the modal content has its own complex interaction model.
 
-## 选择与虚拟化
+## Selection and virtualization
 
-| 组件或模式 | 用途 | 继续阅读 |
+| Component or pattern | Purpose | Continue reading |
 | --- | --- | --- |
-| [Select](/ratatui-kit/components/select/) | 普通单选列表 | 小到中等列表 |
-| [MultiSelect](/ratatui-kit/components/multi-select/) | 普通多选列表 | 小到中等多选 |
-| [TreeSelect](/ratatui-kit/components/tree-select/) | 通用树形选择，不绑定文件语义 | 分组、层级、目录式数据 |
-| [VirtualList](/ratatui-kit/components/virtual-list/) | 长列表窗口化渲染，自定义行 | 几千到几万行 |
-| [Virtual Multi Select](/ratatui-kit/components/virtual-multi-select/) | `VirtualList + HashSet` 组合出来的长列表多选模式 | 长列表多选、业务自控选择集 |
+| [Select](/ratatui-kit/components/select/) | Ordinary single-select list | Small to medium lists |
+| [MultiSelect](/ratatui-kit/components/multi-select/) | Ordinary multi-select list | Small to medium multi-select |
+| [TreeSelect](/ratatui-kit/components/tree-select/) | Generic tree selection without file-specific semantics | Grouped, hierarchical, directory-like data |
+| [VirtualList](/ratatui-kit/components/virtual-list/) | Windowed rendering for long lists with custom rows | Thousands to tens of thousands of rows |
+| [Virtual Multi Select](/ratatui-kit/components/virtual-multi-select/) | Long-list multi-select pattern composed from `VirtualList + HashSet` | Long-list multi-select where business code owns the selected set |
 
-`Virtual Multi Select` 不是单独组件，而是一个推荐组合模式。这样比把每种业务选择都做成内置组件更稳：`VirtualList` 只负责光标、窗口化和可见行渲染，选择集合仍然由业务代码拥有。
+`Virtual Multi Select` is not a separate component. It is a recommended composition pattern. This is steadier than turning every business selection variant into a built-in component: `VirtualList` owns only cursor movement, windowing, and visible row rendering, while your business code still owns the selection set.
 
-## 真实 examples
+## Real examples
 
-| 场景 | example | VHS |
+| Scenario | Example | VHS |
 | --- | --- | --- |
-| 滚动容器 | `cargo run --example scrollview` | `docs/tapes/scrollview.tape` |
-| 自动换行正文 | `cargo run --example wrapped_text` | `docs/tapes/wrapped-text.tape` |
-| 单行输入 | `cargo run --example input` | `docs/tapes/input.tape` |
-| 搜索/新增输入 | `cargo run --example search_input` | `docs/tapes/search-input.tape` |
-| 基础弹层 | `cargo run --example modal` | `docs/tapes/modal.tape` |
-| 确认弹窗 | `cargo run --example confirm_modal` | `docs/tapes/confirm-modal.tape` |
-| 提示弹窗 | `cargo run --example alert_modal` | `docs/tapes/alert-modal.tape` |
-| 快捷键帮助 | `cargo run --example shortcut_info_modal` | `docs/tapes/shortcut-info-modal.tape` |
-| 单选 | `cargo run --example select` | `docs/tapes/select.tape` |
-| 多选 | `cargo run --example multi_select` | `docs/tapes/multi-select.tape` |
-| 树形选择 | `cargo run --example tree_select` | `docs/tapes/tree-select.tape` |
-| 虚拟列表 | `cargo run --example virtual_list` | `docs/tapes/virtual-list.tape` |
-| 虚拟多选模式 | `cargo run --example virtual_multi_select` | `docs/tapes/virtual-multi-select.tape` |
+| Scroll container | `cargo run --example scrollview` | `docs/tapes/scrollview.tape` |
+| Auto-wrapped prose | `cargo run --example wrapped_text` | `docs/tapes/wrapped-text.tape` |
+| Single-line input | `cargo run --example input` | `docs/tapes/input.tape` |
+| Search/create input | `cargo run --example search_input` | `docs/tapes/search-input.tape` |
+| Base modal | `cargo run --example modal` | `docs/tapes/modal.tape` |
+| Confirm modal | `cargo run --example confirm_modal` | `docs/tapes/confirm-modal.tape` |
+| Alert modal | `cargo run --example alert_modal` | `docs/tapes/alert-modal.tape` |
+| Shortcut help | `cargo run --example shortcut_info_modal` | `docs/tapes/shortcut-info-modal.tape` |
+| Single select | `cargo run --example select` | `docs/tapes/select.tape` |
+| Multi select | `cargo run --example multi_select` | `docs/tapes/multi-select.tape` |
+| Tree select | `cargo run --example tree_select` | `docs/tapes/tree-select.tape` |
+| Virtual list | `cargo run --example virtual_list` | `docs/tapes/virtual-list.tape` |
+| Virtual multi-select pattern | `cargo run --example virtual_multi_select` | `docs/tapes/virtual-multi-select.tape` |
 
-后续新增内置组件时，也应该先补 example、VHS tape 和参考页。文档里出现的组件行为必须能从真实 example 复现。
+When adding new built-in components later, add the example, VHS tape, and reference page together. Component behavior described in the docs must be reproducible from a real example.

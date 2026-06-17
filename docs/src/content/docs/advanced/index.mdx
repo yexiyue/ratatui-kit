@@ -1,57 +1,57 @@
 ---
-title: 高级自定义
-description: 自定义 Hook、手写 Component、原生 widget 桥接和 Provider 扩展。
+title: Advanced Customization
+description: Custom hooks, handwritten Components, native widget bridges, and Provider extensions.
 sidebar:
   order: 1
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-高级自定义是 ratatui-kit 的逃生口，不是学习路径的起点。React 把这类内容放在 Escape Hatches，Vue 把组合复用、插件和渲染机制放在更靠后的章节；ratatui-kit 也遵循同样原则：先组合内置组件、hooks、输入层和 Router，只有框架边界已经清楚时，才下沉到自定义能力。
+Advanced customization is ratatui-kit's escape hatch, not the starting point for learning the framework. React places these topics under Escape Hatches, and Vue keeps composition reuse, plugins, and rendering mechanisms in later chapters. ratatui-kit follows the same principle: compose built-in components, hooks, input layers, and Router first; drop down to custom abilities only once the framework boundaries are clear.
 
 <CardGrid>
-  <Card title="组合优先" icon="puzzle">
-    业务状态、输入互斥、弹窗、列表和长文本先用现有组件与 hooks 组合。能组合出来，就不要急着手写 runtime 能力。
+  <Card title="Compose first" icon="puzzle">
+    Start by composing business state, input exclusivity, modals, lists, and long text with existing components and hooks. If composition solves it, do not rush into handwritten runtime capability.
   </Card>
-  <Card title="边界清楚" icon="setting">
-    自定义 Hook 管逻辑复用，Provider 管作用域依赖，手写 Component 管绘制和布局。不要让一个抽象同时接管所有事情。
+  <Card title="Keep boundaries clear" icon="setting">
+    Custom hooks own logic reuse, Providers own scoped dependencies, and handwritten Components own drawing and layout. Do not let one abstraction take over everything at once.
   </Card>
-  <Card title="保留测试面" icon="rocket">
-    高级 example 仍然要能 `cargo run --example ...`，并用 VHS 录出真实运行素材；文档不能只描述一个想象中的 API。
+  <Card title="Keep the test surface" icon="rocket">
+    Advanced examples still need to run with `cargo run --example ...` and produce real VHS recordings. Docs should not describe an imagined API.
   </Card>
 </CardGrid>
 
-## 选择哪条路
+## Which path to choose
 
-| 你遇到的问题 | 优先方案 | 继续阅读 |
-| --- | --- |
-| 多个组件重复同一段状态、派生数据、事件处理 | 写组合型 `use_*` 函数 | [自定义 Hook](/ratatui-kit/advanced/custom-hook/) |
-| 一棵子树需要同一份主题、workspace、服务句柄或权限上下文 | 封装 Provider / `ContextProvider` | [自定义 Provider](/ratatui-kit/advanced/custom-provider/) |
-| 现有内置组件不能覆盖某个 ratatui widget 或 stateful widget | 手写 `Component::draw` | [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/) |
-| 子组件区域不再是普通 flex 切分 | 重写 `calc_children_areas` | [渲染循环](/ratatui-kit/internals/render-loop/) |
-| 需要理解为什么状态保留、为什么事件不穿透 | 先回到核心模型 | [组件模型](/ratatui-kit/core/component-model/) / [输入层](/ratatui-kit/core/input-layers/) |
+| Problem | Preferred path | Continue reading |
+| --- | --- | --- |
+| Multiple components repeat the same state, derived data, or event handling | Write a compositional `use_*` function | [Custom Hook](/ratatui-kit/advanced/custom-hook/) |
+| A subtree needs the same theme, workspace, service handle, or permission context | Wrap a Provider / `ContextProvider` | [Custom Provider](/ratatui-kit/advanced/custom-provider/) |
+| Existing built-in components do not cover a ratatui widget or stateful widget | Handwrite `Component::draw` | [Native Widget Bridging](/ratatui-kit/advanced/custom-widget/) |
+| Child regions are no longer ordinary flex splits | Override `calc_children_areas` | [Render Loop](/ratatui-kit/internals/render-loop/) |
+| You need to understand why state is preserved or why events do not pass through | Return to the core model first | [Component Model](/ratatui-kit/core/component-model/) / [Input Layers](/ratatui-kit/core/input-layers/) |
 
-## 不要过早自定义
+## Do not customize too early
 
-很多看起来“需要扩展框架”的需求，其实是作用域选错了：
+Many requirements that look like "framework extension" are really scope mistakes:
 
-- 页面私有状态优先放在 `use_state`，不要默认升到 Atom。
-- 跨子树配置优先用 Provider，不要因为“传得远”就用进程级全局状态。
-- 弹窗、搜索输入、确认流程优先用内置组件，不要重新发明输入互斥。
-- 派生数据优先用 `use_memo`，不要复制成第二份可变状态。
-- draw 阶段只渲染，不要在那里触发响应式写入。
+- Keep page-private state in `use_state` first; do not default to Atom.
+- Use Provider for cross-subtree configuration; do not use process-wide global state just because props travel far.
+- Use built-in components for modals, search inputs, and confirmation flows; do not reinvent input exclusivity.
+- Use `use_memo` for derived data; do not copy it into a second mutable state value.
+- Draw during draw; do not trigger reactive writes there.
 
-如果一个自定义抽象需要同时改状态模型、输入模型、布局模型和绘制模型，通常说明它还没有被切小。先把问题拆成可测试的 hook、provider 或组件，再决定是否需要框架级 API。
+If one custom abstraction needs to change the state model, input model, layout model, and drawing model at the same time, it is usually not small enough yet. Split the problem into testable hooks, providers, or components first, then decide whether a framework-level API is needed.
 
-## 高级 example 的标准
+## Standards for advanced examples
 
-这里的每条高级教程都必须满足同一组约束：
+Every advanced tutorial here follows the same constraints:
 
-- 有真实源码，位于 `examples/advanced/`。
-- 有稳定命令，例如 `cargo run --example custom_hook`。
-- 有 VHS tape，位于 `docs/tapes/`。
-- 有真实运行素材，位于 `docs/public/recordings/`。
-- 文档先展示运行结果，再解释抽象边界。
-- 如果文档暴露出 API 不顺或语义不清，先修框架，再补文档。
+- It has real source code under `examples/advanced/`.
+- It has a stable command such as `cargo run --example custom_hook`.
+- It has a VHS tape under `docs/tapes/`.
+- It has real runtime media under `docs/public/recordings/`.
+- The docs show the running result before explaining abstraction boundaries.
+- If the docs reveal awkward API or unclear semantics, fix the framework first and then update the docs.
 
-下一步可以从 [自定义 Hook](/ratatui-kit/advanced/custom-hook/) 开始。它是最常见、风险最低的扩展方式，也最适合从业务代码里沉淀经验。
+You can start with [Custom Hook](/ratatui-kit/advanced/custom-hook/). It is the most common and lowest-risk extension style, and the best place to extract experience from business code.

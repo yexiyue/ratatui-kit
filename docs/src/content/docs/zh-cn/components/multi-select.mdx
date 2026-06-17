@@ -1,0 +1,96 @@
+---
+title: MultiSelect 多选
+description: 用内置 MultiSelect 处理草稿选择、提交确认和外部选中态。
+sidebar:
+  order: 3
+---
+
+`MultiSelect` 是普通多选列表组件。它和 `Select` 一样内部持有 `ListState`，但把交互拆成两层：`Space` 切换草稿选择并触发 `on_change`，`Enter` 提交当前选择并触发 `on_select`。
+
+![multi select demo](/ratatui-kit/zh-cn/recordings/multi-select.gif)
+
+这个录屏由 `docs/tapes/multi-select.tape` 生成。示例用 `default_index` 把光标放到第一项，先用 `Space` 勾选 Format，再移动到 Clippy 勾选并按 `Enter` 提交，最后切到空态。
+
+## 运行
+
+```bash
+cargo run --example multi_select
+```
+
+按 `j/k` 移动，按 `Space` 切换选中，按 `Enter` 提交，按 `e` 切换空态，按 `q` 退出。
+
+## 最小形态
+
+```rust title="examples/components/multi_select.rs"
+MultiSelect<&'static str>(
+    items: items,
+    default_index: Some(0),
+    highlight_symbol: "> ",
+    empty_message: "No checks",
+    on_change: move |items: Vec<&'static str>| {
+        selected_count.set(items.len());
+    },
+    on_select: move |items: Vec<&'static str>| {
+        submitted.set(format!("submitted {} checks", items.len()));
+    },
+)
+```
+
+`default_index` 只负责默认光标，不会自动勾选项目。选中集合始终来自用户的 `Space` 操作，或来自你传入的外部 `selected` 状态。
+
+## 草稿和提交
+
+`on_change` 和 `on_select` 都收到已经按当前索引顺序整理好的 `Vec<T>`：
+
+- `on_change`：每次 `Space` 后触发，适合更新右侧预览、计数、筛选摘要。
+- `on_select`：按 `Enter` 后触发，适合确认提交、关闭弹层、进入下一步流程。
+
+```rust title="examples/components/multi_select.rs"
+on_change: move |items: Vec<&'static str>| {
+    draft.set(selection_label(&items));
+    submitted.set("draft changed".to_string());
+},
+on_select: move |items: Vec<&'static str>| {
+    submitted.set(if items.is_empty() {
+        "submitted none".to_string()
+    } else {
+        format!("submitted {} checks", items.len())
+    });
+},
+```
+
+这个拆分适合搜索结果、批量操作、设置面板和弹窗里的多选确认：用户可以先试选，再用一个明确动作提交。
+
+## 外部状态
+
+默认情况下，`MultiSelect` 自己保存光标和选中集合。如果业务要跨组件读取或重置它们，可以传入外部状态：
+
+```rust
+MultiSelect<&'static str>(
+    state: list_state,
+    selected: selected_indices,
+    items: items,
+    on_change: move |items| {
+        summary.set(format!("{} selected", items.len()));
+    },
+)
+```
+
+`selected` 的类型是 `State<HashSet<usize>>`。当列表变短时，组件会自动裁掉越界的选中索引；当光标越界时，会把光标夹回最后一个有效项。空列表只显示 `empty_message`，不消费导航键或确认键，父组件仍然可以处理 `e`、`q` 这类页面快捷键。
+
+## 布局和样式
+
+`MultiSelect` 可以直接接收 `width`、`height`、`margin` 和 `offset`，并转发给内部 `Border`：
+
+```rust
+MultiSelect<&'static str>(
+    width: Constraint::Length(36),
+    top_title: Line::from(" release checks ").centered(),
+    bottom_title: Line::from(" draft selection ").centered(),
+    border_style: Style::new().fg(Color::Cyan),
+    highlight_style: Style::new().fg(Color::Black).bg(Color::Green),
+    selected_item_style: Style::new().fg(Color::Yellow).bold(),
+)
+```
+
+如果一个页面里有多个选择控件，用 `active: false` 关闭暂时不该响应输入的实例。放进 `Modal` 子树时，`Current` handler 会自动归属弹窗输入层，不会再让弹窗背后的组件处理同一组按键。层级数据看 [TreeSelect](/ratatui-kit/zh-cn/components/tree-select/)。

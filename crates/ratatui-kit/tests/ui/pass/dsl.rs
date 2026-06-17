@@ -1,4 +1,4 @@
-//! 新 DSL 应编译通过：一等控制流、widget()/stateful 之 widget()、{ expr }、Text。
+// 新 DSL 应编译通过：一等控制流、widget()/stateful 之 widget()、{ expr }、Text。
 #![allow(dead_code)]
 
 use ratatui_kit::prelude::*;

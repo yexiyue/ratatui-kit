@@ -1,18 +1,18 @@
-//! Border 组件：为内容添加可定制的边框、标题、内边距等。
-//!
-//! 常用于包裹内容、分组、突出显示等场景。
-//!
-//! ## 用法示例
-//! ```rust
-//! element!(Border(
-//!     border_style: Style::default().blue(),
-//!     top_title: Some(Line::from("标题")),
-//!     padding: Padding::new(1, 1, 0, 0),
-//! ){
-//!     ChildComponent()
-//! })
-//! ```
-//! 支持自定义边框样式、边框字符集、上下标题、内边距等属性。
+// Border 组件：为内容添加可定制的边框、标题、内边距等。
+//
+// 常用于包裹内容、分组、突出显示等场景。
+//
+// ## 用法示例
+// ```rust
+// element!(Border(
+//     border_style: Style::default().blue(),
+//     top_title: Some(Line::from("标题")),
+//     padding: Padding::new(1, 1, 0, 0),
+// ){
+//     ChildComponent()
+// })
+// ```
+// 支持自定义边框样式、边框字符集、上下标题、内边距等属性。
 
 use ratatui::{
     symbols::border,
@@ -25,23 +25,23 @@ use crate::{AnyElement, Component};
 
 #[with_layout_style]
 #[derive(Props)]
-/// Border 组件属性。
+// Border 组件属性。
 pub struct BorderProps<'a> {
-    /// 内边距。
+    // 内边距。
     pub padding: Padding,
-    /// 边框样式。
+    // 边框样式。
     pub border_style: ratatui::style::Style,
-    /// 显示哪些边。
+    // 显示哪些边。
     pub borders: ratatui::widgets::Borders,
-    /// 边框字符集。
+    // 边框字符集。
     pub border_set: border::Set<'static>,
-    /// 整体样式。
+    // 整体样式。
     pub style: ratatui::style::Style,
-    /// 子元素列表。
+    // 子元素列表。
     pub children: Vec<AnyElement<'a>>,
-    /// 顶部标题。可直接传 `Line`(经宏 `.into()` + std `From<T> for Option<T>` 自动 `Some`)或 `Option<Line>`。
+    // 顶部标题。可直接传 `Line`(经宏 `.into()` + std `From<T> for Option<T>` 自动 `Some`)或 `Option<Line>`。
     pub top_title: Option<Line<'static>>,
-    /// 底部标题。可直接传 `Line`(自动 `Some`)或 `Option<Line>`。
+    // 底部标题。可直接传 `Line`(自动 `Some`)或 `Option<Line>`。
     pub bottom_title: Option<Line<'static>>,
 }
 
@@ -67,7 +67,7 @@ impl Default for BorderProps<'_> {
     }
 }
 
-/// Border 组件实现。
+// Border 组件实现。
 pub struct Border {
     pub padding: Padding,
     pub border_style: ratatui::style::Style,
@@ -79,7 +79,7 @@ pub struct Border {
 }
 
 impl Border {
-    /// 从 props 派生自身状态的单一构造源（字段镜像列表只写一处，避免 new/update 漂移）。
+    // 从 props 派生自身状态的单一构造源（字段镜像列表只写一处，避免 new/update 漂移）。
     fn from_props(props: &BorderProps<'_>) -> Self {
         Self {
             padding: props.padding,
@@ -96,12 +96,12 @@ impl Border {
 impl Component for Border {
     type Props<'a> = BorderProps<'a>;
 
-    /// 根据属性创建 Border 组件实例
+    // 根据属性创建 Border 组件实例
     fn new(props: &Self::Props<'_>) -> Self {
         Self::from_props(props)
     }
 
-    /// 根据最新属性和子组件更新自身状态
+    // 根据最新属性和子组件更新自身状态
     fn update(
         &mut self,
         props: &mut Self::Props<'_>,
@@ -114,7 +114,7 @@ impl Component for Border {
         updater.update_children(&mut props.children, None);
     }
 
-    /// 渲染 Border 组件
+    // 渲染 Border 组件
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
         // 构建 Block，设置样式、边框、内边距等
         let mut block = Block::new()

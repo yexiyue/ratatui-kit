@@ -1,19 +1,19 @@
-//! Modal 组件：模态弹窗，支持遮罩、居中/自定义位置、尺寸、样式等。
-//!
-//! ## 用法示例
-//! ```rust
-//! element!(Modal(
-//!     open: open.get(),
-//!     width: Constraint::Percentage(60),
-//!     height: Constraint::Percentage(60),
-//!     style: Style::default().dim(),
-//! ){
-//!     Border(top_title: Some(Line::from("弹窗内容"))) {
-//!         // ...子内容
-//!     }
-//! })
-//! ```
-//! 通过 `open` 控制显示，`placement` 控制弹窗位置，`width/height` 控制尺寸。
+// Modal 组件：模态弹窗，支持遮罩、居中/自定义位置、尺寸、样式等。
+//
+// ## 用法示例
+// ```rust
+// element!(Modal(
+//     open: open.get(),
+//     width: Constraint::Percentage(60),
+//     height: Constraint::Percentage(60),
+//     style: Style::default().dim(),
+// ){
+//     Border(top_title: Some(Line::from("弹窗内容"))) {
+//         // ...子内容
+//     }
+// })
+// ```
+// 通过 `open` 控制显示，`placement` 控制弹窗位置，`width/height` 控制尺寸。
 
 use ratatui::{
     layout::{Constraint, Flex, Layout, Margin, Offset},
@@ -29,7 +29,7 @@ use crate::{
 };
 
 #[derive(Default, Clone, Copy)]
-/// 弹窗位置枚举。
+// 弹窗位置枚举。
 pub enum Placement {
     Top,
     TopLeft,
@@ -61,29 +61,29 @@ impl Placement {
 
 #[with_layout_style(margin, offset, width, height)]
 #[derive(Default, Props)]
-/// Modal 组件属性。
+// Modal 组件属性。
 pub struct ModalProps<'a> {
-    /// 弹窗内容。
+    // 弹窗内容。
     pub children: Vec<AnyElement<'a>>,
-    /// 弹窗样式。
+    // 弹窗样式。
     pub style: Style,
-    /// 弹窗位置。
+    // 弹窗位置。
     pub placement: Placement,
-    /// 是否显示弹窗。
+    // 是否显示弹窗。
     pub open: bool,
-    /// 外部注入的输入层句柄（父组件已 `use_input_layer` 时)。
-    ///
-    /// `None` → Modal 内部自开层（handler 全在 Modal 子树内的常见场景)；
-    /// `Some(h)` → 复用父级已登记的层（不重复登记)，仅向子树注入 `CurrentLayer`——
-    /// 用于「handler 注册在 Modal 父组件」的场景（父 `use_input_layer` + `use_event_handler(Layer(h))`)。
-    ///
-    /// **Footgun**：走 `Layer(h)` 路径时必须把 `h` 传进来，否则 Modal 自开新层会截断 `h` → 父级 handler 失聪。
+    // 外部注入的输入层句柄（父组件已 `use_input_layer` 时)。
+    //
+    // `None` → Modal 内部自开层（handler 全在 Modal 子树内的常见场景)；
+    // `Some(h)` → 复用父级已登记的层（不重复登记)，仅向子树注入 `CurrentLayer`——
+    // 用于「handler 注册在 Modal 父组件」的场景（父 `use_input_layer` + `use_event_handler(Layer(h))`)。
+    //
+    // **Footgun**：走 `Layer(h)` 路径时必须把 `h` 传进来，否则 Modal 自开新层会截断 `h` → 父级 handler 失聪。
     pub layer: Option<InputLayer>,
-    /// 是否截断更低层。`None` 视作 `true`（模态独占输入)；非阻塞浮层可设 `Some(false)`。
+    // 是否截断更低层。`None` 视作 `true`（模态独占输入)；非阻塞浮层可设 `Some(false)`。
     pub blocks_lower: Option<bool>,
 }
 
-/// Modal 组件实现。
+// Modal 组件实现。
 pub struct Modal {
     pub open: bool,
     pub margin: Margin,

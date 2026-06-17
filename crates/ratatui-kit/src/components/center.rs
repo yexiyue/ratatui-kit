@@ -8,7 +8,7 @@ pub struct CenterProps<'a> {
     pub children: Vec<AnyElement<'a>>,
 }
 
-/// 居中布局组件
+// 居中布局组件
 pub struct Center;
 
 impl Component for Center {

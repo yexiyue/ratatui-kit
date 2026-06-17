@@ -24,11 +24,11 @@ mod private {
 
 #[doc(hidden)]
 pub trait ElementRepr: private::Sealed + Sized {
-    /// 获取元素的唯一 key，适合 diff、重用等场景。
+    // 获取元素的唯一 key，适合 diff、重用等场景。
     fn key(&self) -> &ElementKey;
-    /// 获取并可变修改元素的属性（props）。
+    // 获取并可变修改元素的属性（props）。
     fn props_mut(&'_ mut self) -> AnyProps<'_>;
-    /// 获取组件辅助操作对象，支持动态调度和扩展。
+    // 获取组件辅助操作对象，支持动态调度和扩展。
     fn helper(&self) -> Box<dyn ComponentHelperExt>;
 }
 
@@ -49,14 +49,14 @@ where
     }
 }
 
-/// ElementExt trait 为所有 UI 元素提供应用入口方法。
-///
-/// # 常用用法
-/// ```rust
-/// element!(MyComponent).fullscreen().await?;
-/// ```
+// ElementExt trait 为所有 UI 元素提供应用入口方法。
+//
+// # 常用用法
+// ```rust
+// element!(MyComponent).fullscreen().await?;
+// ```
 pub trait ElementExt: ElementRepr {
-    /// 启动渲染主循环，传入终端选项，适合自定义Viewport场景。
+    // 启动渲染主循环，传入终端选项，适合自定义Viewport场景。
     fn render_loop(&mut self, options: TerminalOptions) -> impl Future<Output = io::Result<()>> {
         async move {
             let terminal = Terminal::new(CrossTerminal::with_options(options)?)?;
@@ -65,7 +65,7 @@ pub trait ElementExt: ElementRepr {
         }
     }
 
-    /// 以全屏模式运行当前元素，适合大多数终端 UI 应用入口。
+    // 以全屏模式运行当前元素，适合大多数终端 UI 应用入口。
     fn fullscreen(&mut self) -> impl Future<Output = io::Result<()>> {
         async move {
             let terminal = Terminal::new(CrossTerminal::new()?)?;

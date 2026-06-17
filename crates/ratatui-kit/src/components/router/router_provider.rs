@@ -1,15 +1,15 @@
-//! RouterProvider 组件：为终端应用提供路由上下文和历史管理，支持多页面、嵌套路由、参数等。
-//!
-//! 常与 Outlet、Routes 等配合，实现页面跳转和路由状态共享。
-//!
-//! ## 用法示例
-//! ```rust
-//! element!(RouterProvider(
-//!     routes: my_routes(),
-//!     index_path: "/".to_string(),
-//! ))
-//! ```
-//! 子组件可通过 hooks.use_navigate() 跳转页面，通过 hooks.use_route() 获取当前路由。
+// RouterProvider 组件：为终端应用提供路由上下文和历史管理，支持多页面、嵌套路由、参数等。
+//
+// 常与 Outlet、Routes 等配合，实现页面跳转和路由状态共享。
+//
+// ## 用法示例
+// ```rust
+// element!(RouterProvider(
+//     routes: my_routes(),
+//     index_path: "/".to_string(),
+// ))
+// ```
+// 子组件可通过 hooks.use_navigate() 跳转页面，通过 hooks.use_route() 获取当前路由。
 
 use crate::{
     Component, Context, Hooks, UseState,
@@ -20,15 +20,15 @@ use ratatui_kit_macros::{Props, element};
 use std::collections::HashMap;
 
 #[derive(Default, Props)]
-/// RouterProvider 组件属性。
+// RouterProvider 组件属性。
 pub struct RouterProviderProps {
-    /// 路由表。
+    // 路由表。
     pub routes: Routes,
-    /// 默认首页路径。
+    // 默认首页路径。
     pub index_path: String,
-    /// 路由历史最大长度。可直接传 `usize`(自动 `Some`)或 `Option<usize>`。
+    // 路由历史最大长度。可直接传 `usize`(自动 `Some`)或 `Option<usize>`。
     pub history_length: Option<usize>,
-    /// 可选的路由状态。可直接传 `RouteState`(自动 `Some`)或 `Option<RouteState>`。
+    // 可选的路由状态。可直接传 `RouteState`(自动 `Some`)或 `Option<RouteState>`。
     pub state: Option<RouteState>,
 }
 

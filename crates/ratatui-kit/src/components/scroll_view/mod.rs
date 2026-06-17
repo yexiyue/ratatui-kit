@@ -1,43 +1,43 @@
-//! ScrollView 组件：可滚动视图容器，支持横向/纵向滚动条，适合长列表、文档阅读等场景。
-//!
-//! ## 用法示例
-//!
-//! ### 自动管理滚动状态（推荐）
-//! ```rust
-//! element!(ScrollView(
-//!     scroll_bars: ScrollBars::default(),
-//! ){
-//!     // 子内容
-//! })
-//! ```
-//!
-//! ### 手动管理滚动状态
-//! ```rust
-//! let scroll_state = hooks.use_state(ScrollViewState::default);
-//!
-//! hooks.use_event_handler_with_options(
-//!     EventScope::Current,
-//!     EventPriority::Normal,
-//!     EventOptions { hit_test: true },
-//!     move |event| {
-//!         scroll_state.write().handle_event(&event);
-//!         EventResult::Ignored
-//!     },
-//! );
-//!
-//! element!(ScrollView(
-//!     scroll_view_state: scroll_state,
-//!     scroll_bars: ScrollBars::default(),
-//! ){
-//!     // 子内容
-//! })
-//! ```
-//!
-//! ScrollView 支持两种使用方式：
-//! 1. 不传递 `scroll_view_state` 参数，组件会自动管理滚动状态
-//! 2. 传递由 `use_state` 创建的 `scroll_view_state` 参数，手动管理滚动状态
-//!
-//! 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
+// ScrollView 组件：可滚动视图容器，支持横向/纵向滚动条，适合长列表、文档阅读等场景。
+//
+// ## 用法示例
+//
+// ### 自动管理滚动状态（推荐）
+// ```rust
+// element!(ScrollView(
+//     scroll_bars: ScrollBars::default(),
+// ){
+//     // 子内容
+// })
+// ```
+//
+// ### 手动管理滚动状态
+// ```rust
+// let scroll_state = hooks.use_state(ScrollViewState::default);
+//
+// hooks.use_event_handler_with_options(
+//     EventScope::Current,
+//     EventPriority::Normal,
+//     EventOptions { hit_test: true },
+//     move |event| {
+//         scroll_state.write().handle_event(&event);
+//         EventResult::Ignored
+//     },
+// );
+//
+// element!(ScrollView(
+//     scroll_view_state: scroll_state,
+//     scroll_bars: ScrollBars::default(),
+// ){
+//     // 子内容
+// })
+// ```
+//
+// ScrollView 支持两种使用方式：
+// 1. 不传递 `scroll_view_state` 参数，组件会自动管理滚动状态
+// 2. 传递由 `use_state` 创建的 `scroll_view_state` 参数，手动管理滚动状态
+//
+// 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
 
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{
@@ -57,22 +57,22 @@ pub use scrollbars::{ScrollBars, ScrollbarVisibility};
 
 #[with_layout_style]
 #[derive(Default, Props)]
-/// ScrollView 组件属性。
+// ScrollView 组件属性。
 pub struct ScrollViewProps<'a> {
-    /// 子元素列表。
+    // 子元素列表。
     pub children: Vec<AnyElement<'a>>,
-    /// 滚动条配置。
+    // 滚动条配置。
     pub scroll_bars: ScrollBars<'static>,
-    /// 滚动状态。
+    // 滚动状态。
     pub scroll_view_state: Option<State<ScrollViewState>>,
 
-    /// 可选边框块。
+    // 可选边框块。
     pub block: Option<Block<'static>>,
 
     pub disabled: bool,
 }
 
-/// ScrollView 组件实现。
+// ScrollView 组件实现。
 pub struct ScrollView {
     scroll_bars: ScrollBars<'static>,
     block: Option<Block<'static>>,

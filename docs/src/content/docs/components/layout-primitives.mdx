@@ -1,28 +1,28 @@
 ---
-title: 布局与文本基础
-description: View、Border、Center、Positioned、Fragment 和 Text 的职责边界。
+title: Layout and Text Primitives
+description: Responsibility boundaries for View, Border, Center, Positioned, Fragment, and Text.
 sidebar:
   order: 2
 ---
 
-这页覆盖最基础的一组组件。它们不拥有业务状态，也不注册键盘事件；它们只负责把组件树变成可预测的终端区域和文本输出。
+This page covers the most foundational component group. They do not own business state or register keyboard events; they only turn the component tree into predictable terminal regions and text output.
 
-如果你熟悉 React，可以把 `View` 看成最常用的布局容器，把 `Fragment` 看成不产生额外布局节点的包装器。不同之处在于，ratatui-kit 的布局最终会落到 ratatui 的 `Layout`、`Constraint`、`Rect` 和 `Buffer` 上，所以尺寸和区域边界比 Web UI 更明确。
+If you know React, think of `View` as the most common layout container and `Fragment` as a wrapper that does not produce an extra layout node. The difference is that ratatui-kit layout eventually lands on ratatui `Layout`, `Constraint`, `Rect`, and `Buffer`, so sizes and region boundaries are more explicit than in Web UI.
 
-## 选择组件
+## Choosing a component
 
-| 你要做什么 | 组件 | 备注 |
+| What you want to do | Component | Notes |
 | --- | --- | --- |
-| 按横向/纵向组织子组件 | `View` | 默认容器，支持 `flex_direction`、`gap`、`width`、`height`、`margin`、`offset` |
-| 给一组内容加边框、标题和 padding | `Border` | 自己画 `Block`，子组件区域会进入 `Block::inner` |
-| 把一个区域里的内容居中 | `Center` | 透明包装器，内部用三层 `View` 实现居中 |
-| 在绝对坐标上覆盖一块内容 | `Positioned` | 不参与普通 flex 尺寸分配，可选 `Clear` |
-| 返回多个子节点但不增加布局层级 | `Fragment` | transparent layout，继承第一个子节点布局 |
-| 渲染短文本、`Line`、`Text` 或 `Paragraph` | `Text` | 适合固定区域文本；自动高度正文用 `WrappedText` |
+| Organize children horizontally or vertically | `View` | Default container; supports `flex_direction`, `gap`, `width`, `height`, `margin`, and `offset` |
+| Add a border, title, and padding around content | `Border` | Draws its own `Block`; child regions enter `Block::inner` |
+| Center content inside a region | `Center` | Transparent wrapper implemented with three nested `View`s |
+| Overlay content at absolute coordinates | `Positioned` | Does not participate in ordinary flex sizing; can render `Clear` |
+| Return multiple child nodes without adding a layout layer | `Fragment` | Transparent layout; inherits the first child's layout |
+| Render short text, `Line`, `Text`, or `Paragraph` | `Text` | Suitable for fixed-region text; use `WrappedText` for auto-height prose |
 
 ## View
 
-`View` 是最普通的布局容器。它没有自己的绘制内容，只把子元素交给默认 flex 布局计算区域。
+`View` is the ordinary layout container. It has no drawing content of its own; it passes children to the default flex layout algorithm to compute their regions.
 
 ```rust
 element!(
@@ -40,21 +40,21 @@ element!(
 )
 ```
 
-`View` 的布局字段来自 `#[with_layout_style]`：
+`View` layout fields come from `#[with_layout_style]`:
 
-| 字段 | 作用 |
+| Field | Meaning |
 | --- | --- |
-| `flex_direction` | 子区域切分方向，默认使用 ratatui 的 `Direction::Vertical` |
-| `justify_content` | 映射到 ratatui `Flex` |
-| `gap` | 子区域间距 |
-| `width` / `height` | 父级布局计算当前组件区域时使用的 `Constraint` |
-| `margin` / `offset` | 绘制当前组件和子树前应用到当前区域 |
+| `flex_direction` | Direction used to split child regions; defaults to ratatui `Direction::Vertical` |
+| `justify_content` | Maps to ratatui `Flex` |
+| `gap` | Spacing between child regions |
+| `width` / `height` | `Constraint` used by parent layout when computing the current component region |
+| `margin` / `offset` | Applied to the current region before drawing the component and subtree |
 
-如果你不知道该用什么容器，先用 `View`。它是最接近“布局节点”的组件。
+If you are unsure which container to use, start with `View`. It is the closest thing to a plain "layout node".
 
 ## Border
 
-`Border` 同时做两件事：参与父级布局，并在 draw 阶段渲染 ratatui `Block`。渲染完边框后，子组件会被画进 `Block::inner(drawer.area)`。
+`Border` does two things: it participates in parent layout and renders a ratatui `Block` during draw. After rendering the border, children are drawn inside `Block::inner(drawer.area)`.
 
 ```rust
 element!(
@@ -71,22 +71,22 @@ element!(
 )
 ```
 
-常用 props：
+Common props:
 
-| 字段 | 作用 |
+| Field | Meaning |
 | --- | --- |
-| `padding` | 进入 `Block::inner` 前预留内边距 |
-| `border_style` | 边框样式 |
-| `borders` | 显示哪些边，默认 `Borders::ALL` |
-| `border_set` | 边框字符集 |
-| `style` | 整个 block 的基础样式 |
-| `top_title` / `bottom_title` | 顶部和底部标题，可直接传 `Line` |
+| `padding` | Inner padding reserved before entering `Block::inner` |
+| `border_style` | Border style |
+| `borders` | Which edges to show; defaults to `Borders::ALL` |
+| `border_set` | Border character set |
+| `style` | Base style for the whole block |
+| `top_title` / `bottom_title` | Top and bottom titles; you can pass `Line` directly |
 
-`Border` 是内容分组组件，不应该被用来做页面 section 的装饰性大卡片。终端 UI 里边框会消耗真实字符区域，过度嵌套会让内容密度变差。
+`Border` is a content-grouping component. It should not be used as decorative page-section chrome. In terminal UI, borders consume real character cells, and excessive nesting reduces content density.
 
 ## Center
 
-`Center` 是一个透明布局辅助组件。它没有自己的 draw 行为，而是把 children 放进内部嵌套的 `View`，用指定 `width` 和 `height` 在父区域中居中。
+`Center` is a transparent layout helper. It has no draw behavior of its own; it puts children into internally nested `View`s and centers the specified `width` and `height` inside the parent region.
 
 ```rust
 element!(
@@ -101,11 +101,11 @@ element!(
 )
 ```
 
-`Center` 适合启动页、空态、小弹层内容或示例里的焦点区域。需要复杂响应式布局时，直接用 `View` 组合会更清楚。
+`Center` fits splash screens, empty states, small modal content, and focused example regions. For complex responsive layout, composing `View`s directly is usually clearer.
 
 ## Positioned
 
-`Positioned` 用绝对 `Rect` 绘制子树：
+`Positioned` draws a subtree at an absolute `Rect`:
 
 ```rust
 element!(
@@ -123,13 +123,13 @@ element!(
 )
 ```
 
-它的布局尺寸会被设置成 `Constraint::Length(0)`，因此不会占用父级 flex 空间。draw 阶段会把 `drawer.area` 改成 `Rect::new(x, y, width, height)`；`clear: true` 时会先渲染 ratatui `Clear`，适合覆盖背景内容。
+Its layout size is set to `Constraint::Length(0)`, so it does not occupy parent flex space. During draw, it changes `drawer.area` to `Rect::new(x, y, width, height)`; when `clear: true`, it renders ratatui `Clear` first, which is useful for overlaying background content.
 
-谨慎使用 `Positioned`。它绕过普通布局流，很适合局部浮层、光标附近提示或调试 overlay，但不适合构建主要页面结构。主要结构仍然应该由 `View`、`Border`、`ScrollView` 或专门组件表达。
+Use `Positioned` carefully. It bypasses the ordinary layout flow and is well suited to local floating layers, cursor-adjacent hints, or debug overlays, but not to the main page structure. Main structure should still be expressed with `View`, `Border`, `ScrollView`, or dedicated components.
 
 ## Fragment
 
-`Fragment` 是透明容器，用来返回多个子节点：
+`Fragment` is a transparent container for returning multiple child nodes:
 
 ```rust
 element!(
@@ -140,13 +140,13 @@ element!(
 )
 ```
 
-它调用 `set_transparent_layout(true)`，不会形成自己的独立布局节点。运行时会继承第一个子组件的 `LayoutStyle`；如果本帧没有子节点，则重置为默认 layout。
+It calls `set_transparent_layout(true)`, so it does not create its own independent layout node. At runtime, it inherits the first child component's `LayoutStyle`; if there are no children in the current frame, it resets to the default layout.
 
-这和函数组件的透明布局规则一致：不要指望在一个透明包装器外层设置 `width` / `height` 后它自己占位。布局属性应该放到它返回的根子组件上。
+This matches the transparent layout rule for function components: do not expect setting `width` / `height` on the outside of a transparent wrapper to make it occupy space by itself. Put layout properties on the root child component it returns.
 
 ## Text
 
-`Text` 是 `Paragraph` 的薄封装，可以直接接收字符串、`Line`、ratatui `Text` 或 `Paragraph`：
+`Text` is a thin wrapper around `Paragraph`. It can receive a string, `Line`, ratatui `Text`, or `Paragraph` directly:
 
 ```rust
 element!(
@@ -157,21 +157,21 @@ element!(
 )
 ```
 
-常用 props：
+Common props:
 
-| 字段 | 作用 |
+| Field | Meaning |
 | --- | --- |
-| `text` | `&str`、`String`、`Line`、ratatui `Text` 或 `Paragraph` |
-| `style` | 应用到 Paragraph 的整体样式 |
-| `alignment` | 文本对齐 |
-| `scroll` | Paragraph 的滚动偏移，类型是 `Position` |
-| `wrap` | 是否启用 `Wrap { trim }`，传入 `true` 会 trim 空白 |
+| `text` | `&str`, `String`, `Line`, ratatui `Text`, or `Paragraph` |
+| `style` | Overall style applied to the Paragraph |
+| `alignment` | Text alignment |
+| `scroll` | Paragraph scroll offset, typed as `Position` |
+| `wrap` | Whether to enable `Wrap { trim }`; passing `true` trims whitespace |
 
-`Text.wrap` 只影响 Paragraph 在当前区域内怎么换行，不会把换行后的真实高度反馈给父级布局。需要“长正文自动计算高度，然后交给 ScrollView 滚动”的场景，用 [WrappedText](/ratatui-kit/components/wrapped-text/)。
+`Text.wrap` only affects how the Paragraph wraps inside the current region; it does not feed the measured wrapped height back to parent layout. For "long prose that should compute its own height, then scroll inside ScrollView", use [WrappedText](/ratatui-kit/components/wrapped-text/).
 
-## 原生 widget adapter
+## Native widget adapter
 
-`element!` 里也可以直接桥接 ratatui widget：
+You can also bridge ratatui widgets directly inside `element!`:
 
 ```rust
 element!(
@@ -182,13 +182,13 @@ element!(
 )
 ```
 
-`widget(...)` 适合无状态 widget；`stateful(...)` 适合 `List`、`Table` 这类需要 ratatui state 的 widget。它们是低层逃生口，简单桥接可以直接用；如果你需要把复杂 widget 封成可复用组件，看 [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/)。
+`widget(...)` is for stateless widgets; `stateful(...)` is for widgets like `List` and `Table` that need ratatui state. They are low-level escape hatches. Simple bridges can use them directly; if you need to wrap a complex widget as a reusable component, see [Native Widget Bridging](/ratatui-kit/advanced/custom-widget/).
 
-## 和其它组件的边界
+## Boundaries with other components
 
-- 布局结构用 `View` / `Border` / `Center`。
-- 长正文用 `WrappedText`，可滚动区域用 `ScrollView`。
-- 弹层不要用 `Positioned` 手写一整套输入互斥；优先用 [Modal](/ratatui-kit/components/modal/) 或封装好的弹窗组件。
-- 原生 widget 只需要桥接时用 `widget` / `stateful`；需要状态、事件、布局和复用时手写 `Component`。
+- Use `View` / `Border` / `Center` for layout structure.
+- Use `WrappedText` for long prose and `ScrollView` for scrollable regions.
+- Do not handwrite a full input-exclusivity stack for modals with `Positioned`; prefer [Modal](/ratatui-kit/components/modal/) or the packaged modal components.
+- Use `widget` / `stateful` only when a native widget needs to be bridged; write a `Component` when you need state, events, layout, and reuse.
 
-更多运行时层面的解释见 [组件模型](/ratatui-kit/core/component-model/) 和 [渲染循环](/ratatui-kit/internals/render-loop/)。
+For more runtime-level explanation, see [Component Model](/ratatui-kit/core/component-model/) and [Render Loop](/ratatui-kit/internals/render-loop/).

@@ -1,17 +1,17 @@
 ---
-title: 输入层
-description: 用 Layer、Scope 和 EventResult 解决终端输入互斥。
+title: Input layers
+description: Use Layer, Scope, and EventResult to solve terminal input isolation.
 sidebar:
   order: 3
 ---
 
 import Mermaid from '../../../components/Mermaid.astro';
 
-输入事件不是广播给所有组件，而是交给中央 `InputRuntime` 分发。组件在每帧 update 期间重新登记输入层和 handler；终端事件到来时，运行时只把事件投递给当前活跃层。
+Input events are not broadcast to every component; they are dispatched by the central `InputRuntime`. During each frame's update phase, components register input layers and handlers again. When a terminal event arrives, the runtime sends it only to currently active layers.
 
-想先看完整运行例子，可以从 [输入互斥](/ratatui-kit/tutorials/input-mutex/) 开始。
+To see a complete running example first, start with [Input isolation](/ratatui-kit/tutorials/input-mutex/).
 
-## 分发顺序
+## Dispatch order
 
 <Mermaid
 	chart={`
@@ -25,29 +25,29 @@ flowchart TD
     result --> consumed["Consumed: stop"]
     result --> ignored["Ignored: continue"]
 	`}
-	caption="Global 不受 layer 截断；普通 handler 先按层级，再按同层 priority 投递。"
+	caption="Global handlers are not cut off by layers; ordinary handlers dispatch by layer first, then same-layer priority."
 />
 
-分发有两个阶段：
+Dispatch has two phases:
 
-| 阶段 | 候选 handler | 排序 |
+| Phase | Candidate handlers | Ordering |
 | --- | --- | --- |
 | Global | `EventScope::Global` | `priority desc, order asc` |
-| Layer | 活跃输入层内的 handler | `z-order desc, priority desc, order asc` |
+| Layer | Handlers in active input layers | `z-order desc, priority desc, order asc` |
 
-`z-order` 优先于 `priority`。上层 `Normal` 会先于下层 `High`，否则弹窗背后的组件仍然可能抢到事件。
+`z-order` beats `priority`. A `Normal` handler in an upper layer runs before a `High` handler in a lower layer; otherwise a component behind a modal could still steal the event.
 
-## 三个核心类型
+## Three core types
 
-`InputLayer` 是当前帧的层句柄：
+`InputLayer` is the handle for the current frame's layer:
 
 ```rust
 let layer = hooks.use_input_layer(open, true);
 ```
 
-`open=false` 时会返回句柄但不入栈，绑定到它的 handler 会静默跳过。`blocks_lower=true` 时，这一层会截断更低层。
+When `open=false`, a handle is returned but the layer is not pushed, and handlers bound to it are silently skipped. When `blocks_lower=true`, this layer cuts off lower layers.
 
-`EventScope` 决定 handler 属于哪一层：
+`EventScope` decides which layer a handler belongs to:
 
 ```rust
 EventScope::Current
@@ -55,20 +55,20 @@ EventScope::Layer(layer)
 EventScope::Global
 ```
 
-`Current` 会解析到 context 中最近的当前层。放在 `Modal` 子树里的组件通常用 `Current` 就够了；父组件想控制 `Modal` 的按键时，用 `Layer(layer)` 显式绑定。
+`Current` resolves to the nearest current layer in context. Components inside a `Modal` subtree usually only need `Current`; parent components that want to control modal keys should bind explicitly with `Layer(layer)`.
 
-`EventResult` 决定事件是否继续传播：
+`EventResult` decides whether the event continues propagating:
 
 ```rust
 EventResult::Consumed
 EventResult::Ignored
 ```
 
-处理了事件就返回 `Consumed`。没有处理就返回 `Ignored`，让同层后续 handler 或更低层继续尝试。
+Return `Consumed` after handling an event. Return `Ignored` when this handler did not handle it, so later same-layer handlers or lower layers can try.
 
-## 命中过滤
+## Hit testing
 
-默认 handler 会收到所属层里的所有键盘和鼠标事件。需要“只在组件区域内处理鼠标”的场景，用 `use_event_handler_with_options`：
+By default, a handler receives all keyboard and mouse events in its layer. For cases where mouse input should be handled only inside a component's area, use `use_event_handler_with_options`:
 
 ```rust
 hooks.use_event_handler_with_options(
@@ -76,17 +76,17 @@ hooks.use_event_handler_with_options(
     EventPriority::Normal,
     EventOptions { hit_test: true },
     move |event| {
-        // 鼠标事件在组件上一帧区域外时不会调用这个闭包。
+        // Mouse events outside this component's previous-frame area do not call this closure.
         EventResult::Ignored
     },
 );
 ```
 
-`hit_test` 只影响鼠标事件。键盘事件没有坐标，仍按 layer、priority 和注册顺序投递。命中区域来自 handler 所属组件上一帧的绘制 `Rect`，所以它适合滚轮、点击、拖拽这类局部鼠标交互；不要用它表达模态互斥，模态互斥仍然应该用 `InputLayer`。
+`hit_test` affects only mouse events. Keyboard events have no coordinates and are still delivered by layer, priority, and registration order. The hit area comes from the owning component's previous-frame drawn `Rect`, so it is appropriate for local mouse wheel, click, and drag interactions. Do not use it to express modal isolation; modal isolation should still use `InputLayer`.
 
-## Modal 配对
+## Modal pairing
 
-弹窗互斥的标准模式：
+The standard modal isolation pattern:
 
 ```rust
 let layer = hooks.use_input_layer(open, true);
@@ -107,23 +107,23 @@ element!(
 )
 ```
 
-`Modal(layer: Some(layer))` 必须和 handler 使用同一个 layer。漏传时，`Modal` 会自开一个新层并截断父级 layer，父级 handler 就收不到事件。
+`Modal(layer: Some(layer))` must receive the same layer used by the handler. If you omit it, `Modal` opens a new layer and cuts off the parent's layer, so the parent handler no longer receives events.
 
-## 生命周期
+## Lifecycle
 
-`InputLayer` 句柄每帧重建，只能在同一帧里传给 handler 或子组件。不要把它存进 `State`，下一帧这个 id 已经不在活跃层栈里。
+`InputLayer` handles are rebuilt every frame and should only be passed to handlers or child components in that same frame. Do not store one in `State`; on the next frame, that ID is no longer in the active layer stack.
 
-这也是为什么输入系统不会泄漏：关闭弹窗后下一帧不会再注册它的 layer 和 handler，dispatch 时自然就找不到它。
+This is also why the input system does not leak: after a modal closes, the next frame no longer registers its layer or handlers, so dispatch naturally cannot find them.
 
-## 内置组件
+## Built-in components
 
-普通交互优先用内置组件：
+Prefer built-in components for ordinary interactions:
 
-| 需求 | 组件 |
+| Need | Component |
 | --- | --- |
-| 搜索输入 | `SearchInput` |
-| 确认弹窗 | `ConfirmModal` |
-| 提示弹窗 | `AlertModal` |
-| 快捷键帮助 | `ShortcutInfoModal` |
+| Search input | `SearchInput` |
+| Confirmation dialog | `ConfirmModal` |
+| Alert dialog | `AlertModal` |
+| Shortcut help | `ShortcutInfoModal` |
 
-这些组件内部已经配好输入层，业务只需要处理 `open`、回调和展示内容。只有弹窗里有专用复杂交互时，再手写 `use_input_layer`、`use_event_handler(EventScope::Layer(...))` 和 `Modal(layer: Some(...))`。
+These components already wire their input layers internally. Application code only handles `open`, callbacks, and displayed content. Write `use_input_layer`, `use_event_handler(EventScope::Layer(...))`, and `Modal(layer: Some(...))` by hand only for specialized modal interactions.

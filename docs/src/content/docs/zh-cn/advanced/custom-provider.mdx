@@ -1,0 +1,118 @@
+---
+title: 自定义 Provider
+description: 用 ContextProvider 建立局部作用域，并让子组件读取最近的上下文。
+sidebar:
+  order: 4
+---
+
+`custom_provider` 展示的是应用架构里的另一类自定义：不是把状态放进全局，而是用 `ContextProvider` 为一段组件子树注入配置。录屏里外层 workspace 会切换主题和密度，右侧的 nested provider 会局部覆盖 workspace，但不会影响同级组件。
+
+![custom provider demo](/ratatui-kit/zh-cn/recordings/custom-provider.gif)
+
+这个录屏由 `docs/tapes/custom-provider.tape` 生成，运行的是 `examples/advanced/custom_provider.rs`。
+
+## 运行
+
+```bash
+cargo run --example custom_provider
+```
+
+## Provider 是作用域
+
+根组件把当前 workspace 配置组装成一个普通 Rust 值，然后交给 `ContextProvider`。它只影响自己的 children：
+
+```rust title="examples/advanced/custom_provider.rs"
+let settings = WorkspaceSettings {
+    profile: PROFILES[profile_index.get()],
+    density: density.get(),
+};
+
+element!(
+    ContextProvider(value: Context::owned(settings)) {
+        ProviderHeader(status: status_view)
+        WorkspaceSummary
+        ScopedAuditProvider
+        ContextProbe
+    }
+)
+```
+
+这类值通常是主题、权限、当前 workspace、路由上下文、服务句柄或页面级配置。它们不一定适合放进 Atom，因为它们天然有边界：只该被某棵子树看见。
+
+`Context` 有三种来源：
+
+| 构造方式 | 语义 | 适合场景 |
+| --- | --- | --- |
+| `Context::owned(value)` | Provider 拥有这个值 | 页面级配置、当前 workspace、路由上下文 |
+| `Context::from_ref(&value)` | Provider 只提供不可变借用 | 外层已经持有的只读配置或服务引用 |
+| `Context::from_mut(&mut value)` | Provider 提供可变借用 | 框架内部临时把路由表、子树状态传给下一层 |
+
+应用代码优先用 `Context::owned`。借用型 context 的生命周期跟当前 update 子树绑定，适合低层组件或框架内部组合；如果你发现自己想长期保存 `from_ref` / `from_mut` 得到的值，通常应该把它变成拥有型配置、`use_state`、Atom，或显式 props。
+
+## 子组件读取最近的 Context
+
+子组件用 `use_context::<T>()` 读取 Provider 注入的类型。建议把借用守卫限制在一个小块里，只把需要渲染的字段拷出来：
+
+```rust
+let (name, mode, accent, density_label) = {
+    let settings = hooks.use_context::<WorkspaceSettings>();
+    (
+        settings.profile.name,
+        settings.profile.mode,
+        settings.profile.accent,
+        settings.density.label(),
+    )
+};
+```
+
+这样后续再调用其他 hooks、渲染子组件或进入新的 Provider 时，不会意外持有旧的 context borrow。这个习惯对 `use_context_mut` 尤其重要。
+
+## 可以局部覆盖
+
+Provider 可以嵌套。内层注入同一种类型时，子组件读取到的是最近的那一层：
+
+```rust
+let scoped = WorkspaceSettings {
+    profile: AUDIT_PROFILE,
+    density,
+};
+
+element!(
+    ContextProvider(value: Context::owned(scoped)) {
+        ScopedAuditPanel
+    }
+)
+```
+
+录屏里的 `ScopedAuditPanel` 会看到 `nested audit`，而同级的 `ContextProbe` 仍然看到外层 workspace。这就是 Provider 的核心价值：作用域清楚，覆盖不会泄漏。
+
+## try_use_context 适合可选能力
+
+如果某个组件可以在 Provider 内外都工作，用 `try_use_context`：
+
+```rust
+let label = hooks
+    .try_use_context::<WorkspaceSettings>()
+    .map(|settings| settings.profile.name.to_string())
+    .unwrap_or_else(|| "<missing>".to_string());
+```
+
+`try_` 变体在没有 Provider 或 context 当前已被借用时返回 `None`。断言型 `use_context` / `use_context_mut` 则会 panic，并给出更明确的诊断，适合“没有这个 Provider 就是编程错误”的组件。
+
+## 和 Atom 的边界
+
+Provider 和 Atom 解决的是不同问题：
+
+| 场景 | 优先选择 |
+| --- | --- |
+| 子树级主题、当前 workspace、页面上下文、局部服务对象 | `ContextProvider` |
+| 跨页面、跨子树、进程级共享状态 | `Atom` |
+| 组件私有状态，卸载后自然释放 | `use_state` |
+
+不要为了“传得远”把页面级状态默认塞进 Atom。先看它有没有天然作用域；有的话，Provider 会让生命周期和覆盖关系更清楚。
+
+## 什么时候自定义 Provider
+
+当你发现多个组件都需要同一组环境数据，但这些数据又不应该是全局单例时，就可以封装自己的 Provider 组件。路由系统里的 `RouterProvider` 也是这个模式：它把 history、route context 和 outlet 子树组合起来，让页面组件只通过 hooks 读取当前路由能力。
+
+下一步可以看 [自定义 Hook](/ratatui-kit/zh-cn/advanced/custom-hook/) 了解业务逻辑如何沉淀成 `use_*`，或者回到 [Atom 全局状态](/ratatui-kit/zh-cn/tutorials/atom-state/) 对比进程级状态的使用边界。

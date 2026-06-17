@@ -1,0 +1,121 @@
+---
+title: TreeSelect 树形选择
+description: 用内置 TreeSelect 处理层级数据、折叠展开和路径型选择。
+sidebar:
+  order: 4
+---
+
+`TreeSelect` 是通用树形选择组件，启用 `tree` feature 后可用。它复用 `tui-tree-widget` 的 `TreeItem` 与 `TreeState`，只沉淀层级导航、折叠展开、确认选择和输入互斥，不绑定文件、目录或其它业务语义。
+
+![tree select demo](/ratatui-kit/zh-cn/recordings/tree-select.gif)
+
+这个录屏由 `docs/tapes/tree-select.tape` 生成。示例默认选中 `components/select`，用 `j` 移到 `multi-select` 后按 `Enter` 提交，再回到父节点折叠/展开，最后切到空树状态。
+
+## 运行
+
+```bash
+cargo run --example tree_select
+```
+
+按 `h/l` 折叠或展开，按 `j/k` 移动，按 `Space` 切换当前节点，按 `Enter` 提交，按 `e` 切换空树，按 `q` 退出。
+
+## Feature
+
+`TreeSelect` 位于 `tree` feature 下：
+
+```toml
+ratatui-kit = { version = "...", features = ["tree"] }
+```
+
+examples 使用 `full` feature，所以可以直接运行。库默认 feature 为空；如果只用裸 `cargo check`，不会编译到树形组件。
+
+## 最小形态
+
+```rust title="examples/components/tree_select.rs"
+use ratatui_kit::components::tui_tree_widget::TreeItem;
+
+TreeSelect<&'static str>(
+    active: true,
+    items: demo_items(),
+    default_selection: vec!["components", "select"],
+    highlight_symbol: "> ",
+    node_closed_symbol: "+ ",
+    node_open_symbol: "- ",
+    on_select: move |id: &'static str| {
+        submitted.set(format!("selected {id}"));
+    },
+)
+```
+
+`default_selection` 不是索引，而是一条节点路径。对于 `components/select` 这样的默认路径，组件会选中 `select`，并打开它的祖先节点 `components`，让默认项在首帧可见。
+
+## TreeItem
+
+`TreeItem<T>` 的 `T` 是节点标识，不是展示文本。标识只需要在同一层级内唯一，最终 `on_select` 返回的是当前路径最后一个标识。
+
+```rust title="examples/components/tree_select.rs"
+fn demo_items() -> Vec<TreeItem<'static, &'static str>> {
+    vec![
+        branch(
+            "components",
+            "Components",
+            vec![
+                TreeItem::new_leaf("search-input", "SearchInput"),
+                TreeItem::new_leaf("select", "Select"),
+                TreeItem::new_leaf("multi-select", "MultiSelect"),
+                TreeItem::new_leaf("tree-select", "TreeSelect"),
+            ],
+        ),
+    ]
+}
+```
+
+框架侧不把 `PathBuf`、文件扩展名、章节 ID 这类业务类型放进组件 API。需要文件树、目录树、章节树时，在业务层把数据转成 `TreeItem<T>` 即可。
+
+## 外部状态
+
+默认情况下，`TreeSelect` 自己保存 `TreeState<T>`。如果页面需要展示当前路径、跨组件重置、或把状态放进弹窗外部，可以传入外部状态：
+
+```rust title="examples/components/tree_select.rs"
+let tree_state = hooks.use_state(TreeState::<&'static str>::default);
+let path = path_label(tree_state.read().selected());
+
+TreeSelect<&'static str>(
+    state: tree_state,
+    items: items,
+    default_selection: default_selection,
+    on_select: move |id| {
+        submitted.set(format!("selected {id}"));
+    },
+)
+```
+
+`TreeState::selected()` 返回完整路径切片，例如 `["components", "select"]`。`Enter` 的 `on_select` 只返回当前节点 id；如果业务需要完整路径，可以直接读取外部 `TreeState`。
+
+## 输入和空态
+
+`TreeSelect` 的 handler 使用 `EventScope::Current`：
+
+- `h` / `Left`：折叠当前节点，或回到父节点。
+- `l` / `Right`：展开当前节点。
+- `j/k` / `Down/Up`：移动到可见节点。
+- `Space`：切换当前节点展开状态。
+- `Enter`：提交当前节点。
+
+`active: false` 时不处理事件。`items` 为空时也不消费树形导航键，父组件仍然可以处理页面级快捷键，例如示例里的 `e` 和 `q`。
+
+## 布局和样式
+
+`TreeSelect` 可以直接接收 `width`、`height`、`margin` 和 `offset`。边框仍然使用 `tui-tree-widget` 原生的 `Block`，这让它保持薄封装：
+
+```rust
+TreeSelect<&'static str>(
+    width: Constraint::Length(40),
+    block: Block::bordered()
+        .border_style(Style::new().fg(Color::Cyan))
+        .title_top(Line::from(" component map ").centered()),
+    highlight_style: Style::new().fg(Color::Black).bg(Color::Green),
+)
+```
+
+需要放进弹窗时，直接把它渲染在 `Modal` 子树里即可；它的 `Current` handler 会归属弹窗输入层，弹窗背后的组件不会再处理同一组按键。普通单选看 [Select](/ratatui-kit/zh-cn/components/select/)，普通多选看 [MultiSelect](/ratatui-kit/zh-cn/components/multi-select/)，长列表和自定义行看 [VirtualList](/ratatui-kit/zh-cn/components/virtual-list/)。

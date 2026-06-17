@@ -1,0 +1,98 @@
+---
+title: SearchInput 搜索输入
+description: 用内置 SearchInput 封装单行搜索、校验提示和输入互斥。
+sidebar:
+  order: 2
+---
+
+`SearchInput` 是带局部编辑态的单行搜索框。它默认按 `s` 进入输入态，内部打开一个会截断下层 handler 的 input layer；输入态里按 `j/k/q` 只会写入输入框或被输入框处理，不会继续触发背景列表移动或退出。
+
+![search input demo](/ratatui-kit/zh-cn/recordings/search-input.gif)
+
+这个录屏由 `docs/tapes/search-input.tape` 生成。示例先在背景列表里移动一次，再进入搜索输入 `dep` 并提交；随后再次进入输入态追加 `zz`，按 `Esc` 取消并清空，背景快捷键恢复可用。
+
+## 运行
+
+```bash
+cargo run --example search_input
+```
+
+按 `s` 进入搜索，输入时按 `Enter` 提交，按 `Esc` 取消，背景状态下按 `j/k` 移动列表，按 `q` 退出。
+
+## 最小形态
+
+```rust title="examples/components/search_input.rs"
+SearchInput(
+    value: query.read().to_string(),
+    placeholder: "Press s to search commands".to_string(),
+    on_change: move |next: String| query.set(next),
+    on_submit: move |value: String| {
+        submitted.set(format!("submitted {value}"));
+        true
+    },
+)
+```
+
+`SearchInput` 是受控组件：展示值来自 `value`，每次输入变化通过 `on_change` 通知外部状态。组件内部只保存输入光标、临时校验状态和“是否正在编辑”。
+
+## 输入互斥
+
+进入编辑态后，组件会注册 `EventScope::Layer(layer)` handler，并让这一层 `blocks_lower=true`。这意味着背景页面的 `j/k/q` 不会收到同一个按键：
+
+```rust title="examples/components/search_input.rs"
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    // 只在 SearchInput 未进入编辑态时收到 j/k/q。
+})
+```
+
+按 `Enter` 时会调用 `on_submit(value) -> bool`。返回 `true` 关闭编辑态；返回 `false` 可以把用户留在输入框里，适合校验失败、远程搜索未完成或必须先确认的场景。
+
+按 `Esc` 会取消编辑态。如果设置 `clear_on_escape: true`，组件会同时清空内部输入、回调 `on_change(String::new())` 和 `on_clear(())`。
+
+## 校验和状态
+
+`validate` 是同步校验回调，返回 `(bool, String)`：
+
+```rust title="examples/components/search_input.rs"
+validate: move |value: String| {
+    if value.len() > 18 {
+        (false, "too long".to_string())
+    } else if value.is_empty() {
+        (true, "type to filter".to_string())
+    } else {
+        (true, format!("{} matches", count_matches(&value)))
+    }
+},
+```
+
+校验文案会显示在边框标题上。`true` 使用 `success_border_style` / `success_status_style`，`false` 使用 `error_border_style` / `error_status_style`，没有校验结果时使用 `active_border_style`。
+
+## 外部开关
+
+`is_editing` 是外部“允许编辑”开关，不是组件当前内部编辑态。它适合页面级禁用搜索，例如弹窗打开、数据切换或权限不足时：
+
+```rust
+SearchInput(
+    is_editing: can_search.get(),
+    activate_key: KeyCode::Char('/'),
+)
+```
+
+当 `is_editing` 变成 `false`，组件会同步退出内部编辑态，避免输入层已经关闭但 UI 仍显示 active。
+
+## 布局和样式
+
+`SearchInput` 可以接收 `width`、`margin` 和 `offset`，并转发给内部 `Border`。高度固定为 3 行，保持单行输入框的稳定外观：
+
+```rust
+SearchInput(
+    width: Constraint::Fill(1),
+    border_style: Style::new().fg(Color::Cyan),
+    active_border_style: Style::new().fg(Color::Yellow),
+    success_border_style: Style::new().fg(Color::Green),
+    error_border_style: Style::new().fg(Color::Red),
+    cursor_style: Style::new().bg(Color::Yellow),
+)
+```
+
+需要完全自定义输入行为时，可以直接使用底层 `Input` 加 `use_input_layer`。弹窗互斥看 [输入层](/ratatui-kit/zh-cn/core/input-layers/) 和 [输入互斥教程](/ratatui-kit/zh-cn/tutorials/input-mutex/)。

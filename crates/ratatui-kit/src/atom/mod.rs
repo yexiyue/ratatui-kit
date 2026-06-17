@@ -13,15 +13,15 @@ pub type AtomState<T> = ReactiveHandle<T, WakerMap>;
 pub type AtomStateRef<'a, T> = ReactiveRef<'a, T, WakerMap>;
 pub type AtomStateMut<'a, T> = ReactiveMutRef<'a, T, WakerMap>;
 
-/// 全局响应式原子（类 Jotai/Recoil）。
-///
-/// 模块级声明 `static COUNT: Atom<i32> = Atom::new(|| 0);`，零宏零结构。底层 `AtomState`
-/// 在首次 `use_atom`/读写时**惰性**创建（插入进程级全局 `OWNER`）——因 generational-box
-/// 需运行时初始化，故以 `OnceLock` 承载。`Atom`/`AtomState` 仍 `Send + Sync`（全局静态需
-/// `Sync`），正好支撑后台 `tokio::spawn` 移动句柄更新状态。
-///
-/// 在组件内用 [`crate::UseAtom::use_atom`] 订阅；组件外/后台任务可经 [`Atom::get`]/[`Atom::set`]
-/// 或经 `use_atom` 返回的 `Copy + Send` 句柄直接读写。
+// 全局响应式原子（类 Jotai/Recoil）。
+//
+// 模块级声明 `static COUNT: Atom<i32> = Atom::new(|| 0);`，零宏零结构。底层 `AtomState`
+// 在首次 `use_atom`/读写时**惰性**创建（插入进程级全局 `OWNER`）——因 generational-box
+// 需运行时初始化，故以 `OnceLock` 承载。`Atom`/`AtomState` 仍 `Send + Sync`（全局静态需
+// `Sync`），正好支撑后台 `tokio::spawn` 移动句柄更新状态。
+//
+// 在组件内用 [`crate::UseAtom::use_atom`] 订阅；组件外/后台任务可经 [`Atom::get`]/[`Atom::set`]
+// 或经 `use_atom` 返回的 `Copy + Send` 句柄直接读写。
 pub struct Atom<T>
 where
     T: Send + Sync + 'static,
@@ -34,7 +34,7 @@ impl<T> Atom<T>
 where
     T: Send + Sync + 'static,
 {
-    /// 以无捕获初始化器声明一个全局原子（`const fn`，可作 `static`）。
+    // 以无捕获初始化器声明一个全局原子（`const fn`，可作 `static`）。
     pub const fn new(init: fn() -> T) -> Self {
         Self {
             init,
@@ -42,12 +42,12 @@ where
         }
     }
 
-    /// 惰性解析底层句柄（首次调用时以 `init()` 创建并插入全局 OWNER）。
+    // 惰性解析底层句柄（首次调用时以 `init()` 创建并插入全局 OWNER）。
     pub fn state(&self) -> AtomState<T> {
         *self.cell.get_or_init(|| AtomState::new((self.init)()))
     }
 
-    /// 组件外直接读（`T: Copy`）。
+    // 组件外直接读（`T: Copy`）。
     pub fn get(&self) -> T
     where
         T: Copy,
@@ -55,7 +55,7 @@ where
         self.state().get()
     }
 
-    /// 组件外直接写（触发订阅者重渲）。
+    // 组件外直接写（触发订阅者重渲）。
     pub fn set(&self, value: T) {
         self.state().set(value);
     }

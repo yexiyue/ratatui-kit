@@ -1,15 +1,15 @@
-//! Outlet 组件：路由嵌套出口，根据当前路径动态渲染匹配的子路由组件。
-//!
-//! 通常与 RouterProvider、Routes 等配合使用，实现多级页面嵌套和动态参数解析。
-//!
-//! 类似于 React Router 的 <Outlet />，用于在父路由中渲染匹配的子路由内容，支持递归嵌套和参数传递。
+// Outlet 组件：路由嵌套出口，根据当前路径动态渲染匹配的子路由组件。
+//
+// 通常与 RouterProvider、Routes 等配合使用，实现多级页面嵌套和动态参数解析。
+//
+// 类似于 React Router 的 <Outlet />，用于在父路由中渲染匹配的子路由内容，支持递归嵌套和参数传递。
 
 use crate::{
     AnyElement, Component, ComponentUpdater, Context, Hooks, NoProps, UseContext, element,
     prelude::{ContextProvider, Fragment, Route, RouteContext, Routes},
 };
 
-/// Outlet 组件实现。
+// Outlet 组件实现。
 pub struct Outlet;
 
 impl Component for Outlet {

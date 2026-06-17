@@ -1,0 +1,311 @@
+---
+title: Hooks
+description: 组件里的状态、副作用、异步任务、上下文、输入事件和生命周期能力。
+sidebar:
+  order: 3
+---
+
+Hooks 是函数组件和运行时之间的连接点。组件函数每帧都会重新执行；hooks 让状态、异步任务、事件 handler 和上下文读取能挂在持久组件实例上，而不是挂在临时的 `Element` 声明上。
+
+如果你已经读过 [计数器教程](/ratatui-kit/zh-cn/tutorials/counter/)，可以把这页当成 reference：写组件时先查“用哪个 hook”，遇到调用顺序、依赖或自定义 hook 时再看后面的规则。
+
+## 怎么选
+
+| 需求 | Hook | 例子 |
+| --- | --- | --- |
+| 组件私有响应式状态 | `use_state` | [计数器教程](/ratatui-kit/zh-cn/tutorials/counter/) |
+| 挂载时启动一次异步任务 | `use_future` | 定时器、后台轮询 |
+| 依赖变化时做同步副作用 | `use_effect` | 根据派生结果修正游标 |
+| 依赖变化时启动异步副作用 | `use_async_effect` | 异步校验、请求刷新 |
+| 维护 `data / loading / error` | `use_async_state` | [异步数据三态](/ratatui-kit/zh-cn/tutorials/async-state/) |
+| 缓存纯计算结果 | `use_memo` | [自定义 Hook](/ratatui-kit/zh-cn/advanced/custom-hook/) |
+| 读取 Provider 注入的值 | `use_context` / `try_use_context` | [自定义 Provider](/ratatui-kit/zh-cn/advanced/custom-provider/) |
+| 注册键盘/鼠标事件 | `use_event_handler` | [输入互斥](/ratatui-kit/zh-cn/tutorials/input-mutex/) |
+| 注册带命中过滤的事件 | `use_event_handler_with_options` | 局部鼠标滚轮、组件区域内点击 |
+| 声明模态输入层 | `use_input_layer` | [Modal 基础弹层](/ratatui-kit/zh-cn/components/modal/) |
+| 读取终端或组件尺寸 | `use_terminal_size` / `use_previous_size` | 响应式布局、测量上一帧区域 |
+| 请求退出应用 | `use_exit` | 所有可退出 example |
+| 组件卸载时清理资源 | `use_on_drop` | 退订外部资源 |
+| 在终端渲染区前插入内容 | `use_insert_before` | 高级逃生口，少量终端前缀内容 |
+
+特性门控能力还包括 `use_atom`（`atom` feature）和 `use_router` / `use_navigate`（`router` feature）。它们分别在 [状态](/ratatui-kit/zh-cn/core/state/) 和 [路由](/ratatui-kit/zh-cn/core/routing/) 中展开。
+
+## 调用顺序必须稳定
+
+Hooks 按调用顺序索引。首帧调用 `use_state`、`use_memo`、`use_effect` 时，运行时会把对应 hook 放进组件实例的 hook 列表；下一帧会按同样的顺序取回旧 hook。
+
+所以 hook 调用不能放进 `if`、`for`、`match` 分支，也不能放在可能提前 `return` 的路径后面：
+
+```rust
+// 不要这样写
+if enabled {
+    hooks.use_state(String::new);
+}
+
+let cursor = hooks.use_state(|| 0usize);
+```
+
+如果第一帧 `enabled=true`，第二帧 `enabled=false`，`cursor` 的索引会错位，运行时可能拿到错误类型的 hook。
+
+正确做法是让 hook 顺序固定，把条件放进 hook 参数、事件 handler 或渲染树里：
+
+```rust
+let query = hooks.use_state(String::new);
+let cursor = hooks.use_state(|| 0usize);
+
+element!(
+    View {
+        if enabled {
+            Text(text: query.read().clone())
+        } else {
+            Text(text: "disabled")
+        }
+    }
+)
+```
+
+`element!` 里的控制流不影响 hook 顺序。完整例子见 [控制流语法](/ratatui-kit/zh-cn/core/control-flow/)。
+
+## use_state
+
+`use_state` 创建组件局部响应式状态。返回的 `State<T>` 是轻量句柄，可以按值传进闭包、子组件或手写组件 props。
+
+```rust
+let mut count = hooks.use_state(|| 0i32);
+
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    if matches!(event, Event::Key(_)) {
+        count += 1;
+        return EventResult::Consumed;
+    }
+
+    EventResult::Ignored
+});
+```
+
+读状态用 `get()` 或 `read()`；写状态用 `set()`、`write()` 或 `+=` 这类运算符。写入会唤醒渲染循环，让下一帧重新执行组件函数。
+
+`State<T>` 要求 `T: Unpin + Send + Sync + 'static`。这让后台任务也能持有句柄写入状态。draw 阶段如果只是把 state 交给 ratatui 的 stateful widget 渲染，用 `write_no_update()`，避免绘制本身触发新一轮更新；[原生 Widget 桥接](/ratatui-kit/zh-cn/advanced/custom-widget/) 展示了这个边界。
+
+## use_future
+
+`use_future` 在组件挂载时启动一次 future。它适合“这个组件活着期间跑一次”的任务，例如定时器循环：
+
+```rust
+let mut count = hooks.use_state(|| 0);
+
+hooks.use_future(async move {
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        count += 1;
+    }
+});
+```
+
+`use_future` 的初始化闭包只在首帧注册。不要用它表达“依赖变化时重新请求”；那应该用 `use_async_effect` 或 `use_async_state`。
+
+## use_effect 和 use_memo
+
+`use_effect` 表示“依赖变化时做事”。依赖使用 `PartialEq` 比较，不要求 `Clone`：
+
+```rust
+hooks.use_effect(
+    move || {
+        let next_cursor = cursor_value.min(visible_len.saturating_sub(1));
+        if next_cursor != cursor_value {
+            cursor.set(next_cursor);
+        }
+    },
+    (visible_len, cursor_value),
+);
+```
+
+`use_memo` 表示“依赖不变时复用值”。它适合纯计算，例如根据查询字符串过滤命令列表：
+
+```rust
+let visible = hooks.use_memo(
+    move || matching_indices(COMMANDS, &query_text),
+    query_text,
+);
+```
+
+不要用 `use_memo` 偷偷做副作用，也不要为了缓存一个副作用结果去改用 `use_effect`。两者的区别很简单：memo 返回值，effect 做事。
+
+## use_async_effect 和 use_async_state
+
+`use_async_effect` 会在依赖变化时替换旧 future 并启动新 future：
+
+```rust
+hooks.use_async_effect(
+    async move {
+        status.set("checking".to_string());
+        // async work
+    },
+    validation_key,
+);
+```
+
+如果你要的是常见的请求三态，用 `use_async_state`。它组合了 `use_state + use_async_effect`，依赖变化时设置 `loading=true`，成功写 `data`，失败写 `error`，完成后设置 `loading=false`。
+
+```rust
+let result = hooks.use_async_state(
+    move || async move { fetch_projects(filter).await },
+    filter,
+);
+
+let loading = result.loading.get();
+let data = result.data.read();
+let error = result.error.read();
+```
+
+刷新期间旧 `data` 会保留。终端界面通常更适合“旧内容继续可见，同时展示 loading 状态”，而不是每次刷新都清空屏幕。
+
+## use_context
+
+`use_context::<T>()` 读取最近的 `ContextProvider` 注入值；`try_use_context::<T>()` 在没有 Provider 或当前已被借用时返回 `None`。
+
+```rust
+let (name, accent) = {
+    let settings = hooks.use_context::<WorkspaceSettings>();
+    (settings.profile.name, settings.profile.accent)
+};
+```
+
+建议把 context 借用限制在一个小块里，只把渲染需要的字段拷出来。这样后续再调用其他 hooks、进入嵌套 Provider 或请求可变 context 时，不会意外持有旧 borrow。
+
+Provider 适合子树级能力，例如主题、当前 workspace、局部服务对象。跨页面、进程级状态才考虑 Atom。
+
+## use_event_handler 和 use_input_layer
+
+`use_event_handler` 把键盘/鼠标事件注册到当前输入层。handler 必须返回 `EventResult`：
+
+```rust
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    let Event::Key(key) = event else {
+        return EventResult::Ignored;
+    };
+
+    match key.code {
+        KeyCode::Char('q') => {
+            exit();
+            EventResult::Consumed
+        }
+        _ => EventResult::Ignored,
+    }
+});
+```
+
+`Consumed` 会截断后续 handler；`Ignored` 表示这个 handler 没处理，让同层或下层继续试。
+
+如果事件只应该在组件区域内生效，用 `use_event_handler_with_options`：
+
+```rust
+hooks.use_event_handler_with_options(
+    EventScope::Current,
+    EventPriority::Normal,
+    EventOptions { hit_test: true },
+    move |event| {
+        // mouse events outside this component's last drawn area are skipped
+        EventResult::Ignored
+    },
+);
+```
+
+`hit_test` 只过滤鼠标事件。键盘事件没有坐标，仍会正常投递给 handler。命中区域来自组件上一帧的绘制区域，因此第一次绘制前不要依赖它做精确鼠标交互。
+
+模态交互用 `use_input_layer(open, blocks_lower)` 声明独占层：
+
+```rust
+let layer = hooks.use_input_layer(open.get(), true);
+
+hooks.use_event_handler(EventScope::Layer(layer), EventPriority::High, move |event| {
+    // modal keys
+    EventResult::Consumed
+});
+```
+
+`InputLayer` 句柄只在同一帧有效，每帧都会重新铸造。不要把它存进 `use_state`。如果你把层传给 `Modal(layer: Some(layer))`，Modal 子树里的 `Current` handler 会自动归属这个层，背景组件不会再处理同一组按键。
+
+手写 `Component` 里如果要调用 `use_event_handler` 或 `use_input_layer`，需要先让 hooks 拿到 context stack：
+
+```rust
+let mut hooks = hooks.with_context_stack(updater.component_context_stack());
+```
+
+函数组件由 `#[component]` 自动处理，不需要手写这一步。
+
+## 尺寸、退出和清理
+
+`use_terminal_size()` 返回当前终端尺寸，并在 `Resize` 事件后更新。它是少数可以在手写 `Component` 中直接调用、无需手动 `with_context_stack` 的 hook。
+
+`use_previous_size()` 返回组件上一帧的绘制区域，适合需要知道自身区域的组件逻辑。注意它不是当前帧最终布局结果，而是上一帧记录。
+
+`use_exit()` 返回一个 `'static` 退出闭包。调用它会在下一次 update 请求退出应用：
+
+```rust
+let mut exit = hooks.use_exit();
+
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    if matches!(event, Event::Key(key) if key.code == KeyCode::Char('q')) {
+        exit();
+        return EventResult::Consumed;
+    }
+
+    EventResult::Ignored
+});
+```
+
+`use_on_drop` 在组件销毁时运行回调，适合退订外部资源。不要在这个回调里使用 `State` 句柄写 UI 状态；组件已经在卸载路径上。
+
+## 低层逃生口：use_insert_before
+
+`use_insert_before()` 返回一个 `InsertBeforeHandler`，可以在当前终端渲染区域前插入一段额外内容。它不是布局系统的一部分，也不会生成组件树节点；更适合输入法候选条、调试前缀区这类少量终端级内容。
+
+```rust
+let insert_before = hooks.use_insert_before();
+
+hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    if matches!(event, Event::Key(key) if key.code == KeyCode::Enter) {
+        insert_before
+            .render_before(Line::from("submitted"), 1)
+            .finish();
+        return EventResult::Consumed;
+    }
+
+    EventResult::Ignored
+});
+```
+
+`insert_before(height, callback)` 直接拿到底层 buffer 回调；`render_before(widget, height)` 会把 ratatui `Widget` 渲染到这段前置区域。调用后用 `finish()` 唤醒渲染循环，队列会在下一次 update 结束时交给终端处理。
+
+不要用它承载普通 UI、弹窗、列表或页面内容。这些内容应该继续放在组件树里，用 `View`、`Border`、`Modal`、`ScrollView` 或自定义 `Component` 表达。
+
+## 自定义 Hook
+
+业务侧自定义 hook 优先写成普通函数，稳定地组合内置 hooks：
+
+```rust
+fn use_command_palette(hooks: &mut Hooks, commands: &'static [Command]) -> CommandPalette {
+    let query = hooks.use_state(String::new);
+    let cursor = hooks.use_state(|| 0usize);
+    let visible = hooks.use_memo(
+        move || matching_indices(commands, query.read().as_str()),
+        query.read().clone(),
+    );
+
+    // event handler / effect...
+
+    CommandPalette { visible, cursor }
+}
+```
+
+这个函数仍然要遵守 hook 顺序规则。它的好处是 API 很轻：组件只拿 snapshot 画界面，状态、派生数据、事件处理都被收进一个命名良好的 `use_*` 函数。完整例子见 [自定义 Hook](/ratatui-kit/zh-cn/advanced/custom-hook/)。
+
+只有当能力需要自己的生命周期回调时，才实现底层 `Hook` trait，例如：
+
+- 需要在 `poll_change` 中轮询外部 future 或手动 waker。
+- 需要在 `pre_component_update` / `post_component_update` 中读取运行时上下文。
+- 需要在 `pre_component_draw` / `post_component_draw` 中记录区域或绘制时信息。
+- 需要在 `on_drop` 中释放外部资源。
+
+底层自定义 hook 的标准形态是 `Sealed trait + UseXxxImpl + Hooks::use_hook`。普通业务逻辑先用组合型 hook；只有现有 hooks 表达不了生命周期时，再落到 `Hook` trait。

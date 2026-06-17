@@ -1,0 +1,109 @@
+---
+title: ShortcutInfoModal 快捷键帮助
+description: 用内置 ShortcutInfoModal 展示可滚动快捷键手册，同时保持弹窗输入互斥。
+sidebar:
+  order: 5
+---
+
+`ShortcutInfoModal` 是快捷键帮助弹窗。它适合把页面、弹窗或工作区的快捷键按分组展示出来，并在内容超过弹窗高度时交给内部 `ScrollView` 滚动。
+
+![shortcut info modal demo](/ratatui-kit/zh-cn/recordings/shortcut-info-modal.gif)
+
+这个录屏由 `docs/tapes/shortcut-info-modal.tape` 生成。示例先移动背景任务列表，再打开快捷键手册；弹窗里按多次 `j` 会滚动手册内容，但背景选中项不会继续下移。关闭后再按 `j`，背景列表恢复响应。
+
+## 运行
+
+```bash
+cargo run --example shortcut_info_modal
+```
+
+背景状态下按 `j/k` 移动，按 `i` 打开快捷键帮助。弹窗内按 `j/k` 滚动帮助内容，按 `Esc` 或 `i` 关闭，按 `q` 退出。
+
+## 最小形态
+
+```rust title="examples/components/shortcut_info_modal.rs"
+ShortcutInfoModal(
+    open: shortcuts_open.get(),
+    title: Line::from("Shortcut reference"),
+    sections: vec![
+        ShortcutInfoSection::new(
+            "Navigation",
+            [
+                ("Move selection down", "j / Down"),
+                ("Move selection up", "k / Up"),
+            ],
+        ),
+        ShortcutInfoSection::new(
+            "Modal",
+            [
+                ("Scroll reference", "j / k"),
+                ("Close reference", "Esc / i"),
+            ],
+        ),
+    ],
+    on_close: move |_: ()| {
+        shortcuts_open.set(false);
+    },
+)
+```
+
+`ShortcutInfoSection::new` 接收任何可以转成 `ShortcutInfo` 的条目。最常见的是 `(&str, &str)`：左侧是行为描述，右侧是快捷键组合。
+
+## 输入互斥和滚动
+
+这个组件和其它内置弹窗一样内部创建独占 input layer，并把同一个 layer 传给底层 `Modal`：
+
+```rust
+let layer = hooks.use_input_layer(open, true);
+
+hooks.use_event_handler(EventScope::Layer(layer), EventPriority::High, move |event| {
+    if close_keys.contains(&key.code) {
+        on_close(());
+        return EventResult::Consumed;
+    }
+
+    EventResult::Ignored
+});
+
+Modal(open: open, layer: Some(layer)) {
+    ScrollView {
+        // shortcut sections
+    }
+}
+```
+
+关键差异在最后的 `EventResult::Ignored`。关闭键会被弹窗消费；其它键会继续交给同一层里的 `ScrollView`，所以 `j/k`、方向键和翻页键仍能滚动帮助内容。由于这一层设置了 `blocks_lower=true`，即使 `ScrollView` 也返回 `Ignored`，背景层仍不会收到同一组按键。
+
+## 关闭键
+
+默认关闭键是 `Esc`、`i` 和 `I`：
+
+```rust
+ShortcutInfoModal(
+    close_keys: vec![KeyCode::Esc, KeyCode::Char('i'), KeyCode::Char('I')],
+    close_hint: Line::from("j/k scroll | Esc / i close").centered(),
+)
+```
+
+如果你的页面已经把 `i` 用作其它前景操作，可以替换 `close_keys`。底部提示由 `close_hint` 控制，不会根据 `close_keys` 自动生成。
+
+## 尺寸和样式
+
+`ShortcutInfoModal` 暴露底层 `Modal` 的尺寸、遮罩和主要文本样式：
+
+```rust
+ShortcutInfoModal(
+    width: Constraint::Length(78),
+    height: Constraint::Length(13),
+    style: Style::new().dim(),
+    border_style: Style::new().yellow(),
+    title_style: Style::new().yellow().bold(),
+    section_title_style: Style::new().cyan().bold(),
+    description_style: Style::new(),
+    key_style: Style::new().yellow(),
+)
+```
+
+内容区域已经包了一层 `ScrollView`。如果你需要搜索、过滤或动态生成帮助项，只需要重新生成 `sections`；如果弹窗里还有输入框、列表选择或多步交互，再使用底层 `Modal` + `use_input_layer` 组合。
+
+普通提示看 [AlertModal](/ratatui-kit/zh-cn/components/alert-modal/)，需要让用户做选择时用 [ConfirmModal](/ratatui-kit/zh-cn/components/confirm-modal/)。

@@ -1,7 +1,6 @@
-/* Ratatui Kit 品牌色：取自 logo 的 teal(青绿) + amber(奶酪黄) 双色体系。
-   暗色页用 amber 强调(像 logo 奶酪在深色上发光)，亮色页用 teal 强调(像 logo 主体)。
-   用 :root:root 提升优先级覆盖 starlight-theme-nova 默认中性 accent，
-   让文档内页的链接、侧边栏激活项、焦点环、callout 等都跟随品牌色。 */
+/* Ratatui Kit brand colors: teal and amber from the logo. Dark pages use amber
+   accents, light pages use teal accents. :root:root raises specificity enough
+   to override starlight-theme-nova's neutral default accents. */
 :root:root {
 	--sl-color-accent-low: #3a2808;
 	--sl-color-accent: #c47512;
@@ -16,4 +15,26 @@
 	--sl-color-accent-high: #053034;
 	--sl-color-text-accent: #0a5b60;
 	--sl-color-asides-text-accent: #0a5b60;
+}
+
+/* Installation pages use astro:components <Code themes={{light,dark}}> blocks
+   so the version can be interpolated. That component outputs a bare
+   pre.astro-code, so these rules align it with Starlight's code block styling
+   and switch Shiki tokens to --shiki-dark on dark pages. */
+.sl-markdown-content .astro-code {
+	padding: 0.85rem 1.1rem;
+	border-radius: 0.5rem;
+	overflow-x: auto;
+	tab-size: 2;
+	font-size: var(--sl-text-code, 0.875rem);
+	line-height: 1.7;
+}
+
+:root[data-theme='dark'] .sl-markdown-content .astro-code {
+	color: var(--shiki-dark) !important;
+	background-color: var(--shiki-dark-bg) !important;
+}
+
+:root[data-theme='dark'] .sl-markdown-content .astro-code span {
+	color: var(--shiki-dark) !important;
 }

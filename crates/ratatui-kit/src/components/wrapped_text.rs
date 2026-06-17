@@ -1,7 +1,7 @@
-//! WrappedText 组件：按指定宽度自动换行，并把换行后的行数暴露给布局系统。
-//!
-//! 与 `Text(wrap: true)` 不同，`WrappedText` 会根据 `wrap_width` 计算自身高度，
-//! 因而适合放进 `ScrollView` 渲染长文档、日志、说明文本或小说正文。
+// WrappedText 组件：按指定宽度自动换行，并把换行后的行数暴露给布局系统。
+//
+// 与 `Text(wrap: true)` 不同，`WrappedText` 会根据 `wrap_width` 计算自身高度，
+// 因而适合放进 `ScrollView` 渲染长文档、日志、说明文本或小说正文。
 
 use crate::{Component, ComponentDrawer, ComponentUpdater, Hooks};
 use ratatui::{
@@ -15,25 +15,25 @@ const DEFAULT_WRAP_WIDTH: u16 = 80;
 
 #[with_layout_style]
 #[derive(Default, Props)]
-/// 自动换行文本属性。
+// 自动换行文本属性。
 pub struct WrappedTextProps {
-    /// 要渲染的纯文本。可直接传 `&str` 或 `String`。
+    // 要渲染的纯文本。可直接传 `&str` 或 `String`。
     pub text: String,
-    /// 应用于整段文本的样式。
+    // 应用于整段文本的样式。
     pub style: Style,
-    /// 文本对齐方式。
+    // 文本对齐方式。
     pub alignment: Alignment,
-    /// 文本滚动偏移，语义与 ratatui `Paragraph::scroll` 保持一致。
+    // 文本滚动偏移，语义与 ratatui `Paragraph::scroll` 保持一致。
     pub scroll: Position,
-    /// 用于计算换行和自动高度的宽度。长正文放进 `ScrollView` 时建议显式传入。
+    // 用于计算换行和自动高度的宽度。长正文放进 `ScrollView` 时建议显式传入。
     pub wrap_width: Option<u16>,
-    /// 是否拆分超过宽度的长词/长串。默认 `true`，适合 CJK 正文和长日志。
+    // 是否拆分超过宽度的长词/长串。默认 `true`，适合 CJK 正文和长日志。
     pub break_words: Option<bool>,
-    /// 是否把自身高度设为换行后的行数。默认 `true`。
+    // 是否把自身高度设为换行后的行数。默认 `true`。
     pub auto_height: Option<bool>,
 }
 
-/// 自动换行文本组件。
+// 自动换行文本组件。
 pub struct WrappedText {
     paragraph: Paragraph<'static>,
     line_count: u16,

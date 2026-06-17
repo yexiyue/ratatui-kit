@@ -1,4 +1,4 @@
-//! Select 组件：带键盘事件处理的单选列表。
+// Select 组件：带键盘事件处理的单选列表。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{

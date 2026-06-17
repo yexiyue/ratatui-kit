@@ -1,22 +1,22 @@
 ---
-title: 路由
-description: RouterProvider、Outlet、Navigate、params 和 RouteState 的职责边界。
+title: Routing
+description: The boundaries between RouterProvider, Outlet, Navigate, params, and RouteState.
 sidebar:
   order: 5
 ---
 
 import Mermaid from '../../../components/Mermaid.astro';
 
-Router 是 Provider 作用域状态，不是全局单例。一个 `RouterProvider` 持有一条 `RouterHistory`，并通过 Context 把当前路由上下文和导航能力传给子树。
+Router is provider-scoped state, not a global singleton. One `RouterProvider` owns one `RouterHistory` and uses Context to provide the current route context and navigation capabilities to its subtree.
 
 ```rust
 let mut navigate = hooks.use_navigate();
 navigate.push("/projects/boreal");
 ```
 
-想先看完整运行例子，可以从 [路由工作台](/ratatui-kit/tutorials/router/) 开始。
+To see a complete running example first, start with [Routing workspace](/ratatui-kit/tutorials/router/).
 
-## 三层状态
+## Three state layers
 
 <Mermaid
 	chart={`
@@ -27,37 +27,37 @@ flowchart TD
     outlet --> route["Route"]
     route --> page["matched component"]
 	`}
-	caption="RouterProvider 保存 history；Outlet 根据 RouteContext 匹配 Route，并把命中的组件渲染出来。"
+	caption="RouterProvider stores history; Outlet matches Route from RouteContext and renders the matched component."
 />
 
-路由运行时可以分成三层：
+The routing runtime has three layers:
 
-| 层 | 生命周期 | 内容 |
+| Layer | Lifetime | Contents |
 | --- | --- | --- |
-| `RouterHistory` | 跟随 `RouterProvider` | history 栈、当前指针、最大历史长度 |
-| `RouteContext` | 当前 history entry | 当前 path、动态 params、可选 `RouteState` |
-| `Route` | 路由表定义 | path pattern、组件、子路由 |
+| `RouterHistory` | Follows `RouterProvider` | History stack, current pointer, max history length |
+| `RouteContext` | Current history entry | Current path, dynamic params, optional `RouteState` |
+| `Route` | Route table definition | Path pattern, component, child routes |
 
-`Navigate` 写的是 `RouterHistory`。`Outlet` 读当前 `RouteContext`，按 `routes!` 声明顺序找到第一个匹配的 `Route`，并把剩余 path 交给嵌套 `Outlet` 继续消费。
+`Navigate` writes `RouterHistory`. `Outlet` reads the current `RouteContext`, finds the first matching `Route` in `routes!` declaration order, and passes the remaining path to a nested `Outlet`.
 
-`RouterProvider(history_length: n)` 可以限制 history 栈长度。默认是 `10`；传入 `0` 会按 `1` 处理，也就是只保留当前最新 entry。
+`RouterProvider(history_length: n)` limits history length. The default is `10`; passing `0` is treated as `1`, meaning only the current latest entry is retained.
 
 ## Navigate
 
-`use_navigate()` 返回 `Navigate` 句柄，常用方法如下：
+`use_navigate()` returns a `Navigate` handle. Common methods:
 
-| 方法 | 行为 |
+| Method | Behavior |
 | --- | --- |
-| `push(path)` | 新增一条 history entry，并清空 route state |
-| `push_with_state(path, state)` | 新增 history entry，并携带一次性 state |
-| `replace(path)` | 替换当前 history entry，并清空 route state |
-| `replace_with_state(path, state)` | 替换当前 history entry，并携带一次性 state |
-| `go(delta)` | 按偏移移动 history 指针，负数后退、正数前进 |
-| `back()` / `forward()` | `go(-1)` / `go(1)` 的语义化快捷方式 |
+| `push(path)` | Add a history entry and clear route state |
+| `push_with_state(path, state)` | Add a history entry with one-shot state |
+| `replace(path)` | Replace the current history entry and clear route state |
+| `replace_with_state(path, state)` | Replace the current history entry with one-shot state |
+| `go(delta)` | Move the history pointer; negative goes back, positive goes forward |
+| `back()` / `forward()` | Semantic shortcuts for `go(-1)` / `go(1)` |
 
-`Navigate` 写入的是当前 `RouterProvider` 里的 `RouterHistory`，不是全局路由单例。同一个应用可以嵌多个 RouterProvider，它们各自维护自己的 history。
+`Navigate` writes to the `RouterHistory` inside the current `RouterProvider`, not to a global route singleton. One app can nest multiple `RouterProvider`s, each with its own history.
 
-## 嵌套路由
+## Nested routes
 
 ```rust
 let routes = routes! {
@@ -69,29 +69,29 @@ let routes = routes! {
 };
 ```
 
-父路由组件可以渲染固定外壳，然后在内部放 `Outlet`。路径 `/projects/boreal` 会先进入 `AppShell`，再由子 `Outlet` 命中 `/projects/:slug`。
+A parent route component can render a fixed shell and place an `Outlet` inside it. The path `/projects/boreal` enters `AppShell` first, then the child `Outlet` matches `/projects/:slug`.
 
-静态路由使用前缀匹配并要求段边界；动态参数只匹配单段，不会跨 `/`。同前缀路由需要把更具体的动态路由放在前面，例如 `/projects/:slug` 要先于 `/projects`。
+Static routes use prefix matching with segment boundaries; dynamic params match only one segment and do not cross `/`. For same-prefix routes, put the more specific dynamic route first, such as `/projects/:slug` before `/projects`.
 
-## 参数和 state
+## Params and state
 
-动态参数从 path 来：
+Dynamic params come from the path:
 
 ```rust
 let params = hooks.use_params();
 let slug = params.get("slug");
 ```
 
-如果页面需要当前命中的路由定义本身，可以用 `use_route()`：
+If a page needs the matched route definition itself, use `use_route()`:
 
 ```rust
 let route = hooks.use_route();
 let pattern = route.path.as_str();
 ```
 
-多数业务页面只需要 `use_params()`。`use_route()` 更适合调试、面包屑、路由可视化或封装自己的路由辅助组件。
+Most business pages only need `use_params()`. `use_route()` is more useful for debugging, breadcrumbs, route visualizers, or your own route helper components.
 
-`RouteState` 从导航行为来：
+`RouteState` comes from navigation behavior:
 
 ```rust
 navigate.push_with_state(
@@ -102,12 +102,12 @@ navigate.push_with_state(
 let notice = hooks.try_use_route_state::<RouteNotice>();
 ```
 
-`try_use_route_state::<T>()` 找不到 Router context、没有 state 或类型不匹配时返回 `None`。`use_route_state::<T>()` 是断言型 API，会在缺失或类型不匹配时 panic。
+`try_use_route_state::<T>()` returns `None` when there is no Router context, no state, or a type mismatch. `use_route_state::<T>()` is the assertion-style API and panics on absence or type mismatch.
 
-普通 `push(path)` 和 `replace(path)` 会清空当前 route state；只有 `push_with_state` 和 `replace_with_state` 会显式携带 state。这能避免从详情页跳到普通页时把旧 state 泄漏到新页面。
+Plain `push(path)` and `replace(path)` clear the current route state; only `push_with_state` and `replace_with_state` carry state explicitly. This prevents old state from leaking into unrelated pages when leaving a detail page.
 
-## 为什么不用 Atom
+## Why not Atom
 
-Atom 是进程级状态；Router 是 Provider 作用域状态。把默认 Router 存到 Atom 会让多个 `RouterProvider` 互相污染，也会让测试、嵌入式子应用和局部导航变难。
+Atom is process-wide state; Router is provider-scoped state. Storing the default Router in an Atom would let multiple `RouterProvider`s pollute each other and would make testing, embedded subapps, and local navigation harder.
 
-需要外部可控路由时，优先设计显式 controlled Router API，例如由调用方传入当前 path 和变更回调。只有真正跨 Provider 共享的业务状态，才应该进入 Atom。
+If you need externally controlled routing, prefer designing an explicit controlled Router API where the caller passes the current path and change callback. Only business state that truly needs to be shared across providers should go into Atom.

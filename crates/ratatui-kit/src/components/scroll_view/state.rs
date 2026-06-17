@@ -1,36 +1,36 @@
-//! ScrollViewState：滚动视图的状态管理结构，记录偏移量、尺寸、页大小等。
-//!
-//! 常与 ScrollView 组件配合使用，支持键盘/鼠标事件驱动的滚动。
-//!
-//! ## 用法示例
-//! ```rust
-//! let scroll_state = hooks.use_state(ScrollViewState::default);
-//! element!(ScrollView(scroll_view_state: scroll_state) { ... })
-//! // 在事件处理器中调用 `scroll_state.write().handle_event(&event)`。
-//! ```
-//! 支持上下左右/翻页/鼠标滚轮等多种滚动方式。
+// ScrollViewState：滚动视图的状态管理结构，记录偏移量、尺寸、页大小等。
+//
+// 常与 ScrollView 组件配合使用，支持键盘/鼠标事件驱动的滚动。
+//
+// ## 用法示例
+// ```rust
+// let scroll_state = hooks.use_state(ScrollViewState::default);
+// element!(ScrollView(scroll_view_state: scroll_state) { ... })
+// // 在事件处理器中调用 `scroll_state.write().handle_event(&event)`。
+// ```
+// 支持上下左右/翻页/鼠标滚轮等多种滚动方式。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
 use ratatui::layout::{Position, Size};
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
-/// 滚动视图状态。
+// 滚动视图状态。
 pub struct ScrollViewState {
-    /// 偏移量是滚动视图需要移动的行数和列数。
+    // 偏移量是滚动视图需要移动的行数和列数。
     pub(crate) offset: Position,
-    /// 滚动视图的尺寸。在第一次渲染调用前不会被设置。
+    // 滚动视图的尺寸。在第一次渲染调用前不会被设置。
     pub(crate) size: Option<Size>,
-    /// 滚动视图一页的尺寸。在第一次渲染调用前不会被设置。
+    // 滚动视图一页的尺寸。在第一次渲染调用前不会被设置。
     pub(crate) page_size: Option<Size>,
 }
 
 impl ScrollViewState {
-    /// 创建一个偏移量为 (0, 0) 的新滚动视图状态
+    // 创建一个偏移量为 (0, 0) 的新滚动视图状态
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// 创建一个带有指定偏移量的新滚动视图状态
+    // 创建一个带有指定偏移量的新滚动视图状态
     pub fn with_offset(offset: Position) -> Self {
         Self {
             offset,
@@ -38,56 +38,56 @@ impl ScrollViewState {
         }
     }
 
-    /// 设置滚动视图状态的偏移量
+    // 设置滚动视图状态的偏移量
     pub const fn set_offset(&mut self, offset: Position) {
         self.offset = offset;
     }
 
-    /// 获取滚动视图状态的偏移量
+    // 获取滚动视图状态的偏移量
     pub const fn offset(&self) -> Position {
         self.offset
     }
 
-    /// 向上滚动一行
+    // 向上滚动一行
     pub const fn scroll_up(&mut self) {
         self.offset.y = self.offset.y.saturating_sub(1);
     }
 
-    /// 向下滚动一行
+    // 向下滚动一行
     pub const fn scroll_down(&mut self) {
         self.offset.y = self.offset.y.saturating_add(1);
     }
 
-    /// 向下滚动一页
+    // 向下滚动一页
     pub fn scroll_page_down(&mut self) {
         let page_size = self.page_size.map_or(1, |size| size.height);
         // 我们减去 1 以确保页面之间有一行重叠
         self.offset.y = self.offset.y.saturating_add(page_size).saturating_sub(1);
     }
 
-    /// 向上滚动一页
+    // 向上滚动一页
     pub fn scroll_page_up(&mut self) {
         let page_size = self.page_size.map_or(1, |size| size.height);
         // 我们加上 1 以确保页面之间有一行重叠
         self.offset.y = self.offset.y.saturating_add(1).saturating_sub(page_size);
     }
 
-    /// 向左滚动一列
+    // 向左滚动一列
     pub const fn scroll_left(&mut self) {
         self.offset.x = self.offset.x.saturating_sub(1);
     }
 
-    /// 向右滚动一列
+    // 向右滚动一列
     pub const fn scroll_right(&mut self) {
         self.offset.x = self.offset.x.saturating_add(1);
     }
 
-    /// 滚动到缓冲区顶部
+    // 滚动到缓冲区顶部
     pub const fn scroll_to_top(&mut self) {
         self.offset = Position::ORIGIN;
     }
 
-    /// 滚动到缓冲区底部
+    // 滚动到缓冲区底部
     pub fn scroll_to_bottom(&mut self) {
         // 渲染调用会调整偏移量以确保不会滚动到缓冲区末尾之后，所以这里可以将偏移量设置为最大值
         let bottom = self

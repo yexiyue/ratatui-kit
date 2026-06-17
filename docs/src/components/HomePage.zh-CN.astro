@@ -1,0 +1,2467 @@
+---
+import { Code } from 'astro:components';
+import { RK_VERSION } from '../consts';
+
+const rawBaseUrl = import.meta.env.BASE_URL;
+const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
+const recording = (name: string) => `${baseUrl}recordings/${name}.gif`;
+const repoUrl = 'https://github.com/yexiyue/ratatui-kit';
+
+// 代码高亮明暗双主题:亮色页面配亮色代码,暗色页面配暗色代码(由下方 CSS 切换 --shiki-dark)。
+const codeThemes = { light: 'github-light-default', dark: 'github-dark-default' };
+
+// 真实代码:examples/input/input_mutex.rs 的输入层 API(框架级输入互斥)
+const layerCode = `// 进入编辑态时申请一个输入层
+let edit_layer = hooks.use_input_layer(editing.get(), true);
+
+// 只有这一层激活时,handler 才会收到键盘事件
+hooks.use_event_handler(
+    EventScope::Layer(edit_layer),
+    EventPriority::High,
+    move |event| {
+        let Event::Key(key) = event else {
+            return EventResult::Ignored;
+        };
+        match key.code {
+            KeyCode::Enter => editing.set(false),
+            KeyCode::Char(c) => draft.write().push(c),
+            _ => {}
+        }
+        // 背景列表不会再看到这些按键
+        EventResult::Consumed
+    },
+);`;
+
+const features = [
+	{
+		span: 'lg',
+		token: 'element!',
+		title: '声明式语法',
+		text: 'JSX 风格的过程宏 —— UI 由数据描述,而不是手写绘制指令。一套你熟悉的写法,把组件树编译成终端布局。',
+		points: [
+			'if / for / match 是子节点块里的一等公民',
+			'{ expr } 内嵌任意返回 Element 的 Rust 表达式',
+			'widget() / stateful() 桥接原生 ratatui widget',
+		],
+	},
+	{
+		span: 'wide',
+		token: 'use_state · use_future',
+		title: 'Hooks 状态',
+		text: 'use_state、use_future、use_effect 与自定义 Hook 按调用顺序组织。状态句柄是 Copy 的,支持 count += 1 运算符重载,随组件卸载自动释放。',
+	},
+	{
+		span: 'wide',
+		token: 'use_input_layer',
+		title: '输入层互斥',
+		text: '事件不再广播给所有组件,而是按当前活动输入层路由。弹窗或进入编辑态时申请一层,背景列表自动让出键盘,从根上消除焦点争抢。',
+	},
+	{
+		span: 'wide',
+		token: 'Waker',
+		title: '响应式渲染',
+		text: '状态写入唤醒渲染循环,框架只在真正变化时重绘,而非命令式刷屏。基于 generational-box 的响应式句柄,让终端 UI 像前端框架一样按需更新。',
+	},
+	{
+		span: 'sm',
+		token: 'Select · Modal',
+		title: '内置组件',
+		text: '布局、输入、弹层、选择与虚拟列表开箱即用,业务中立、可组合。',
+	},
+	{
+		span: 'sm',
+		token: 'RouterProvider · Atom',
+		title: '路由与全局状态',
+		text: 'Router 管理多页面与历史栈,Atom 管理跨页共享的业务状态。',
+	},
+];
+
+// 全部内置组件:用于「组件展示」滚动切换。代码片段取自各组件文档里的真实用法。
+const components = [
+	{
+		name: 'View · Border · Text',
+		desc: '最基础的布局与文本原语:flex 容器、边框分组、段落渲染,把组件树切成可预测的终端区域。',
+		gif: null,
+		href: 'components/layout-primitives/',
+		example: 'hello_world',
+		code: `View(flex_direction: Direction::Vertical, gap: 1) {
+    Text(text: "header")
+    View(height: Constraint::Fill(1)) {
+        Text(text: "body")
+    }
+    Text(text: "footer")
+}`,
+	},
+	{
+		name: 'ScrollView',
+		desc: '可滚动容器:超出视口的内容先渲染到更大缓冲区再按 offset 显示,支持 j/k、翻页与滚动条。',
+		gif: 'scrollview',
+		href: 'components/scroll-view/',
+		example: 'scrollview',
+		code: `ScrollView(
+    flex_direction: Direction::Vertical,
+    block: Block::bordered(),
+) {
+    for (i, row) in rows.iter().enumerate() {
+        View(key: i, height: Constraint::Length(1)) {
+            Text(text: row)
+        }
+    }
+}`,
+	},
+	{
+		name: 'WrappedText',
+		desc: '长正文:先按指定宽度硬换行,再把真实行数写回布局高度,让外层 ScrollView 正确计算滚动范围。',
+		gif: 'wrapped-text',
+		href: 'components/wrapped-text/',
+		example: 'wrapped_text',
+		code: `ScrollView(scroll_view_state: scroll_state, block: Block::bordered()) {
+    WrappedText(
+        text: BODY,
+        wrap_width: 72,
+        style: Style::new().white(),
+    )
+}`,
+	},
+	{
+		name: 'Input',
+		desc: '单行输入框的显示组件,渲染 tui_input 状态;写入、提交、退出都交给页面 handler 控制。',
+		gif: 'input',
+		href: 'components/input/',
+		example: 'input',
+		code: `Border(height: Constraint::Length(3)) {
+    Input(
+        input: input.read().clone(),
+        placeholder: "Type and press Enter".to_string(),
+        cursor_style: Style::new().bg(Color::Yellow),
+    )
+}`,
+	},
+	{
+		name: 'SearchInput',
+		desc: '带编辑态的搜索框:按 s 进入输入并开独占输入层,封装激活、提交、清空、校验与输入互斥。',
+		gif: 'search-input',
+		href: 'components/search-input/',
+		example: 'search_input',
+		code: `SearchInput(
+    value: query.read().to_string(),
+    placeholder: "Press s to search".to_string(),
+    on_change: move |next: String| query.set(next),
+    on_submit: move |value: String| {
+        submitted.set(value);
+        true
+    },
+)`,
+	},
+	{
+		name: 'Modal',
+		desc: '底层弹层:负责绘制遮罩、定位内容并为子树提供当前输入层,确认与关闭逻辑由外层组合。',
+		gif: 'modal',
+		href: 'components/modal/',
+		example: 'modal',
+		code: `Modal(
+    open: open.get(),
+    width: Constraint::Length(68),
+    height: Constraint::Length(12),
+) {
+    Border(top_title: Line::from("Details").centered()) {
+        Text(text: Line::from("Modal content"))
+    }
+}`,
+	},
+	{
+		name: 'ConfirmModal',
+		desc: '确认弹窗:内部建独占输入层,封装确认/取消、按钮焦点切换与输入互斥,受控 open 决定显示。',
+		gif: 'confirm-modal',
+		href: 'components/confirm-modal/',
+		example: 'confirm_modal',
+		code: `ConfirmModal(
+    open: confirm_open.get(),
+    title: Line::from("Delete release?"),
+    content: format!("Remove {selected_label}?"),
+    confirm_text: "Delete".to_string(),
+    on_confirm: move |_: ()| confirm_open.set(false),
+    on_cancel: move |_: ()| confirm_open.set(false),
+)`,
+	},
+	{
+		name: 'AlertModal',
+		desc: '提示型弹窗:无确认/取消按钮,只展示一段信息,关闭键按下时回调 on_close,期间截断下层输入。',
+		gif: 'alert-modal',
+		href: 'components/alert-modal/',
+		example: 'alert_modal',
+		code: `AlertModal(
+    open: alert_open.get(),
+    title: Line::from("Workspace is current"),
+    message: format!("{selected_label} is synced."),
+    on_close: move |_: ()| alert_open.set(false),
+)`,
+	},
+	{
+		name: 'ShortcutInfoModal',
+		desc: '快捷键帮助弹窗:按分组展示快捷键,内容超高时交给内部 ScrollView 滚动,并保持弹窗输入互斥。',
+		gif: 'shortcut-info-modal',
+		href: 'components/shortcut-info-modal/',
+		example: 'shortcut_info_modal',
+		code: `ShortcutInfoModal(
+    open: shortcuts_open.get(),
+    title: Line::from("Shortcut reference"),
+    sections: vec![ShortcutInfoSection::new(
+        "Navigation",
+        [("Down", "j"), ("Up", "k")],
+    )],
+    on_close: move |_: ()| shortcuts_open.set(false),
+)`,
+	},
+	{
+		name: 'Select',
+		desc: '单选列表:内部持有 ListState,把 j/k、方向键、Home/End 和 Enter 变成列表导航与选择回调。',
+		gif: 'select',
+		href: 'components/select/',
+		example: 'select',
+		code: `Select<&'static str>(
+    items: items,
+    default_index: Some(1),
+    highlight_symbol: "> ",
+    empty_message: "No environments",
+    on_select: move |item: &'static str| {
+        selected.set(item);
+    },
+)`,
+	},
+	{
+		name: 'MultiSelect',
+		desc: '多选列表:交互分两层 —— Space 切换草稿选择触发 on_change,Enter 提交选择触发 on_select。',
+		gif: 'multi-select',
+		href: 'components/multi-select/',
+		example: 'multi_select',
+		code: `MultiSelect<&'static str>(
+    items: items,
+    highlight_symbol: "> ",
+    on_change: move |items: Vec<&'static str>| {
+        selected_count.set(items.len());
+    },
+    on_select: move |items: Vec<&'static str>| {
+        submitted.set(items.len());
+    },
+)`,
+	},
+	{
+		name: 'TreeSelect',
+		desc: '树形选择(tree feature):复用 tui-tree-widget 处理层级导航、折叠展开、路径型选择与输入互斥。',
+		gif: 'tree-select',
+		href: 'components/tree-select/',
+		example: 'tree_select',
+		code: `TreeSelect<&'static str>(
+    active: true,
+    items: demo_items(),
+    default_selection: vec!["components", "select"],
+    node_open_symbol: "- ",
+    node_closed_symbol: "+ ",
+    on_select: move |id: &'static str| {
+        submitted.set(id);
+    },
+)`,
+	},
+	{
+		name: 'VirtualList',
+		desc: '长列表(virtual-list feature):复用 tui-widget-list 只渲染可见窗口,可承载几万行并自定义行渲染。',
+		gif: 'virtual-list',
+		href: 'components/virtual-list/',
+		example: 'virtual_list',
+		code: `VirtualList<Line<'static>>(
+    item_count: 10_000,
+    default_index: Some(42),
+    render_item: |ctx: &ListBuildContext| {
+        let style = if ctx.is_selected {
+            Style::new().black().on_green()
+        } else {
+            Style::new()
+        };
+        (Line::styled(format!("row {:05}", ctx.index + 1), style), 1u16)
+    },
+)`,
+	},
+	{
+		name: 'VirtualMultiSelect',
+		desc: '长列表多选的组合模式:VirtualList 管光标与窗口化渲染,业务用外部 HashSet 保存多选集合。',
+		gif: 'virtual-multi-select',
+		href: 'components/virtual-multi-select/',
+		example: 'virtual_multi_select',
+		code: `VirtualList<Line<'static>>(
+    state: list_state,
+    item_count: item_count,
+    render_item: move |ctx: &ListBuildContext| {
+        let mark = if selected.contains(&ctx.index) { "[x]" } else { "[ ]" };
+        (Line::styled(format!("{mark} Row {:05}", ctx.index + 1), Style::default()), 1u16)
+    },
+)`,
+	},
+];
+
+const pathItems = [
+	{ title: '先跑起来', href: 'start/quick-start/', text: '从 hello world 和 counter 建立组件直觉。' },
+	{ title: '理解核心模型', href: 'core/component-model/', text: '掌握 element、component、hooks、context 和 render loop 的边界。' },
+	{ title: '处理真实输入', href: 'tutorials/input-mutex/', text: '用输入层解决弹窗、列表和编辑态之间的事件归属。' },
+	{ title: '扩展框架层', href: 'advanced/custom-hook/', text: '沉淀 provider、hook 和 widget,把业务约束变成复用能力。' },
+];
+
+// 第一幕「对比塌缩」:同一个每秒自增的计数器。
+// 左:裸 ratatui 的命令式实现,你要亲手管终端生命周期、渲染循环、计时器和事件轮询。
+const rawCode = `fn main() -> std::io::Result<()> {
+    let mut terminal = ratatui::init(); // 手动进入 / 退出终端
+    let mut count = 0_u64;              // 状态散落在 main
+    let mut last = Instant::now();      // 自己维护计时器
+    loop {                             // 手写渲染循环
+        terminal.draw(|f| ui(f, count))?;
+        if last.elapsed() >= Duration::from_secs(1) {
+            count += 1;                // 手动推进状态
+            last = Instant::now();
+        }
+        if event::poll(Duration::from_millis(50))? {
+            if let Event::Key(k) = event::read()? {
+                if k.code == KeyCode::Char('q') {
+                    break;             // 自己处理退出
+                }
+            }
+        }
+    }
+    ratatui::restore();               // 别忘了恢复终端
+    Ok(())
+}`;
+
+// 右:ratatui-kit 的声明式核心。运行时接管终端、循环和退出,你只描述状态和 UI。
+const kitCoreCode = `#[component]
+fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut count = hooks.use_state(|| 0_u64);
+
+    hooks.use_future(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            count += 1;
+        }
+    });
+
+    element!(
+        Border(border_style: Style::new().yellow()) {
+            Text(text: Line::from(format!("Counter: {:02}", count.get())))
+        }
+    )
+}`;
+
+// 左侧描述随滚动在两幕之间切换(对应右侧代码窗的两段代码)。
+const rawNarr = {
+	kicker: '纯 ratatui · 手动挡',
+	title: '一切都得自己来',
+	text: '进入和退出终端、手写渲染循环、用 Instant 维护计时器、轮询并分发每个按键——计数器还没开始,样板代码已经堆满了 main。',
+};
+const kitNarr = {
+	kicker: 'ratatui-kit · 自动挡',
+	title: '只描述状态和 UI',
+	text: 'use_state 管状态、use_future 跑异步、element! 声明界面。终端生命周期、渲染循环和退出都交给运行时——同一个计数器,少写一半代码。',
+};
+
+// 第二幕「三步跑起来」:安装 → 写组件 → 运行。
+const cargoTomlCode = `[dependencies]
+ratatui-kit = "${RK_VERSION}"
+tokio = { version = "1", features = [
+    "rt-multi-thread", "macros", "time",
+] }`;
+
+const counterFileCode = `use ratatui_kit::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    element!(Counter).fullscreen().await.unwrap();
+}
+
+#[component]
+fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut count = hooks.use_state(|| 0_u64);
+
+    hooks.use_future(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            count += 1;
+        }
+    });
+
+    element!(
+        Border(border_style: Style::new().yellow()) {
+            Text(text: Line::from(format!("Counter: {:02}", count.get())))
+        }
+    )
+}`;
+
+const qsSteps = [
+	{
+		n: '01',
+		title: '安装依赖',
+		text: '把 ratatui-kit 和 Tokio 加进 Cargo.toml。框架默认不开任何 feature,按需再打开 router、atom、input 等。',
+	},
+	{
+		n: '02',
+		title: '写第一个组件',
+		text: 'use_state 管状态、use_future 跑异步、element! 声明 UI。组件实例由运行时跨帧保留,写入状态自动唤醒渲染。',
+	},
+	{
+		n: '03',
+		title: '跑起来',
+		text: 'cargo run,终端进入全屏。计数器每秒自增,按 q 退出、Ctrl+C 强制结束,退出后终端自动恢复。',
+	},
+];
+---
+
+<div class="rk-home" data-rk-home>
+	<div class="rk-home__grain" aria-hidden="true"></div>
+
+	<section class="rk-hero" aria-labelledby="rk-home-title">
+		<div class="rk-hero__copy">
+			<p class="rk-brand" data-rk-reveal>
+				<span class="rk-brand__mark" aria-hidden="true">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 724" aria-hidden="true">
+<path d="M0,0 L434,0 L454,3 L474,9 L497,20 L511,30 L525,42 L535,53 L547,70 L558,93 L564,113 L567,133 L567,591 L564,611 L558,631 L547,654 L537,668 L525,682 L514,692 L497,704 L474,715 L454,721 L434,724 L0,724 L-20,721 L-40,715 L-63,704 L-77,694 L-91,682 L-101,671 L-113,654 L-124,631 L-130,611 L-133,591 L-133,133 L-130,113 L-124,93 L-113,70 L-103,56 L-91,42 L-80,32 L-63,20 L-40,9 L-20,3 Z " fill="#064A4F" transform="translate(133,0)"/>
+<path d="M0,0 L96,0 L96,160 L93,180 L87,200 L76,223 L66,237 L54,251 L43,261 L26,273 L3,284 L-17,290 L-37,293 L-195,292 L-195,200 L-189,188 L-180,178 L-158,156 L-151,148 L-125,122 L-118,114 L-95,91 L-88,83 L-67,62 L-60,54 L-36,30 L-29,22 L-12,5 L-4,1 Z " fill="#FCA91C" transform="translate(604,431)"/>
+<path d="M0,0 L8,0 L19,3 L28,9 L43,23 L56,35 L71,49 L86,63 L99,75 L114,89 L126,100 L143,116 L158,130 L171,142 L187,157 L200,169 L215,183 L228,195 L236,203 L241,213 L243,222 L242,233 L238,243 L231,252 L216,267 L208,274 L175,307 L167,314 L142,339 L134,346 L108,372 L100,379 L76,403 L68,410 L44,434 L36,441 L30,446 L22,450 L17,451 L5,451 L-6,447 L-15,440 L-21,430 L-23,424 L-23,408 L-18,396 L-9,386 L8,369 L15,361 L72,304 L79,296 L133,242 L137,234 L139,226 L138,215 L134,206 L127,198 L120,191 L112,184 L96,169 L81,155 L65,140 L52,128 L37,114 L22,100 L9,88 L-7,73 L-22,59 L-28,49 L-30,43 L-31,34 L-29,24 L-24,14 L-20,9 L-11,3 Z " fill="#FCF8EF" transform="translate(146,128)"/>
+<path d="M0,0 L7,0 L7,60 L4,80 L-2,100 L-10,99 L-22,93 L-32,84 L-39,73 L-43,61 L-44,56 L-44,45 L-41,33 L-36,23 L-27,13 L-18,6 L-9,2 Z " fill="#064A4F" transform="translate(693,531)"/>
+<path d="M0,0 L12,2 L20,7 L26,14 L30,24 L30,35 L27,44 L18,54 L9,58 L-1,59 L-11,56 L-20,50 L-26,40 L-27,37 L-27,22 L-22,12 L-17,7 L-9,2 Z " fill="#064A4F" transform="translate(557,565)"/>
+<path d="M0,0 L8,1 L14,5 L18,12 L18,20 L13,28 L7,31 L-3,31 L-10,26 L-13,20 L-13,13 L-9,5 L-4,1 Z " fill="#064A4F" transform="translate(501,634)"/>
+</svg>
+				</span>
+				<span class="rk-brand__word">RATATUI KIT</span>
+			</p>
+			<h1 id="rk-home-title" data-rk-reveal style="--i:1">把终端 UI 写成可组合的应用</h1>
+			<p class="rk-hero__lead" data-rk-reveal style="--i:2">
+				组件、Hooks、输入层、路由和全局状态,一套你熟悉的 React 式模型,构建在 Ratatui 和 Tokio 之上。
+			</p>
+			<div class="rk-actions" data-rk-reveal style="--i:3" aria-label="首页操作">
+				<a class="rk-button rk-button--primary" data-magnetic href={`${baseUrl}start/quick-start/`}>
+					<span>开始学习</span>
+					<span class="rk-button__icon" aria-hidden="true">→</span>
+				</a>
+				<a class="rk-button rk-button--ghost" href={repoUrl} target="_blank" rel="noreferrer">
+					<span>在 GitHub 查看</span>
+					<span class="rk-button__icon" aria-hidden="true">↗</span>
+				</a>
+			</div>
+		</div>
+
+		<figure class="rk-window rk-window--term rk-hero__window" data-rk-reveal style="--i:2">
+			<div class="rk-window__bar">
+				<span class="rk-window__dots"><i></i><i></i><i></i></span>
+				<span class="rk-window__name">cargo run --example todo_app</span>
+			</div>
+			<div class="rk-window__screen">
+				<img
+					src={recording('todo-app')}
+					alt="用 ratatui-kit 构建的 todo 应用运行录屏:增删任务、过滤与状态切换"
+					loading="eager"
+					decoding="async"
+				/>
+			</div>
+		</figure>
+	</section>
+
+	<section class="rk-qs" aria-labelledby="rk-qs-title">
+		{/* 第一幕:左描述 + 右单代码窗,滚动进度驱动打字机(前半打 raw,后半切换文案重新打 kit) */}
+		<div class="rk-qs-act rk-qs-act--versus" data-qs-act1 data-phase="raw">
+			<div class="rk-qs-act__sticky">
+				<header class="rk-qs-head">
+					<p class="rk-qs-eyebrow" data-rk-reveal>快速入门</p>
+					<h2 id="rk-qs-title" data-rk-reveal style="--i:1">同一个计数器,少写一半代码</h2>
+				</header>
+
+				<div class="rk-qs-split">
+					<div class="rk-qs-narrate">
+						<div class="rk-qs-copy" data-qs-copy="raw">
+							<span class="rk-qs-copy__kicker">{rawNarr.kicker}</span>
+							<h3 class="rk-qs-copy__title">{rawNarr.title}</h3>
+							<p>{rawNarr.text}</p>
+						</div>
+						<div class="rk-qs-copy" data-qs-copy="kit">
+							<span class="rk-qs-copy__kicker">{kitNarr.kicker}</span>
+							<h3 class="rk-qs-copy__title">{kitNarr.title}</h3>
+							<p>{kitNarr.text}</p>
+						</div>
+						<div class="rk-qs-switch" aria-hidden="true">
+							<span class="rk-qs-switch__tab" data-phase="raw">纯 ratatui</span>
+							<span class="rk-qs-switch__tab" data-phase="kit">ratatui-kit</span>
+							<span class="rk-qs-switch__bar"><span class="rk-qs-switch__fill" data-qs-phasefill></span></span>
+						</div>
+					</div>
+
+					<figure class="rk-window rk-window--code rk-qs-typer">
+						<div class="rk-window__bar">
+							<span class="rk-window__dots"><i></i><i></i><i></i></span>
+							<span class="rk-window__name" data-qs-title>main.rs · 纯 ratatui</span>
+						</div>
+						<div class="rk-window__body rk-code rk-qs-typer__body">
+							<div class="rk-qs-codelayer" data-qs-code="raw">
+								<Code code={rawCode} lang="rust" themes={codeThemes} />
+							</div>
+							<div class="rk-qs-codelayer" data-qs-code="kit">
+								<Code code={kitCoreCode} lang="rust" themes={codeThemes} />
+							</div>
+						</div>
+					</figure>
+				</div>
+			</div>
+		</div>
+
+		{/* 第二幕:三步跑起来 —— 步骤进度随滚动推进,代码窗与终端窗同步切换 */}
+		<div class="rk-qs-act rk-qs-act--steps" data-qs-act2 data-step="1">
+			<div class="rk-qs-act2__grid">
+				<div class="rk-qs-rail">
+					<p class="rk-qs-rail__lead" data-rk-reveal>从空目录到会动的终端,三步。</p>
+					<ol class="rk-qs-steps" data-qs-steps>
+						<span class="rk-qs-steps__track" aria-hidden="true"><span class="rk-qs-steps__fill" data-qs-fill></span></span>
+						{qsSteps.map((step, index) => (
+							<li class="rk-qs-step" data-qs-step={index + 1}>
+								<span class="rk-qs-step__dot" aria-hidden="true">{step.n}</span>
+								<div class="rk-qs-step__body">
+									<span class="rk-qs-step__title">{step.title}</span>
+									<p>{step.text}</p>
+								</div>
+							</li>
+						))}
+					</ol>
+				</div>
+
+				<div class="rk-qs-stage">
+					<div class="rk-qs-panel" data-qs-panel="1">
+						<figure class="rk-window rk-window--code">
+							<div class="rk-window__bar">
+								<span class="rk-window__dots"><i></i><i></i><i></i></span>
+								<span class="rk-window__name">Cargo.toml</span>
+							</div>
+							<div class="rk-window__body rk-code">
+								<Code code={cargoTomlCode} lang="toml" themes={codeThemes} />
+							</div>
+						</figure>
+					</div>
+					<div class="rk-qs-panel" data-qs-panel="2">
+						<figure class="rk-window rk-window--code">
+							<div class="rk-window__bar">
+								<span class="rk-window__dots"><i></i><i></i><i></i></span>
+								<span class="rk-window__name">src/main.rs</span>
+							</div>
+							<div class="rk-window__body rk-code">
+								<Code code={counterFileCode} lang="rust" themes={codeThemes} />
+							</div>
+						</figure>
+					</div>
+					<div class="rk-qs-panel" data-qs-panel="3">
+						<figure class="rk-window rk-window--term">
+							<div class="rk-window__bar">
+								<span class="rk-window__dots"><i></i><i></i><i></i></span>
+								<span class="rk-window__name">cargo run --example counter</span>
+							</div>
+							<div class="rk-window__screen">
+								<img
+									src={recording('counter')}
+									alt="counter 示例每秒自增、按 q 退出的终端录屏"
+									loading="lazy"
+									decoding="async"
+								/>
+							</div>
+						</figure>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="rk-system" aria-labelledby="rk-system-title">
+		<header class="rk-section-copy">
+			<h2 id="rk-system-title" data-rk-reveal>像写前端应用一样写终端 UI</h2>
+			<p data-rk-reveal style="--i:1">
+				Ratatui Kit 不替代 Ratatui,而是在它之上补齐组件更新、状态管理和事件路由,
+				让大型终端应用也能保持结构清晰。
+			</p>
+		</header>
+
+		<div class="rk-feat" aria-label="框架能力">
+			{features.map((feature, index) => (
+				<article class={`rk-feat-card rk-feat-card--${feature.span}`} data-spot data-rk-reveal style={`--i:${index % 3}`}>
+					<code class="rk-feat-card__token" aria-hidden="true">{feature.token}</code>
+					<h3 class="rk-feat-card__title">{feature.title}</h3>
+					<p>{feature.text}</p>
+					{feature.points && (
+						<ul class="rk-feat-card__points">
+							{feature.points.map((pt) => (
+								<li>{pt}</li>
+							))}
+						</ul>
+					)}
+				</article>
+			))}
+		</div>
+	</section>
+
+	<section class="rk-layer" aria-labelledby="rk-layer-title">
+		<div class="rk-layer__copy">
+			<h2 id="rk-layer-title" data-rk-reveal>事件按层路由,而不是广播</h2>
+			<p data-rk-reveal style="--i:1">
+				打开弹窗或进入编辑态时,框架把键盘交给当前层,背景组件自动让出输入。
+				这几行就是 <code>examples/input/input_mutex.rs</code> 在做的事。
+			</p>
+			<a class="rk-textlink" data-rk-reveal style="--i:2" href={`${baseUrl}core/input-layers/`}>
+				阅读输入层参考
+				<span aria-hidden="true">→</span>
+			</a>
+		</div>
+
+		<div class="rk-layer__demo">
+			<div class="rk-window rk-window--code" data-spot data-rk-reveal>
+				<div class="rk-window__bar">
+					<span class="rk-window__dots"><i></i><i></i><i></i></span>
+					<span class="rk-window__name">input_mutex.rs</span>
+				</div>
+				<div class="rk-window__body rk-code">
+					<Code code={layerCode} lang="rust" themes={codeThemes} />
+				</div>
+			</div>
+
+			<figure class="rk-window rk-window--term" data-rk-reveal style="--i:1">
+				<div class="rk-window__bar">
+					<span class="rk-window__dots"><i></i><i></i><i></i></span>
+					<span class="rk-window__name">cargo run --example input_mutex</span>
+				</div>
+				<div class="rk-window__screen">
+					<img
+						src={recording('input_mutex')}
+						alt="终端里弹窗接管键盘事件后,背景列表停止响应输入的录屏"
+						loading="lazy"
+						decoding="async"
+					/>
+				</div>
+			</figure>
+		</div>
+	</section>
+
+	<section class="rk-deck-section" aria-labelledby="rk-deck-title">
+		<header class="rk-section-copy">
+			<h2 id="rk-deck-title" data-rk-reveal>需要的组件,大多已经内置</h2>
+			<p data-rk-reveal style="--i:1">
+				从布局原语到虚拟列表,{components.length} 个内置组件保持业务中立、可组合、输入语义清晰。
+				向下滚动逐个浏览,每个都有可运行 example 和真实录屏。
+			</p>
+		</header>
+
+		<div class="rk-cmp" data-cmp data-index="0" style={`--cmp-count:${components.length}`}>
+			<div class="rk-cmp__grid">
+				<div class="rk-cmp__nav">
+					<div class="rk-cmp__copies">
+						{components.map((c, index) => (
+							<div class={`rk-cmp__copy${index === 0 ? ' is-active' : ''}`} data-cmp-copy={index}>
+								<span class="rk-cmp__count">{String(index + 1).padStart(2, '0')} / {String(components.length).padStart(2, '0')}</span>
+								<h3 class="rk-cmp__name">{c.name}</h3>
+								<p>{c.desc}</p>
+								<a class="rk-textlink" href={`${baseUrl}${c.href}`}>
+									查看 {c.name} 文档
+									<span aria-hidden="true">→</span>
+								</a>
+							</div>
+						))}
+					</div>
+					<div class="rk-cmp__progress" aria-hidden="true">
+						<span class="rk-cmp__progress-fill" data-cmp-fill></span>
+					</div>
+					<a class="rk-textlink rk-cmp__all" href={`${baseUrl}components/`}>
+						查看全部组件文档
+						<span aria-hidden="true">→</span>
+					</a>
+				</div>
+
+				<div class="rk-cmp__stage">
+					{components.map((c, index) => (
+						<div class={`rk-cmp__panel${index === 0 ? ' is-active' : ''}`} data-cmp-panel={index}>
+							<figure class="rk-window rk-window--code rk-cmp__code">
+								<div class="rk-window__bar">
+									<span class="rk-window__dots"><i></i><i></i><i></i></span>
+									<span class="rk-window__name">{c.example}.rs</span>
+								</div>
+								<div class="rk-window__body rk-code">
+									<Code code={c.code} lang="rust" themes={codeThemes} />
+								</div>
+							</figure>
+							{c.gif && (
+								<figure class="rk-window rk-window--term rk-cmp__demo">
+									<div class="rk-window__bar">
+										<span class="rk-window__dots"><i></i><i></i><i></i></span>
+										<span class="rk-window__name">cargo run --example {c.example}</span>
+									</div>
+									<div class="rk-window__screen">
+										<img src={recording(c.gif)} alt={`${c.name} 组件运行录屏`} loading="lazy" decoding="async" />
+									</div>
+								</figure>
+							)}
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="rk-path" aria-labelledby="rk-path-title">
+		<div class="rk-path__intro">
+			<h2 id="rk-path-title" data-rk-reveal>从一个组件走到完整应用</h2>
+			<p data-rk-reveal style="--i:1">
+				首页只承担一件事:把你带到正确的第一篇文档,再让示例和参考材料持续接上。
+			</p>
+		</div>
+
+		<div class="rk-path__grid">
+			{pathItems.map((item, index) => (
+				<a class="rk-path-card" data-spot data-rk-reveal style={`--i:${index}`} href={`${baseUrl}${item.href}`}>
+					<span class="rk-path-card__num" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+					<div>
+						<span class="rk-path-card__title">{item.title}</span>
+						<p>{item.text}</p>
+					</div>
+				</a>
+			))}
+		</div>
+	</section>
+
+	<section class="rk-final" aria-labelledby="rk-final-title">
+		<div class="rk-final__shell" data-spot data-rk-reveal>
+			<div class="rk-final__core">
+				<div>
+					<h2 id="rk-final-title">先从一个会动的计数器开始</h2>
+					<p>写一个每秒自增的组件,再逐步加上异步状态、输入层和路由。</p>
+					<code class="rk-final__install">cargo add ratatui-kit</code>
+				</div>
+				<a class="rk-button rk-button--primary" data-magnetic href={`${baseUrl}start/quick-start/`}>
+					<span>开始学习</span>
+					<span class="rk-button__icon" aria-hidden="true">→</span>
+				</a>
+			</div>
+		</div>
+	</section>
+</div>
+
+<script>
+	const root = document.querySelector('[data-rk-home]');
+	if (root) {
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const fine = window.matchMedia('(pointer: fine)').matches;
+
+		// 滚动揭示
+		const revealItems = root.querySelectorAll('[data-rk-reveal]');
+		if (reduce || !('IntersectionObserver' in window)) {
+			revealItems.forEach((item) => item.classList.add('is-visible'));
+		} else {
+			const observer = new IntersectionObserver(
+				(entries) => {
+					entries.forEach((entry) => {
+						if (entry.isIntersecting) {
+							entry.target.classList.add('is-visible');
+							observer.unobserve(entry.target);
+						}
+					});
+				},
+				{ threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
+			);
+			revealItems.forEach((item) => observer.observe(item));
+		}
+
+		// 高级交互:指针聚光 + 磁吸主按钮(仅精确指针、尊重 reduce-motion)
+		if (fine && !reduce) {
+			root.querySelectorAll('[data-spot]').forEach((card) => {
+				let raf = 0;
+				card.addEventListener('pointermove', (event) => {
+					if (raf) return;
+					raf = requestAnimationFrame(() => {
+						raf = 0;
+						const rect = card.getBoundingClientRect();
+						card.style.setProperty('--mx', `${((event.clientX - rect.left) / rect.width) * 100}%`);
+						card.style.setProperty('--my', `${((event.clientY - rect.top) / rect.height) * 100}%`);
+					});
+				});
+			});
+
+			root.querySelectorAll('[data-magnetic]').forEach((btn) => {
+				let raf = 0;
+				btn.addEventListener('pointermove', (event) => {
+					if (raf) return;
+					raf = requestAnimationFrame(() => {
+						raf = 0;
+						const rect = btn.getBoundingClientRect();
+						const x = (event.clientX - rect.left - rect.width / 2) / rect.width;
+						const y = (event.clientY - rect.top - rect.height / 2) / rect.height;
+						btn.style.transform = `translate(${x * 7}px, ${y * 7}px)`;
+					});
+				});
+				btn.addEventListener('pointerleave', () => {
+					btn.style.transform = '';
+				});
+			});
+		}
+	}
+</script>
+
+<script>
+	// 组件展示:右侧 panel 自然滚动,IntersectionObserver 检测视口中线的组件,平滑切换左描述
+	import { scroll } from 'motion';
+
+	const cmp = document.querySelector('[data-cmp]');
+	const reduceCmp = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	if (cmp && !reduceCmp && window.innerWidth > 980) {
+		const copies = Array.from(cmp.querySelectorAll('[data-cmp-copy]'));
+		const panels = Array.from(cmp.querySelectorAll('[data-cmp-panel]'));
+		const fill = cmp.querySelector('[data-cmp-fill]');
+		let cur = -1;
+		const setActive = (i) => {
+			if (i < 0 || i === cur) return;
+			cur = i;
+			cmp.dataset.index = String(i);
+			copies.forEach((el, k) => el.classList.toggle('is-active', k === i));
+		};
+
+		// 哪个 panel 跨过视口中线,就激活对应描述
+		const io = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) {
+					if (e.isIntersecting) setActive(panels.indexOf(e.target));
+				}
+			},
+			{ rootMargin: '-50% 0px -50% 0px' },
+		);
+		panels.forEach((p) => io.observe(p));
+
+		// 进度条跟随整体滚动
+		if (fill) {
+			scroll(
+				(progress) => {
+					fill.style.width = `${Math.min(100, progress * 100).toFixed(1)}%`;
+				},
+				{ target: cmp, offset: ['start start', 'end end'] },
+			);
+		}
+	}
+</script>
+
+<script>
+	// 快速入门两幕:Motion scroll() 驱动(桌面、非 reduce-motion;窄屏与降级走静态 CSS)
+	import { scroll } from 'motion';
+
+	const qs = document.querySelector('.rk-qs');
+	const reduceQs = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	if (qs && !reduceQs && window.innerWidth > 980) {
+		// 第一幕:左描述 + 右代码窗,滚动进度驱动打字机(前半打 raw,后半切文案重打 kit)
+		const act1 = qs.querySelector('[data-qs-act1]');
+		if (act1) {
+			const titleEl = act1.querySelector('[data-qs-title]');
+			const phaseFill = act1.querySelector('[data-qs-phasefill]');
+			const rawLayer = act1.querySelector('[data-qs-code="raw"]');
+			const kitLayer = act1.querySelector('[data-qs-code="kit"]');
+			const rawLines = rawLayer ? Array.from(rawLayer.querySelectorAll('.line')) : [];
+			const kitLines = kitLayer ? Array.from(kitLayer.querySelectorAll('.line')) : [];
+			const titles = { raw: 'main.rs · 纯 ratatui', kit: 'counter.rs · ratatui-kit' };
+
+			const typeset = (lines, n) => {
+				const caret = n > 0 && n <= lines.length ? n - 1 : -1;
+				for (let i = 0; i < lines.length; i++) {
+					lines[i].classList.toggle('typed', i < n);
+					lines[i].classList.toggle('caret', i === caret);
+				}
+			};
+
+			act1.classList.add('is-typing');
+			let phase = '';
+			scroll(
+				(progress) => {
+					const next = progress < 0.5 ? 'raw' : 'kit';
+					if (next !== phase) {
+						phase = next;
+						act1.dataset.phase = phase;
+						if (titleEl) titleEl.textContent = titles[phase];
+					}
+					if (phaseFill) phaseFill.style.width = `${Math.min(100, progress * 100).toFixed(1)}%`;
+					if (phase === 'raw') {
+						const t = Math.min(1, progress / 0.46); // 前半行程内打完 raw
+						typeset(rawLines, Math.round(t * rawLines.length));
+						typeset(kitLines, 0);
+					} else {
+						const t = Math.min(1, (progress - 0.5) / 0.46); // 后半行程内打完 kit
+						typeset(rawLines, rawLines.length);
+						typeset(kitLines, Math.round(t * kitLines.length));
+					}
+				},
+				{ target: act1, offset: ['start start', 'end end'] },
+			);
+		}
+
+		// 第二幕:右侧三块自然滚动,IntersectionObserver 累积点亮左侧步骤(走过的步骤保持高亮)
+		const act2 = qs.querySelector('[data-qs-act2]');
+		const fill2 = act2 ? act2.querySelector('[data-qs-fill]') : null;
+		const steps2 = act2 ? Array.from(act2.querySelectorAll('.rk-qs-step')) : [];
+		const panels2 = act2 ? Array.from(act2.querySelectorAll('[data-qs-panel]')) : [];
+
+		if (act2 && panels2.length) {
+			let curStep = 0;
+			const setStep = (n) => {
+				if (n === curStep) return;
+				curStep = n;
+				act2.dataset.step = String(n);
+				steps2.forEach((el, k) => el.classList.toggle('is-on', k < n));
+			};
+
+			const io = new IntersectionObserver(
+				(entries) => {
+					for (const e of entries) {
+						if (e.isIntersecting) setStep(Number(e.target.dataset.qsPanel));
+					}
+				},
+				{ rootMargin: '-50% 0px -50% 0px' },
+			);
+			panels2.forEach((p) => io.observe(p));
+			setStep(1);
+
+			if (fill2) {
+				scroll(
+					(progress) => {
+						fill2.style.height = `${Math.min(100, progress * 100).toFixed(1)}%`;
+					},
+					{ target: act2, offset: ['start start', 'end end'] },
+				);
+			}
+		}
+	}
+</script>
+
+<style>
+	/* ===== Starlight / nova 集成:首页全幅,头部融入,亮/暗自适应 ===== */
+	/* nova 的 .main-pane 用 overflow:auto 当滚动容器,会让首页内的 position:sticky
+	   相对它(不自滚)而失效(卡片堆叠、两幕滚动动画都失灵)。首页改回 visible,
+	   让 sticky 与 motion scroll() 都相对 window,行为一致。水平溢出由 .rk-home
+	   自身的 overflow-x:clip 兜底。 */
+	:global(.main-pane:has(.rk-home)) {
+		overflow-x: clip;
+		overflow-y: visible;
+	}
+
+	:global(.sl-container:has(.rk-home)) {
+		max-width: none;
+		padding-inline: 0;
+	}
+
+	:global(main > .content-panel:has(+ .content-panel .rk-home)) {
+		display: none;
+	}
+
+	:global([data-theme='dark'] body:has(.rk-home)) {
+		background: #052a2d;
+	}
+
+	:global([data-theme='light'] body:has(.rk-home)) {
+		background: #fdf9f1;
+	}
+
+	:global(body:has(.rk-home) .main-frame header) {
+		backdrop-filter: blur(20px) saturate(140%);
+		-webkit-backdrop-filter: blur(20px) saturate(140%);
+	}
+
+	:global([data-theme='dark'] body:has(.rk-home) .main-frame header) {
+		border-bottom-color: rgba(252, 169, 27, 0.14);
+		background: rgba(5, 42, 45, 0.72);
+	}
+
+	:global([data-theme='light'] body:has(.rk-home) .main-frame header) {
+		border-bottom-color: rgba(6, 74, 79, 0.1);
+		background: rgba(253, 249, 241, 0.74);
+	}
+
+	/* ===== 令牌:暗色为基准,亮色覆盖(单一琥珀强调色) ===== */
+	.rk-home {
+		--rk-ease: cubic-bezier(0.32, 0.72, 0, 1);
+		--rk-radius: 1.5rem;
+		--rk-radius-sm: 1.1rem;
+		--rk-pad: 0.5rem;
+
+		--rk-teal: #0e6b70;
+		--rk-teal-deep: #064a4f;
+		--rk-bg-base: #052a2d;
+		--rk-bg1: rgba(252, 169, 27, 0.13);
+		--rk-bg2: rgba(14, 107, 112, 0.18);
+		--rk-ink: #f3f0e7;
+		--rk-muted: rgba(243, 240, 231, 0.66);
+		--rk-soft: rgba(243, 240, 231, 0.42);
+		--rk-line: rgba(233, 231, 222, 0.1);
+		--rk-line-strong: rgba(252, 169, 27, 0.34);
+		--rk-grain: rgba(233, 231, 222, 0.03);
+		--rk-card: rgba(233, 231, 222, 0.025);
+		--rk-elev: #08363a;
+		--rk-core-1: rgba(9, 50, 54, 0.92);
+		--rk-core-2: rgba(5, 38, 41, 0.94);
+		--rk-accent: #fca91b;
+		--rk-accent-display: #fca91b;
+		--rk-accent-glow: rgba(252, 169, 27, 0.15);
+		--rk-spot: rgba(252, 169, 27, 0.13);
+		--rk-btn-bg: #fca91b;
+		--rk-btn-ink: #06262a;
+		--rk-shadow: rgba(0, 0, 0, 0.5);
+
+		position: relative;
+		overflow-x: clip;
+		margin-inline: calc(50% - 50vw);
+		padding: clamp(1rem, 2vw, 2rem) clamp(1.1rem, 5vw, 4.5rem) 0;
+		color: var(--rk-ink);
+		background:
+			radial-gradient(circle at 14% -4%, var(--rk-bg1), transparent 34rem),
+			radial-gradient(circle at 88% 6%, var(--rk-bg2), transparent 28rem),
+			var(--rk-bg-base);
+		font-family: var(--__sl-font, ui-sans-serif), "Plus Jakarta Sans", system-ui, sans-serif;
+		font-feature-settings: "ss01", "cv01";
+	}
+
+	:global([data-theme='light']) .rk-home {
+		--rk-teal: #0a5b60;
+		--rk-teal-deep: #064a4f;
+		--rk-bg-base: #fdf9f1;
+		--rk-bg1: rgba(252, 169, 27, 0.12);
+		--rk-bg2: rgba(6, 74, 79, 0.09);
+		--rk-ink: #06363a;
+		--rk-muted: rgba(7, 54, 58, 0.66);
+		--rk-soft: rgba(7, 54, 58, 0.45);
+		--rk-line: rgba(6, 74, 79, 0.13);
+		--rk-line-strong: rgba(6, 74, 79, 0.3);
+		--rk-grain: rgba(6, 74, 79, 0.03);
+		--rk-card: #ffffff;
+		--rk-elev: #ffffff;
+		--rk-core-1: #ffffff;
+		--rk-core-2: #fbf6ec;
+		--rk-accent: #0a5b60;
+		--rk-accent-display: #07565b;
+		--rk-accent-glow: rgba(6, 74, 79, 0.1);
+		--rk-spot: rgba(6, 74, 79, 0.1);
+		--rk-btn-bg: #064a4f;
+		--rk-btn-ink: #fdf9f1;
+		--rk-shadow: rgba(6, 50, 54, 0.14);
+	}
+
+	.rk-home__grain {
+		position: fixed;
+		inset: 0;
+		z-index: 1;
+		pointer-events: none;
+		opacity: 0.7;
+		background-image:
+			linear-gradient(var(--rk-grain) 1px, transparent 1px),
+			linear-gradient(90deg, var(--rk-grain) 1px, transparent 1px);
+		background-size: 44px 44px;
+		mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.1));
+	}
+
+	.rk-home :where(section) {
+		position: relative;
+		z-index: 2;
+		max-width: 1320px;
+		margin-inline: auto;
+	}
+
+	.rk-home h1,
+	.rk-home h2 {
+		margin: 0;
+		color: var(--rk-ink);
+		font-weight: 720;
+		letter-spacing: -0.018em;
+		line-height: 1.08;
+		text-wrap: balance;
+	}
+
+	.rk-section-copy {
+		max-width: 44rem;
+		margin-bottom: clamp(2.2rem, 4.5vw, 3.4rem);
+	}
+
+	.rk-section-copy h2,
+	.rk-path h2 {
+		font-size: clamp(1.75rem, 3vw, 2.55rem);
+	}
+
+	.rk-section-copy p,
+	.rk-layer__copy p,
+	.rk-path__intro p {
+		margin: 1rem 0 0;
+		max-width: 40rem;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	.rk-system,
+	.rk-layer,
+	.rk-deck-section,
+	.rk-path,
+	.rk-final {
+		padding-block: clamp(4rem, 8vw, 7.5rem);
+	}
+
+	/* ===== Hero ===== */
+	.rk-hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+		align-items: center;
+		gap: clamp(2rem, 5vw, 5rem);
+		min-height: min(600px, calc(100dvh - 9rem));
+		padding-block: clamp(2.25rem, 4.5vw, 4rem) clamp(2rem, 4vw, 3.4rem);
+	}
+
+	.rk-brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin: 0 0 1.25rem;
+		text-decoration: none;
+	}
+
+	.rk-brand__mark {
+		display: grid;
+		place-items: center;
+		width: 1.65rem;
+		height: 1.65rem;
+		color: var(--rk-accent);
+	}
+
+	.rk-brand__mark svg {
+		width: 100%;
+		height: 100%;
+	}
+
+	.rk-brand__word {
+		color: var(--rk-soft);
+		font-size: 0.72rem;
+		font-weight: 680;
+		letter-spacing: 0.24em;
+	}
+
+	.rk-hero h1 {
+		max-width: 16ch;
+		font-size: clamp(2.2rem, 3.8vw, 3.4rem);
+		letter-spacing: -0.022em;
+	}
+
+	.rk-hero__lead {
+		max-width: 32rem;
+		margin: 1.3rem 0 0;
+		color: var(--rk-muted);
+		font-size: clamp(1rem, 1.1vw, 1.08rem);
+		line-height: 1.7;
+	}
+
+	.rk-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.8rem;
+		margin-top: 2rem;
+	}
+
+	.rk-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.8rem;
+		min-height: 3rem;
+		padding: 0.45rem 0.5rem 0.45rem 1.3rem;
+		border-radius: 999px;
+		color: var(--rk-ink);
+		text-decoration: none;
+		font-weight: 640;
+		font-size: 0.92rem;
+		line-height: 1;
+		white-space: nowrap;
+		transition:
+			transform 600ms var(--rk-ease),
+			background 600ms var(--rk-ease),
+			border-color 600ms var(--rk-ease),
+			box-shadow 600ms var(--rk-ease);
+	}
+
+	.rk-button--primary {
+		background: var(--rk-btn-bg);
+		color: var(--rk-btn-ink);
+		box-shadow: 0 16px 40px var(--rk-accent-glow);
+	}
+
+	.rk-button--primary:hover {
+		box-shadow: 0 20px 52px var(--rk-accent-glow);
+	}
+
+	.rk-button--ghost {
+		border: 1px solid var(--rk-line);
+		background: var(--rk-card);
+		color: var(--rk-ink);
+	}
+
+	.rk-button--ghost:hover {
+		transform: translateY(-2px);
+		border-color: var(--rk-line-strong);
+		background: var(--rk-accent-glow);
+	}
+
+	.rk-button:active {
+		transform: translateY(0) scale(0.98);
+	}
+
+	.rk-button__icon {
+		display: grid;
+		width: 2rem;
+		height: 2rem;
+		place-items: center;
+		border-radius: 999px;
+		font-size: 0.9rem;
+		background: rgba(0, 0, 0, 0.14);
+		transition:
+			transform 600ms var(--rk-ease),
+			background 600ms var(--rk-ease);
+	}
+
+	.rk-button--ghost .rk-button__icon {
+		background: var(--rk-accent-glow);
+		color: var(--rk-accent);
+	}
+
+	.rk-button:hover .rk-button__icon {
+		transform: translate3d(3px, -1px, 0);
+	}
+
+	/* ===== 窗口外壳:始终深色"终端",在亮/暗页面上都漂浮 ===== */
+	.rk-window {
+		margin: 0;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: var(--rk-radius);
+		background: #0a2e32;
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.06),
+			0 34px 84px var(--rk-shadow);
+		overflow: hidden;
+	}
+
+	:global([data-theme='light']) .rk-window {
+		border-color: rgba(6, 74, 79, 0.12);
+		box-shadow: 0 26px 60px rgba(6, 50, 54, 0.18);
+	}
+
+	.rk-window__bar {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.5rem 0.85rem;
+		background: rgba(0, 0, 0, 0.18);
+	}
+
+	.rk-window__dots {
+		display: flex;
+		align-items: center;
+		gap: 0.42rem;
+	}
+
+	.rk-window__dots i {
+		display: block;
+		margin: 0;
+		width: 0.6rem;
+		height: 0.6rem;
+		border-radius: 999px;
+		background: rgba(243, 240, 231, 0.18);
+	}
+
+	.rk-window__dots i:first-child {
+		background: #fca91b;
+	}
+
+	.rk-window__name {
+		color: rgba(243, 240, 231, 0.5);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.74rem;
+		letter-spacing: 0.01em;
+	}
+
+	.rk-window--code .rk-window__body {
+		background:
+			radial-gradient(circle at 80% -10%, rgba(252, 169, 27, 0.08), transparent 22rem),
+			rgba(8, 7, 5, 0.5);
+	}
+
+	.rk-code :global(pre.astro-code) {
+		margin: 0;
+		padding: clamp(0.7rem, 1.2vw, 0.95rem) clamp(0.85rem, 1.3vw, 1.1rem);
+		background: transparent !important;
+		overflow-x: auto;
+	}
+
+	/* 代码窗:亮色页面用浅色卡片(终端窗保持深色,给 gif 录屏) */
+	:global([data-theme='light']) .rk-window {
+		background: #ffffff;
+		border-color: rgba(6, 74, 79, 0.1);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.7),
+			0 18px 44px rgba(6, 50, 54, 0.1);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__bar {
+		background: #f6f1e7;
+		border-bottom-color: rgba(6, 74, 79, 0.08);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__name {
+		color: rgba(7, 54, 58, 0.5);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__dots i {
+		background: rgba(6, 74, 79, 0.16);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__dots i:first-child {
+		background: #fca91b;
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__body {
+		background: #ffffff;
+	}
+
+	/* shiki 双主题:默认亮色,暗色页面切到 --shiki-dark 变量 */
+	:global([data-theme='dark']) .rk-code :global(pre.astro-code),
+	:global([data-theme='dark']) .rk-code :global(pre.astro-code span) {
+		color: var(--shiki-dark) !important;
+		font-style: var(--shiki-dark-font-style) !important;
+		font-weight: var(--shiki-dark-font-weight) !important;
+		text-decoration: var(--shiki-dark-text-decoration) !important;
+	}
+
+	.rk-code :global(pre.astro-code code) {
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.8rem;
+		line-height: 1.7;
+	}
+
+	.rk-window--term .rk-window__screen {
+		padding: clamp(0.8rem, 1.4vw, 1.15rem);
+		background:
+			radial-gradient(circle at 50% 120%, rgba(252, 169, 27, 0.08), transparent 18rem),
+			rgba(6, 5, 4, 0.6);
+	}
+
+	.rk-window--term img {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 10;
+		object-fit: cover;
+		border-radius: 0.7rem;
+		background: #06201f;
+	}
+
+	/* ===== 能力区:非对称 Bento(主卡 2×2 + 宽卡 + 小卡) ===== */
+	.rk-feat {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		grid-auto-rows: minmax(168px, auto);
+		gap: clamp(0.7rem, 1.3vw, 1.1rem);
+	}
+
+	.rk-feat-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+		padding: clamp(1.4rem, 2.2vw, 1.9rem);
+		border: 1px solid var(--rk-line);
+		border-radius: var(--rk-radius-sm);
+		background:
+			radial-gradient(circle at 0% 0%, var(--rk-accent-glow), transparent 16rem),
+			var(--rk-card);
+		box-shadow: 0 24px 56px var(--rk-shadow);
+		transition:
+			transform 700ms var(--rk-ease),
+			border-color 700ms var(--rk-ease),
+			box-shadow 700ms var(--rk-ease);
+	}
+
+	.rk-feat-card--lg {
+		grid-column: span 2;
+		grid-row: span 2;
+		gap: 0.85rem;
+		padding: clamp(1.7rem, 2.6vw, 2.4rem);
+	}
+
+	.rk-feat-card--wide {
+		grid-column: span 2;
+	}
+
+	.rk-feat-card--sm {
+		grid-column: span 1;
+	}
+
+	.rk-feat-card:hover {
+		transform: translateY(-5px);
+		border-color: var(--rk-line-strong);
+		box-shadow: 0 36px 74px var(--rk-shadow);
+	}
+
+	.rk-feat-card__token {
+		align-self: flex-start;
+		padding: 0.32rem 0.62rem;
+		border-radius: 0.55rem;
+		background: var(--rk-accent-glow);
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.76rem;
+		letter-spacing: -0.01em;
+	}
+
+	.rk-feat-card__title {
+		margin: 0;
+		color: var(--rk-ink);
+		font-size: 1.05rem;
+		font-weight: 660;
+		letter-spacing: -0.012em;
+		line-height: 1.2;
+	}
+
+	.rk-feat-card--lg .rk-feat-card__title {
+		font-size: clamp(1.25rem, 2vw, 1.6rem);
+		letter-spacing: -0.02em;
+	}
+
+	.rk-feat-card p {
+		margin: 0;
+		color: var(--rk-muted);
+		font-size: 0.92rem;
+		line-height: 1.68;
+	}
+
+	.rk-feat-card--lg p {
+		font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+		max-width: 34rem;
+	}
+
+	.rk-feat-card__points {
+		margin: 0.4rem 0 0;
+		margin-top: auto;
+		padding: 1rem 0 0;
+		list-style: none;
+		display: grid;
+		gap: 0.62rem;
+		border-top: 1px solid var(--rk-line);
+	}
+
+	.rk-feat-card__points li {
+		position: relative;
+		padding-left: 1.3rem;
+		color: var(--rk-muted);
+		font-size: 0.92rem;
+		line-height: 1.55;
+	}
+
+	.rk-feat-card__points li::before {
+		content: "";
+		position: absolute;
+		left: 0.15rem;
+		top: 0.52em;
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 999px;
+		background: var(--rk-accent);
+	}
+
+	/* ===== 输入层展示 ===== */
+	.rk-layer {
+		display: grid;
+		grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+		gap: clamp(2rem, 5vw, 4.5rem);
+		align-items: start;
+	}
+
+	/* 左侧文案在视口内垂直居中 sticky,右侧 demo(代码窗 + 录屏)滚动 */
+	.rk-layer__copy {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	@media (max-width: 980px) {
+		.rk-layer__copy {
+			position: static;
+			height: auto;
+			display: block;
+		}
+	}
+
+	.rk-layer h2 {
+		font-size: clamp(1.7rem, 2.8vw, 2.4rem);
+	}
+
+	.rk-layer__copy code {
+		padding: 0.1rem 0.4rem;
+		border-radius: 0.4rem;
+		background: var(--rk-accent-glow);
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.88em;
+	}
+
+	.rk-layer__demo {
+		display: grid;
+		gap: clamp(1rem, 2vw, 1.4rem);
+	}
+
+	.rk-textlink {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1.5rem;
+		color: var(--rk-accent);
+		font-weight: 600;
+		font-size: 0.94rem;
+		text-decoration: none;
+		transition: gap 500ms var(--rk-ease);
+	}
+
+	.rk-textlink span {
+		transition: transform 500ms var(--rk-ease);
+	}
+
+	.rk-textlink:hover span {
+		transform: translateX(4px);
+	}
+
+	/* ===== 快速入门:两幕滚动驱动(对比塌缩 → 三步跑起来) ===== */
+	.rk-qs {
+		padding-block: clamp(2rem, 4vw, 3.5rem);
+	}
+
+	.rk-qs-act--versus {
+		min-height: 210vh;
+	}
+
+
+	.rk-qs-act__sticky,
+	.rk-qs-act2__grid {
+		position: sticky;
+		top: 5.5rem;
+	}
+
+	.rk-qs-act__sticky {
+		display: grid;
+		gap: clamp(1.4rem, 3vw, 2.4rem);
+		min-height: calc(100dvh - 7rem);
+		align-content: center;
+		padding-block: clamp(1rem, 3vh, 2rem);
+	}
+
+	.rk-qs-head {
+		max-width: 46rem;
+	}
+
+	.rk-qs-eyebrow {
+		margin: 0 0 0.8rem;
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.74rem;
+		font-weight: 680;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+	}
+
+	.rk-qs-head h2 {
+		font-size: clamp(1.75rem, 3vw, 2.55rem);
+	}
+
+	.rk-qs-head p {
+		margin: 1rem 0 0;
+		max-width: 42rem;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	/* — 第一幕:左描述 + 右代码窗 + 滚动驱动打字机 — */
+	.rk-qs .rk-code :global(pre.astro-code code) {
+		font-size: 0.74rem;
+		line-height: 1.62;
+	}
+
+	.rk-qs-split {
+		display: grid;
+		grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+		gap: clamp(1.6rem, 4vw, 3.5rem);
+		align-items: center;
+	}
+
+	/* 左:描述(两段叠放,随 phase 交叉淡入) */
+	.rk-qs-narrate {
+		position: relative;
+		display: grid;
+	}
+
+	.rk-qs-copy {
+		grid-area: 1 / 1;
+		max-width: 30rem;
+		opacity: 0;
+		transform: translateY(10px);
+		transition:
+			opacity 0.5s var(--rk-ease),
+			transform 0.5s var(--rk-ease);
+		pointer-events: none;
+	}
+
+	[data-qs-act1][data-phase="raw"] .rk-qs-copy[data-qs-copy="raw"],
+	[data-qs-act1][data-phase="kit"] .rk-qs-copy[data-qs-copy="kit"] {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+	}
+
+	.rk-qs-copy__kicker {
+		display: inline-block;
+		margin-bottom: 0.75rem;
+		padding: 0.25rem 0.66rem;
+		border-radius: 999px;
+		border: 1px solid var(--rk-line-strong);
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.72rem;
+		letter-spacing: 0.01em;
+	}
+
+	.rk-qs-copy__title {
+		margin: 0;
+		color: var(--rk-ink);
+		font-size: clamp(1.4rem, 2.4vw, 2rem);
+		font-weight: 680;
+		letter-spacing: -0.02em;
+		line-height: 1.16;
+	}
+
+	.rk-qs-copy p {
+		margin: 0.85rem 0 0;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	/* 左:phase 切换进度指示 */
+	.rk-qs-switch {
+		display: grid;
+		grid-template-columns: auto auto 1fr;
+		align-items: center;
+		gap: 0.7rem;
+		margin-top: clamp(1.6rem, 3vw, 2.4rem);
+	}
+
+	.rk-qs-switch__tab {
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.76rem;
+		font-weight: 640;
+		color: var(--rk-soft);
+		transition: color 0.4s var(--rk-ease);
+	}
+
+	[data-qs-act1][data-phase="raw"] .rk-qs-switch__tab[data-phase="raw"],
+	[data-qs-act1][data-phase="kit"] .rk-qs-switch__tab[data-phase="kit"] {
+		color: var(--rk-accent);
+	}
+
+	.rk-qs-switch__bar {
+		position: relative;
+		height: 3px;
+		border-radius: 3px;
+		background: var(--rk-line);
+		overflow: hidden;
+	}
+
+	.rk-qs-switch__fill {
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 0%;
+		background: var(--rk-accent);
+		transition: width 0.1s linear;
+	}
+
+	/* 右:打字机代码窗(两段代码叠放,phase 切换) */
+	.rk-qs-typer {
+		margin: 0;
+		will-change: opacity;
+	}
+
+	.rk-qs-typer__body {
+		position: relative;
+		height: clamp(400px, 52vh, 520px);
+		overflow: hidden;
+	}
+
+	.rk-qs-codelayer {
+		position: absolute;
+		inset: 0;
+		opacity: 0;
+		transition: opacity 0.35s var(--rk-ease);
+		pointer-events: none;
+	}
+
+	[data-qs-act1][data-phase="raw"] .rk-qs-codelayer[data-qs-code="raw"],
+	[data-qs-act1][data-phase="kit"] .rk-qs-codelayer[data-qs-code="kit"] {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	/* 打字机:逐行揭示由 JS 按滚动进度加 .typed;门控 .is-typing 保证无 JS 时整段全显 */
+	[data-qs-act1].is-typing .rk-qs-codelayer :global(.astro-code .line) {
+		opacity: 0;
+	}
+
+	[data-qs-act1].is-typing .rk-qs-codelayer :global(.astro-code .line.typed) {
+		opacity: 1;
+	}
+
+	.rk-qs-codelayer :global(.astro-code .line.caret)::after {
+		content: "▋";
+		margin-left: 1px;
+		color: var(--rk-accent);
+		animation: rk-caret 1s steps(1) infinite;
+	}
+
+	@keyframes rk-caret {
+		50% {
+			opacity: 0;
+		}
+	}
+
+	/* — 第二幕:左 sticky 三步(累积高亮)+ 右 Cargo.toml / main.rs / gif 自然滚动 — */
+	.rk-qs-act2__grid {
+		display: grid;
+		grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+		gap: clamp(1.6rem, 4vw, 3.5rem);
+		align-items: start;
+	}
+
+	.rk-qs-rail {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	.rk-qs-rail__lead {
+		margin: 0 0 1.8rem;
+		color: var(--rk-ink);
+		font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+		font-weight: 660;
+		letter-spacing: -0.015em;
+	}
+
+	.rk-qs-steps {
+		position: relative;
+		list-style: none;
+		margin: 0;
+		padding: 0 0 0 2.6rem;
+		display: grid;
+		gap: clamp(1.4rem, 3vw, 2.2rem);
+	}
+
+	.rk-qs-steps__track {
+		position: absolute;
+		left: 0.95rem;
+		top: 0.7rem;
+		bottom: 0.7rem;
+		width: 2px;
+		border-radius: 2px;
+		background: var(--rk-line);
+		overflow: hidden;
+	}
+
+	.rk-qs-steps__fill {
+		position: absolute;
+		inset: 0 0 auto 0;
+		height: 0%;
+		background: var(--rk-accent);
+		transition: height 0.3s var(--rk-ease);
+	}
+
+	.rk-qs-step {
+		position: relative;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1rem;
+		align-items: start;
+		opacity: 0.4;
+		transition: opacity 0.45s var(--rk-ease);
+	}
+
+	.rk-qs-step.is-on {
+		opacity: 1;
+	}
+
+	.rk-qs-step__dot {
+		position: relative;
+		z-index: 1;
+		display: grid;
+		place-items: center;
+		width: 1.9rem;
+		height: 1.9rem;
+		margin-left: -2.6rem;
+		border-radius: 999px;
+		border: 1px solid var(--rk-line-strong);
+		background: var(--rk-bg-base);
+		color: var(--rk-soft);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.72rem;
+		font-weight: 660;
+		transition:
+			background 0.4s var(--rk-ease),
+			border-color 0.4s var(--rk-ease),
+			color 0.4s var(--rk-ease),
+			box-shadow 0.4s var(--rk-ease);
+	}
+
+	.rk-qs-step.is-on .rk-qs-step__dot {
+		border-color: var(--rk-accent);
+		background: var(--rk-accent);
+		color: var(--rk-btn-ink);
+		box-shadow: 0 0 0 5px var(--rk-accent-glow);
+	}
+
+	.rk-qs-step__title {
+		display: block;
+		color: var(--rk-ink);
+		font-size: 1.02rem;
+		font-weight: 660;
+		letter-spacing: -0.01em;
+	}
+
+	.rk-qs-step__body p {
+		margin: 0.35rem 0 0;
+		color: var(--rk-muted);
+		font-size: 0.9rem;
+		line-height: 1.6;
+	}
+
+	.rk-qs-stage {
+		display: flex;
+		flex-direction: column;
+		gap: clamp(2rem, 5vh, 4rem);
+	}
+
+	.rk-qs-panel {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		min-height: clamp(420px, 56vh, 540px);
+	}
+
+	.rk-qs-panel .rk-window {
+		margin: 0;
+	}
+
+	.rk-qs-panel .rk-window--term .rk-window__screen {
+		display: block;
+	}
+
+	.rk-qs-panel .rk-window--term img {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: auto;
+		object-fit: contain;
+		border-radius: 0.6rem;
+		background: #06201f;
+	}
+
+	/* — 快速入门:窄屏降级为静态对比 + 纵向步骤 — */
+	@media (max-width: 980px) {
+		.rk-qs-act--versus,
+		.rk-qs-act--steps {
+			min-height: 0;
+		}
+
+		.rk-qs-act__sticky,
+		.rk-qs-act2__grid {
+			position: static;
+			min-height: 0;
+			align-content: start;
+		}
+
+		.rk-qs-split {
+			grid-template-columns: 1fr;
+			gap: 1.5rem;
+		}
+
+		.rk-qs-narrate {
+			gap: 1.4rem;
+		}
+
+		.rk-qs-copy {
+			grid-area: auto;
+			max-width: none;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-qs-switch {
+			display: none;
+		}
+
+		.rk-qs-typer__body {
+			height: auto;
+		}
+
+		.rk-qs-codelayer {
+			position: static;
+			opacity: 1 !important;
+		}
+
+		.rk-qs-codelayer[data-qs-code="kit"] {
+			margin-top: 0.4rem;
+			border-top: 1px solid var(--rk-line);
+		}
+
+		.rk-qs-act2__grid {
+			grid-template-columns: 1fr;
+			gap: 1.6rem;
+		}
+
+		.rk-qs-rail {
+			position: static;
+			height: auto;
+		}
+
+		.rk-qs-step {
+			opacity: 1 !important;
+		}
+
+		.rk-qs-step__dot {
+			border-color: var(--rk-accent);
+		}
+
+		.rk-qs-steps__fill {
+			height: 100% !important;
+		}
+
+		.rk-qs-stage {
+			gap: 1.4rem;
+		}
+
+		.rk-qs-panel {
+			min-height: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.rk-qs-act--versus,
+		.rk-qs-act--steps {
+			min-height: 0;
+		}
+
+		.rk-qs-act__sticky,
+		.rk-qs-act2__grid {
+			position: static;
+			min-height: 0;
+		}
+
+		.rk-qs-copy {
+			grid-area: auto;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-qs-switch {
+			display: none;
+		}
+
+		.rk-qs-typer__body {
+			height: auto;
+		}
+
+		.rk-qs-codelayer {
+			position: static;
+			opacity: 1 !important;
+		}
+
+		[data-qs-act1].is-typing .rk-qs-codelayer :global(.astro-code .line) {
+			opacity: 1 !important;
+		}
+
+		.rk-qs-steps__fill {
+			height: 100% !important;
+		}
+
+		.rk-qs-step {
+			opacity: 1 !important;
+		}
+
+		.rk-qs-rail {
+			position: static;
+			height: auto;
+		}
+
+		.rk-qs-panel {
+			min-height: 0;
+		}
+	}
+
+	/* ===== 组件展示:左描述居中 sticky + 右代码/gif 自然滚动,描述随滚动平滑切换 ===== */
+	.rk-cmp {
+		margin-top: clamp(1rem, 2vw, 2rem);
+	}
+
+	.rk-cmp__grid {
+		display: grid;
+		grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+		gap: clamp(1.6rem, 4vw, 3.5rem);
+		align-items: start;
+	}
+
+	.rk-cmp__nav {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	.rk-cmp__copies {
+		position: relative;
+		display: grid;
+	}
+
+	.rk-cmp__copy {
+		grid-area: 1 / 1;
+		opacity: 0;
+		transform: translateY(12px);
+		transition:
+			opacity 0.45s var(--rk-ease),
+			transform 0.45s var(--rk-ease);
+		pointer-events: none;
+	}
+
+	.rk-cmp__copy.is-active {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+	}
+
+	.rk-cmp__count {
+		display: inline-block;
+		margin-bottom: 0.7rem;
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.78rem;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.08em;
+	}
+
+	.rk-cmp__name {
+		margin: 0;
+		color: var(--rk-ink);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: clamp(1.4rem, 2.4vw, 2rem);
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		line-height: 1.15;
+	}
+
+	.rk-cmp__copy p {
+		margin: 0.85rem 0 0;
+		max-width: 30rem;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	.rk-cmp__copy .rk-textlink {
+		margin-top: 1.2rem;
+	}
+
+	.rk-cmp__progress {
+		position: relative;
+		height: 3px;
+		margin-top: clamp(1.6rem, 3vw, 2.4rem);
+		border-radius: 3px;
+		background: var(--rk-line);
+		overflow: hidden;
+	}
+
+	.rk-cmp__progress-fill {
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 0%;
+		background: var(--rk-accent);
+		transition: width 0.12s linear;
+	}
+
+	.rk-cmp__all {
+		margin-top: 1.2rem;
+	}
+
+	.rk-cmp__stage {
+		display: flex;
+		flex-direction: column;
+		gap: clamp(2rem, 5vh, 4rem);
+	}
+
+	.rk-cmp__panel {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: clamp(0.85rem, 1.6vw, 1.25rem);
+		min-height: clamp(420px, 58vh, 560px);
+	}
+
+	.rk-cmp__code {
+		flex: none;
+	}
+
+	.rk-cmp__demo {
+		flex: none;
+	}
+
+	.rk-cmp__demo .rk-window__screen {
+		display: block;
+	}
+
+	.rk-cmp__demo img {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: auto;
+		object-fit: contain;
+		border-radius: 0.6rem;
+	}
+
+	@media (max-width: 980px) {
+		.rk-cmp__grid {
+			grid-template-columns: 1fr;
+		}
+
+		.rk-cmp__nav {
+			position: static;
+			height: auto;
+			display: block;
+		}
+
+		.rk-cmp__copies {
+			gap: 1.4rem;
+		}
+
+		.rk-cmp__copy {
+			grid-area: auto;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-cmp__progress,
+		.rk-cmp__stage {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.rk-cmp__nav {
+			position: static;
+			height: auto;
+			display: block;
+		}
+
+		.rk-cmp__copies {
+			gap: 1.4rem;
+		}
+
+		.rk-cmp__copy {
+			grid-area: auto;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-cmp__progress,
+		.rk-cmp__stage {
+			display: none;
+		}
+	}
+
+	/* ===== 学习路径 ===== */
+	.rk-path {
+		display: grid;
+		grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+		gap: clamp(2rem, 5vw, 4.5rem);
+		align-items: center;
+	}
+
+	.rk-path__intro {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	@media (max-width: 980px) {
+		.rk-path__intro {
+			position: static;
+			height: auto;
+			display: block;
+		}
+	}
+
+	.rk-path__grid {
+		display: grid;
+		gap: 0.9rem;
+	}
+
+	.rk-path-card {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1.2rem;
+		align-items: start;
+		padding: clamp(1.15rem, 2vw, 1.55rem) clamp(1.3rem, 2.2vw, 1.75rem);
+		border: 1px solid var(--rk-line);
+		border-radius: var(--rk-radius-sm);
+		background: var(--rk-card);
+		text-decoration: none;
+		transition:
+			transform 600ms var(--rk-ease),
+			border-color 600ms var(--rk-ease),
+			background 600ms var(--rk-ease);
+	}
+
+	.rk-path-card:hover {
+		transform: translateX(8px);
+		border-color: var(--rk-line-strong);
+		background: var(--rk-accent-glow);
+	}
+
+	.rk-path-card__num {
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.92rem;
+		opacity: 0.8;
+	}
+
+	.rk-path-card__title {
+		display: block;
+		color: var(--rk-ink);
+		font-size: 1rem;
+		font-weight: 660;
+		letter-spacing: -0.012em;
+	}
+
+	.rk-path-card p {
+		margin: 0.4rem 0 0;
+		color: var(--rk-muted);
+		font-size: 0.92rem;
+		line-height: 1.62;
+	}
+
+	/* ===== 终态 CTA ===== */
+	.rk-final__shell {
+		padding: var(--rk-pad);
+		border: 1px solid var(--rk-line);
+		border-radius: var(--rk-radius);
+		background: var(--rk-card);
+		box-shadow: 0 38px 90px var(--rk-shadow);
+		overflow: hidden;
+	}
+
+	.rk-final__core {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 2rem;
+		padding: clamp(1.6rem, 4.5vw, 3.2rem);
+		border-radius: calc(var(--rk-radius) - var(--rk-pad));
+		background:
+			radial-gradient(circle at 88% 8%, var(--rk-accent-glow), transparent 24rem),
+			linear-gradient(135deg, var(--rk-core-1), var(--rk-core-2));
+	}
+
+	.rk-final__core h2 {
+		font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+	}
+
+	.rk-final__core p {
+		margin: 0.7rem 0 0;
+		color: var(--rk-muted);
+		font-size: clamp(0.98rem, 1.1vw, 1.06rem);
+		line-height: 1.68;
+	}
+
+	.rk-final__install {
+		display: inline-flex;
+		align-items: center;
+		margin-top: 1.2rem;
+		padding: 0.5rem 0.9rem;
+		border-radius: 0.7rem;
+		border: 1px solid rgba(252, 169, 27, 0.22);
+		background: #0a2e32;
+		color: rgba(243, 240, 231, 0.78);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.84rem;
+	}
+
+	.rk-final__install::before {
+		content: "$";
+		margin-right: 0.6rem;
+		color: #fca91b;
+	}
+
+	/* ===== 聚光(精确指针时由 JS 注入 --mx/--my) ===== */
+	[data-spot] {
+		position: relative;
+	}
+
+	[data-spot]::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		opacity: 0;
+		background: radial-gradient(
+			420px circle at var(--mx, 50%) var(--my, 50%),
+			var(--rk-spot),
+			transparent 62%
+		);
+		transition: opacity 500ms var(--rk-ease);
+	}
+
+	[data-spot]:hover::after {
+		opacity: 1;
+	}
+
+	[data-spot] > * {
+		position: relative;
+		z-index: 1;
+	}
+
+	/* ===== 滚动揭示 ===== */
+	[data-rk-reveal] {
+		opacity: 0;
+		transform: translate3d(0, 32px, 0);
+		filter: blur(8px);
+		transition:
+			opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+			transform 900ms cubic-bezier(0.16, 1, 0.3, 1),
+			filter 900ms cubic-bezier(0.16, 1, 0.3, 1);
+		transition-delay: calc(var(--i, 0) * 70ms);
+	}
+
+	[data-rk-reveal].is-visible {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+		filter: blur(0);
+	}
+
+	/* Hero 代码窗悬浮 */
+	@media (prefers-reduced-motion: no-preference) {
+		.rk-hero__window {
+			animation: rk-float 9s ease-in-out infinite alternate;
+		}
+
+		@keyframes rk-float {
+			from {
+				transform: translate3d(0, 0, 0);
+			}
+			to {
+				transform: translate3d(0, -12px, 0);
+			}
+		}
+	}
+
+	/* ===== 响应式 ===== */
+	@media (max-width: 980px) {
+		.rk-hero,
+		.rk-layer,
+		.rk-path,
+		.rk-final__core {
+			grid-template-columns: 1fr;
+		}
+
+		.rk-hero {
+			min-height: auto;
+			padding-block: 2.5rem;
+		}
+
+		.rk-feat {
+			grid-template-columns: repeat(2, 1fr);
+		}
+
+		.rk-feat-card--lg,
+		.rk-feat-card--wide {
+			grid-column: span 2;
+			grid-row: auto;
+		}
+
+		.rk-feat-card--sm {
+			grid-column: span 1;
+		}
+
+		.rk-path__intro {
+			position: static;
+		}
+
+		.rk-final__core {
+			justify-items: start;
+		}
+	}
+
+	@media (max-width: 600px) {
+		.rk-home {
+			padding-inline: 1rem;
+		}
+
+		.rk-feat {
+			grid-template-columns: 1fr;
+		}
+
+		.rk-feat-card--lg,
+		.rk-feat-card--wide,
+		.rk-feat-card--sm {
+			grid-column: span 1;
+			grid-row: auto;
+		}
+
+		.rk-actions {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.rk-button {
+			width: 100%;
+		}
+
+		.rk-hero h1 {
+			font-size: clamp(2rem, 9vw, 2.8rem);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.rk-home *,
+		.rk-home *::before,
+		.rk-home *::after {
+			animation-duration: 1ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 1ms !important;
+			scroll-behavior: auto !important;
+		}
+
+		[data-rk-reveal] {
+			opacity: 1;
+			transform: none;
+			filter: none;
+		}
+	}
+</style>

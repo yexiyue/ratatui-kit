@@ -1,33 +1,33 @@
 ---
-title: 示例路线图
-description: examples 按教程、组件、hooks 和完整应用组织，并全部绑定真实 VHS 录制。
+title: Example Roadmap
+description: Examples are organized by tutorials, components, hooks, and full apps, and all key paths are tied to real VHS recordings.
 sidebar:
   order: 1
 ---
 
-examples 已按文档路径重新分组。对外命令保持稳定，例如 `cargo run --example counter`；源码按学习路径放进子目录，并在根 `Cargo.toml` 里用 `[[example]]` 显式登记。
+Examples are now grouped by documentation path. Public commands stay stable, such as `cargo run --example counter`; source files live under learning-path subdirectories and are explicitly registered with `[[example]]` entries in the root `Cargo.toml`.
 
-每个重要 example 都应该满足：
+Every important example should satisfy:
 
-- 可以独立 `cargo run --example name`。
-- 对应一篇教程或组件说明。
-- 有可重复的 VHS tape。
-- 录制产物放在 `docs/public/recordings/`。
+- It can run independently with `cargo run --example name`.
+- It maps to a tutorial or component reference page.
+- It has a reproducible VHS tape.
+- Its recording output lives under `docs/public/recordings/`.
 
-## 源码分组
+## Source groups
 
-| 分组 | 用途 | examples |
+| Group | Purpose | Examples |
 | --- | --- | --- |
-| `start` | 入门和核心心智模型 | `hello_world`、`counter` |
-| `hooks` | 状态、副作用、异步数据 | `async_state`、`atom_state` |
-| `core` | 组件模型、Element DSL 和宏语法 | `control_flow` |
-| `routing` | shell、动态参数、history 和页面状态 | `router` |
-| `input` | 输入层、互斥、快捷键 | `input_mutex` |
-| `components` | 内置组件逐个展示 | `input`、`search_input`、`scrollview`、`wrapped_text`、`modal`、`confirm_modal`、`alert_modal`、`shortcut_info_modal`、`select`、`multi_select`、`tree_select`、`virtual_list`、`virtual_multi_select` |
-| `advanced` | 自定义 Hook、Provider、手写 Component、原生 widget 桥接 | `custom_widget`、`custom_hook`、`custom_provider` |
-| `apps` | 组合型完整 demo | `todo_app` |
+| `start` | Getting started and core mental model | `hello_world`, `counter` |
+| `hooks` | State, effects, async data | `async_state`, `atom_state` |
+| `core` | Component model, Element DSL, and macro syntax | `control_flow` |
+| `routing` | Shell, dynamic params, history, and page state | `router` |
+| `input` | Input layers, exclusivity, shortcuts | `input_mutex` |
+| `components` | One page per built-in component | `input`, `search_input`, `scrollview`, `wrapped_text`, `modal`, `confirm_modal`, `alert_modal`, `shortcut_info_modal`, `select`, `multi_select`, `tree_select`, `virtual_list`, `virtual_multi_select` |
+| `advanced` | Custom hooks, Providers, handwritten Components, native widget bridges | `custom_widget`, `custom_hook`, `custom_provider` |
+| `apps` | Full compositional demos | `todo_app` |
 
-Cargo 只能自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。分组目录下的示例必须在根 `Cargo.toml` 里显式登记：
+Cargo only auto-discovers top-level `examples/name.rs` or `examples/name/main.rs`. Examples inside grouping directories must be explicitly registered in the root `Cargo.toml`:
 
 ```toml
 [[example]]
@@ -35,48 +35,48 @@ name = "counter"
 path = "examples/start/counter.rs"
 ```
 
-新增 example 时也应该同步文档页和 VHS tape，避免文档和可运行代码脱节。
+When adding a new example, update the docs page and VHS tape at the same time so documentation does not drift from runnable code.
 
-旧的 `list` / `custom_list` 已被移除：普通选择看 `Select` / `MultiSelect` / `VirtualList`，原生 ratatui widget 桥接看 `custom_widget`。
+The old `list` / `custom_list` examples have been removed: ordinary selection is covered by `Select` / `MultiSelect` / `VirtualList`, and native ratatui widget bridging is covered by `custom_widget`.
 
-## 源码目录
+## Source directories
 
-| 目录 | examples | 状态 |
+| Directory | Examples | Status |
 | --- | --- | --- |
-| `examples/start/` | `hello_world`、`counter` | 已登记到 `Cargo.toml` |
-| `examples/hooks/` | `async_state`、`atom_state` | 已登记到 `Cargo.toml` |
-| `examples/core/` | `control_flow` | 已登记到 `Cargo.toml` |
-| `examples/routing/` | `router` | 已登记到 `Cargo.toml` |
-| `examples/input/` | `input_mutex` | 已登记到 `Cargo.toml` |
-| `examples/components/` | `input`、`search_input`、`scrollview`、`wrapped_text`、`modal`、`confirm_modal`、`alert_modal`、`shortcut_info_modal`、`select`、`multi_select`、`tree_select`、`virtual_list`、`virtual_multi_select` | 已登记到 `Cargo.toml` |
-| `examples/advanced/` | `custom_widget`、`custom_hook`、`custom_provider` | 已登记到 `Cargo.toml` |
-| `examples/apps/` | `todo_app` | 已登记到 `Cargo.toml` |
+| `examples/start/` | `hello_world`, `counter` | Registered in `Cargo.toml` |
+| `examples/hooks/` | `async_state`, `atom_state` | Registered in `Cargo.toml` |
+| `examples/core/` | `control_flow` | Registered in `Cargo.toml` |
+| `examples/routing/` | `router` | Registered in `Cargo.toml` |
+| `examples/input/` | `input_mutex` | Registered in `Cargo.toml` |
+| `examples/components/` | `input`, `search_input`, `scrollview`, `wrapped_text`, `modal`, `confirm_modal`, `alert_modal`, `shortcut_info_modal`, `select`, `multi_select`, `tree_select`, `virtual_list`, `virtual_multi_select` | Registered in `Cargo.toml` |
+| `examples/advanced/` | `custom_widget`, `custom_hook`, `custom_provider` | Registered in `Cargo.toml` |
+| `examples/apps/` | `todo_app` | Registered in `Cargo.toml` |
 
-## 已完成纵切
+## Completed vertical slices
 
-| example | 文档 | 录制 |
+| Example | Docs | Recording |
 | --- | --- | --- |
-| `hello_world` | [快速开始](/ratatui-kit/start/quick-start/) | `docs/tapes/hello-world.tape` |
-| `counter` | [计数器教程](/ratatui-kit/tutorials/counter/) | `docs/tapes/counter.tape` |
-| `async_state` | [异步数据三态](/ratatui-kit/tutorials/async-state/) | `docs/tapes/async-state.tape` |
-| `atom_state` | [Atom 全局状态](/ratatui-kit/tutorials/atom-state/) | `docs/tapes/atom-state.tape` |
-| `control_flow` | [控制流语法](/ratatui-kit/core/control-flow/) | `docs/tapes/control-flow.tape` |
-| `input_mutex` | [输入互斥](/ratatui-kit/tutorials/input-mutex/) | `docs/tapes/input_mutex.tape` |
-| `scrollview` | [ScrollView 滚动容器](/ratatui-kit/components/scroll-view/) | `docs/tapes/scrollview.tape` |
-| `wrapped_text` | [WrappedText 长文本](/ratatui-kit/components/wrapped-text/) | `docs/tapes/wrapped-text.tape` |
-| `input` | [Input 单行输入](/ratatui-kit/components/input/) | `docs/tapes/input.tape` |
-| `search_input` | [SearchInput 搜索输入](/ratatui-kit/components/search-input/) | `docs/tapes/search-input.tape` |
-| `modal` | [Modal 基础弹层](/ratatui-kit/components/modal/) | `docs/tapes/modal.tape` |
-| `confirm_modal` | [ConfirmModal 确认弹窗](/ratatui-kit/components/confirm-modal/) | `docs/tapes/confirm-modal.tape` |
-| `alert_modal` | [AlertModal 提示弹窗](/ratatui-kit/components/alert-modal/) | `docs/tapes/alert-modal.tape` |
-| `shortcut_info_modal` | [ShortcutInfoModal 快捷键帮助](/ratatui-kit/components/shortcut-info-modal/) | `docs/tapes/shortcut-info-modal.tape` |
-| `router` | [路由工作台](/ratatui-kit/tutorials/router/) | `docs/tapes/router.tape` |
-| `select` | [Select 单选](/ratatui-kit/components/select/) | `docs/tapes/select.tape` |
-| `multi_select` | [MultiSelect 多选](/ratatui-kit/components/multi-select/) | `docs/tapes/multi-select.tape` |
-| `tree_select` | [TreeSelect 树形选择](/ratatui-kit/components/tree-select/) | `docs/tapes/tree-select.tape` |
-| `virtual_list` | [VirtualList 虚拟列表](/ratatui-kit/components/virtual-list/) | `docs/tapes/virtual-list.tape` |
-| `virtual_multi_select` | [Virtual Multi Select 虚拟多选](/ratatui-kit/components/virtual-multi-select/) | `docs/tapes/virtual-multi-select.tape` |
+| `hello_world` | [Quick Start](/ratatui-kit/start/quick-start/) | `docs/tapes/hello-world.tape` |
+| `counter` | [Counter Tutorial](/ratatui-kit/tutorials/counter/) | `docs/tapes/counter.tape` |
+| `async_state` | [Async Data States](/ratatui-kit/tutorials/async-state/) | `docs/tapes/async-state.tape` |
+| `atom_state` | [Atom Global State](/ratatui-kit/tutorials/atom-state/) | `docs/tapes/atom-state.tape` |
+| `control_flow` | [Control Flow Syntax](/ratatui-kit/core/control-flow/) | `docs/tapes/control-flow.tape` |
+| `input_mutex` | [Input Mutex](/ratatui-kit/tutorials/input-mutex/) | `docs/tapes/input_mutex.tape` |
+| `scrollview` | [ScrollView](/ratatui-kit/components/scroll-view/) | `docs/tapes/scrollview.tape` |
+| `wrapped_text` | [WrappedText](/ratatui-kit/components/wrapped-text/) | `docs/tapes/wrapped-text.tape` |
+| `input` | [Input](/ratatui-kit/components/input/) | `docs/tapes/input.tape` |
+| `search_input` | [SearchInput](/ratatui-kit/components/search-input/) | `docs/tapes/search-input.tape` |
+| `modal` | [Modal](/ratatui-kit/components/modal/) | `docs/tapes/modal.tape` |
+| `confirm_modal` | [ConfirmModal](/ratatui-kit/components/confirm-modal/) | `docs/tapes/confirm-modal.tape` |
+| `alert_modal` | [AlertModal](/ratatui-kit/components/alert-modal/) | `docs/tapes/alert-modal.tape` |
+| `shortcut_info_modal` | [ShortcutInfoModal](/ratatui-kit/components/shortcut-info-modal/) | `docs/tapes/shortcut-info-modal.tape` |
+| `router` | [Router Workbench](/ratatui-kit/tutorials/router/) | `docs/tapes/router.tape` |
+| `select` | [Select](/ratatui-kit/components/select/) | `docs/tapes/select.tape` |
+| `multi_select` | [MultiSelect](/ratatui-kit/components/multi-select/) | `docs/tapes/multi-select.tape` |
+| `tree_select` | [TreeSelect](/ratatui-kit/components/tree-select/) | `docs/tapes/tree-select.tape` |
+| `virtual_list` | [VirtualList](/ratatui-kit/components/virtual-list/) | `docs/tapes/virtual-list.tape` |
+| `virtual_multi_select` | [Virtual Multi Select](/ratatui-kit/components/virtual-multi-select/) | `docs/tapes/virtual-multi-select.tape` |
 | `todo_app` | [Todo App](/ratatui-kit/apps/todo-app/) | `docs/tapes/todo-app.tape` |
-| `custom_widget` | [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/) | `docs/tapes/custom-widget.tape` |
-| `custom_hook` | [自定义 Hook](/ratatui-kit/advanced/custom-hook/) | `docs/tapes/custom-hook.tape` |
-| `custom_provider` | [自定义 Provider](/ratatui-kit/advanced/custom-provider/) | `docs/tapes/custom-provider.tape` |
+| `custom_widget` | [Native Widget Bridging](/ratatui-kit/advanced/custom-widget/) | `docs/tapes/custom-widget.tape` |
+| `custom_hook` | [Custom Hook](/ratatui-kit/advanced/custom-hook/) | `docs/tapes/custom-hook.tape` |
+| `custom_provider` | [Custom Provider](/ratatui-kit/advanced/custom-provider/) | `docs/tapes/custom-provider.tape` |

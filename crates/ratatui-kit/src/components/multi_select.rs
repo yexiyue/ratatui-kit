@@ -1,4 +1,4 @@
-//! MultiSelect 组件：带键盘事件处理的多选列表。
+// MultiSelect 组件：带键盘事件处理的多选列表。
 
 use std::collections::HashSet;
 

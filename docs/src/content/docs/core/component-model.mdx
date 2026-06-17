@@ -1,17 +1,17 @@
 ---
-title: 组件模型
-description: Element 是每帧声明，Component 是持久实例。
+title: Component model
+description: Element is the per-frame declaration; Component is the persistent instance.
 sidebar:
   order: 1
 ---
 
 import Mermaid from '../../../components/Mermaid.astro';
 
-Ratatui Kit 的组件模型分成两层：`Element` 是每帧重新创建的声明，`Component` 是运行时复用的持久实例。写应用时你大多在 `element!` 里声明 UI；框架在 update 阶段把这些声明协调成组件树，并保留 hooks、子树、布局和生命周期。
+Ratatui Kit's component model has two layers: `Element` is the declaration recreated every frame, while `Component` is the persistent instance reused by the runtime. In application code, you mostly declare UI inside `element!`; during update, the framework reconciles those declarations into a component tree and preserves hooks, subtrees, layout, and lifecycle state.
 
-如果你来自 React，可以把它理解成类似 JSX element 和 component instance 的关系。不同的是这里的输出不是 DOM，而是 ratatui buffer。
+If you come from React, this is similar to the relationship between JSX elements and component instances. The difference is that the output is a Ratatui buffer, not a DOM tree.
 
-## 一帧发生什么
+## What happens in one frame
 
 <Mermaid
 	chart={`
@@ -23,10 +23,10 @@ flowchart TD
     hooks --> layout["calculate layout areas"]
     layout --> draw["draw into ratatui buffer"]
 	`}
-	caption="Element 每帧重建；Component 实例靠协调复用，状态真正挂在实例和 hooks 上。"
+	caption="Elements are rebuilt every frame; Component instances are reused by reconciliation, and state is attached to instances and hooks."
 />
 
-一个函数组件每帧都会重新执行：
+A function component runs again every frame:
 
 ```rust
 #[component]
@@ -39,11 +39,11 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 }
 ```
 
-这里的 `element!(Text(...))` 是声明。真正保存 `count` 的不是这棵临时声明树，而是运行时已经实例化的 `Counter` 节点和它的 hook 列表。
+The `element!(Text(...))` call is a declaration. The thing that actually stores `count` is not this temporary declaration tree, but the instantiated `Counter` node in the runtime and its hook list.
 
-## Element 是声明
+## Element is a declaration
 
-`Element<T>` 可以理解成：
+You can think of `Element<T>` as:
 
 ```rust
 Element<T> {
@@ -52,7 +52,7 @@ Element<T> {
 }
 ```
 
-它很轻，每帧都可以重新创建。`element!` 宏负责把声明式语法变成 element 树：
+It is lightweight and can be rebuilt every frame. The `element!` macro turns declarative syntax into an element tree:
 
 ```rust
 element!(
@@ -63,21 +63,21 @@ element!(
 )
 ```
 
-`AnyElement` 是类型擦除版本，用来把不同组件类型放进同一个 children 列表。完整宏语法见 [声明式语法](/ratatui-kit/core/declarative-syntax/)。
+`AnyElement` is the type-erased version that lets different component types live in the same children list. See [Declarative syntax](/ratatui-kit/core/declarative-syntax/) for the full macro syntax.
 
-## Component 是实例
+## Component is an instance
 
-`Component` 是持久对象。一个实例持有：
+`Component` is the persistent object. An instance owns:
 
-- 组件自身状态。
-- hook 列表。
-- 子组件树。
-- 布局样式。
-- 生命周期回调。
+- The component's own state.
+- Its hook list.
+- Its child component tree.
+- Its layout style.
+- Lifecycle callbacks.
 
-函数组件由 `#[component]` 宏生成 `Component` 实现。你写的是函数，运行时看到的是一个透明包装组件：每帧 update 时执行函数体，拿到返回的根 element，再协调它的子树。
+Function components get a generated `Component` implementation from `#[component]`. You write a function; the runtime sees a transparent wrapper component that runs the function body during each update, obtains the returned root element, and reconciles its subtree.
 
-手写组件直接实现 `Component`，通常用于桥接原生 ratatui widget 或自定义布局：
+Hand-written components implement `Component` directly. This is usually for native Ratatui widget bridges or custom layout:
 
 ```rust
 impl Component for DeployQueue {
@@ -102,20 +102,20 @@ impl Component for DeployQueue {
 }
 ```
 
-完整示例见 [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/)。
+See [Native widget bridge](/ratatui-kit/advanced/custom-widget/) for the complete example.
 
-## 复用规则
+## Reuse rules
 
-运行时协调子节点时，使用 `ElementKey + TypeId` 匹配上一帧节点：
+When reconciling children, the runtime matches current declarations to previous-frame nodes using `ElementKey + TypeId`:
 
-| 本帧声明 | 上一帧实例 | 结果 |
+| Current declaration | Previous instance | Result |
 | --- | --- | --- |
-| 同 key、同组件类型 | 命中 | 复用实例，保留 hooks 和子树 |
-| 同 key、不同组件类型 | 类型变化 | 重建实例 |
-| key 变化 | 身份变化 | 重建实例 |
-| 旧 key 消失 | 无声明 | 卸载实例，运行 `on_drop` |
+| Same key, same component type | Match | Reuse instance, preserve hooks and subtree |
+| Same key, different component type | Type changed | Recreate instance |
+| Key changed | Identity changed | Recreate instance |
+| Old key disappeared | No declaration | Unmount instance and run `on_drop` |
 
-这就是列表渲染要给稳定 key 的原因：
+This is why list rendering needs stable keys:
 
 ```rust
 for item in items {
@@ -125,13 +125,13 @@ for item in items {
 }
 ```
 
-不要用会增删、重排的数组下标当 key。插入一行后，后面所有下标都会变，旧状态就可能被复用到错误的行上。
+Do not use array indices as keys when the list can insert, delete, or reorder items. After inserting one row, every following index changes, and old state may be reused on the wrong row.
 
-静态小数组可以用下标；例如 [控制流语法](/ratatui-kit/core/control-flow/) 里的 `ROWS` 是固定数组，所以 `key: index` 是稳定的。
+Static small arrays can use indices. For example, `ROWS` in [Control flow syntax](/ratatui-kit/core/control-flow/) is a fixed array, so `key: index` is stable.
 
-## 控制流属于声明层
+## Control flow belongs to the declaration layer
 
-`element!` 支持直接写 `if`、`if let`、`for` 和 `match`：
+`element!` supports `if`, `if let`, `for`, and `match` directly:
 
 ```rust
 element!(
@@ -147,13 +147,13 @@ element!(
 )
 ```
 
-这些控制流只改变本帧产生的 element 声明。运行时仍然用 key 和类型决定哪些实例能复用。
+This control flow only changes the element declarations produced for the current frame. The runtime still uses key and type to decide which instances can be reused.
 
-这也解释了一个重要边界：你可以在 `element!` 里放条件渲染，但不要把 hook 调用放进条件分支。Hook 顺序属于组件实例，必须每帧稳定；渲染分支属于声明层，可以每帧变化。更多规则见 [Hooks](/ratatui-kit/core/hooks/)。
+That explains an important boundary: you may use conditional rendering inside `element!`, but do not put hook calls inside conditional branches. Hook order belongs to the component instance and must be stable every frame; render branches belong to the declaration layer and may change every frame. See [Hooks](/ratatui-kit/core/hooks/) for more rules.
 
 ## Props
 
-Props 是传给组件声明的数据。`element!` 会根据 props 字段构造结构体，并用 `Default::default()` 补齐未传字段：
+Props are the data passed to a component declaration. `element!` constructs the props struct from fields and fills missing fields with `Default::default()`:
 
 ```rust
 element!(
@@ -165,7 +165,7 @@ element!(
 )
 ```
 
-自定义 props 用 `#[derive(Props)]`：
+Custom props use `#[derive(Props)]`:
 
 ```rust
 #[derive(Props)]
@@ -174,13 +174,13 @@ struct DeployQueueProps {
 }
 ```
 
-如果 props 里有不能自动 `Default` 的字段，就手写一个语义中性的 `impl Default`。这不是装饰性要求：`element!` 依赖默认值补齐没传的字段。
+If a props field cannot derive `Default`, write a semantically neutral `impl Default`. This is not cosmetic: `element!` depends on default values to fill omitted fields.
 
-可选字段直接用 `Option<T>`。宏会对字段值调用 `.into()`，所以 `top_title: Line::from("title")`、`top_title: Some(line)` 和 `top_title: None` 都能工作。
+Optional fields should use `Option<T>`. The macro calls `.into()` on field values, so `top_title: Line::from("title")`, `top_title: Some(line)`, and `top_title: None` all work.
 
-## 布局属性
+## Layout props
 
-Ratatui Kit 的布局字段来自 `LayoutStyle`：
+Ratatui Kit layout fields come from `LayoutStyle`:
 
 - `width`
 - `height`
@@ -190,11 +190,11 @@ Ratatui Kit 的布局字段来自 `LayoutStyle`：
 - `margin`
 - `offset`
 
-内置组件会在 props 上暴露这些字段；自定义组件如果也想支持布局属性，需要给 props 加 `#[with_layout_style]`。
+Built-in components expose these fields on props. Custom components that want to support layout props should add `#[with_layout_style]` to their props.
 
-函数组件有一个特殊点：`#[component]` 生成的是透明布局组件。它不占独立布局节点，而是继承返回的第一个子节点的布局样式。
+Function components have one special rule: the component generated by `#[component]` is transparent for layout. It does not occupy a separate layout node; it inherits the layout style of the first child element it returns.
 
-所以布局属性要写在函数组件返回的根元素上：
+So layout props should be written on the root element returned by the function component:
 
 ```rust
 #[component]
@@ -207,22 +207,22 @@ fn Panel(_hooks: Hooks) -> impl Into<AnyElement<'static>> {
 }
 ```
 
-不要指望在父级直接给 `Panel(width: ...)` 生效，除非你把 `Panel` 写成带 props 的手写组件或显式把布局字段传给内部根元素。
+Do not expect `Panel(width: ...)` at the parent site to take effect unless `Panel` is a props-bearing hand-written component or explicitly forwards layout fields to its internal root.
 
-## 自定义布局
+## Custom layout
 
-默认组件布局是 flex 切分子区域。需要非 flex 行为时，组件可以重写 `calc_children_areas`：
+The default component layout is flex-like child area splitting. Components can override `calc_children_areas` for non-flex behavior:
 
-- `ScrollView` 要把内容区域和滚动 offset 结合起来。
-- `Modal` 要把弹层定位在屏幕中央，并把 input layer 注入子树。
-- 自定义画布、表格、分栏工作台也可能需要自己的区域计算。
+- `ScrollView` combines content area with scroll offset.
+- `Modal` positions the surface in the screen center and injects an input layer into the subtree.
+- Custom canvases, tables, and split workspaces may need their own area calculation.
 
-`calc_children_areas` 必须返回和 children 数量一致的区域列表。少一个区域会导致子节点不被绘制；多一个区域没有对应子节点。调试构建会尽量暴露这类契约问题。
+`calc_children_areas` must return exactly the same number of areas as there are children. Too few areas means a child will not draw; extra areas have no matching child. Debug builds try to expose these contract violations.
 
-## 从这里往下读
+## Where to read next
 
-- 想理解 `if / for / match` 怎么写进树里，看 [控制流语法](/ratatui-kit/core/control-flow/)。
-- 想查 `element!`、`#[component]`、Props 和 adapter 规则，看 [声明式语法](/ratatui-kit/core/declarative-syntax/)。
-- 想理解状态为什么能跨帧保存，看 [Hooks](/ratatui-kit/core/hooks/) 和 [状态](/ratatui-kit/core/state/)。
-- 想接入原生 ratatui widget，看 [原生 Widget 桥接](/ratatui-kit/advanced/custom-widget/)。
-- 想理解整个 update / draw 循环，看 [渲染循环](/ratatui-kit/internals/render-loop/)。
+- For `if / for / match` inside trees, read [Control flow syntax](/ratatui-kit/core/control-flow/).
+- For `element!`, `#[component]`, props, and adapter rules, read [Declarative syntax](/ratatui-kit/core/declarative-syntax/).
+- For why state persists across frames, read [Hooks](/ratatui-kit/core/hooks/) and [State](/ratatui-kit/core/state/).
+- For native Ratatui widget integration, read [Native widget bridge](/ratatui-kit/advanced/custom-widget/).
+- For the whole update / draw loop, read [Render loop](/ratatui-kit/internals/render-loop/).

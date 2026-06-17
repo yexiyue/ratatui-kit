@@ -42,8 +42,8 @@ impl<'a> Tree<'a> {
         }
     }
 
-    /// 只跑一次 update（自顶向下运行组件、协调子树）。终端以对象安全的
-    /// `&mut dyn UpdaterTerminal` 传入,故渲染 harness 可用 no-op 终端驱动。
+    // 只跑一次 update（自顶向下运行组件、协调子树）。终端以对象安全的
+    // `&mut dyn UpdaterTerminal` 传入,故渲染 harness 可用 no-op 终端驱动。
     pub(crate) fn update_once(&mut self, terminal: &mut dyn UpdaterTerminal) {
         // 每帧重建输入注册表（清空上一帧层/handler、铸造 root 层)。
         // 必须在 ContextStack::root 借走 &mut system_context 之前完成,二者借用不重叠。
@@ -53,7 +53,7 @@ impl<'a> Tree<'a> {
             .update(terminal, &mut component_context_stack, self.props.borrow());
     }
 
-    /// 只跑一次 draw（把树绘到给定 drawer）。供渲染 harness 直接画到 TestBackend Buffer。
+    // 只跑一次 draw（把树绘到给定 drawer）。供渲染 harness 直接画到 TestBackend Buffer。
     pub(crate) fn draw_root(&mut self, drawer: &mut ComponentDrawer) {
         self.root_component.draw(drawer);
     }

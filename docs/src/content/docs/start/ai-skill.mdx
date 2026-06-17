@@ -1,0 +1,44 @@
+---
+title: AI-assisted development
+description: Install the ratatui-kit Claude skill so your AI assistant writes correct, idiomatic ratatui-kit code.
+sidebar:
+  order: 5
+---
+
+ratatui-kit ships an **AI agent skill** — a packaged knowledge base that teaches your AI coding assistant the framework's real components, props, and hooks, the `element!` macro, the input-layer system, the router, and the idioms for building polished TUIs. It uses the open [skills](https://www.npmjs.com/package/skills) convention, so it works with any agent that supports it. With it installed you can ask your assistant to *"build me a terminal todo app"* or *"add a confirmation modal"* and get code that **compiles and follows the framework's conventions**, instead of guessed APIs.
+
+Why it helps: ratatui-kit is a niche framework, so an assistant working from memory tends to hallucinate APIs — the wrong event hook, removed macro syntax, props that don't exist. The skill gives it an accurate, source-derived reference to work from, plus a build workflow that ends in `cargo check`.
+
+## Install
+
+The skill lives in this repository under `skills/ratatui-kit/`. Add it with the [`skills`](https://www.npmjs.com/package/skills) CLI:
+
+```bash
+npx skills add https://github.com/yexiyue/ratatui-kit
+```
+
+This installs the `ratatui-kit` skill. Your assistant consults it automatically whenever you ask it to build or extend a ratatui-kit / terminal UI — you don't have to mention the skill by name.
+
+:::tip[Pair it with the Rust skills]
+The ratatui-kit skill covers the **framework**. It assumes general Rust competence and does not re-teach ownership, `mut` bindings, borrow rules, or async. For those, also install the companion skills:
+
+```bash
+npx skills add rust-best-practices
+npx skills add rust-async-patterns
+```
+:::
+
+## What's inside
+
+- **`SKILL.md`** — the mental model, a from-zero build workflow, a minimal compiling app template, the `element!` essentials, input/state guidance, palette-neutral visual-polish principles, and a pitfalls checklist.
+- **`references/`** — deeper references the assistant reads on demand: every built-in component with its exact props, every hook signature, the macro grammar, the events / state / routing model, and idioms for building polished UIs.
+
+## How to use it
+
+Just describe what you want to your assistant:
+
+- *"Scaffold a new ratatui-kit todo app with a text field, a j/k list, and a delete confirmation."*
+- *"Add a second screen to my app using the router."*
+- *"Make this modal capture keyboard input so the background list stops reacting while it's open."*
+
+The assistant reads the skill, uses the correct APIs and idioms (the `element!` macro, `#[component]`, `use_state` / `use_event_handler`, input layers, the `routes!` router), and — following the skill's guidance — verifies the result compiles before handing it back.

@@ -1,0 +1,44 @@
+---
+title: 用 AI 辅助开发
+description: 安装 ratatui-kit 的 Claude skill，让 AI 助手写出正确、地道的 ratatui-kit 代码。
+sidebar:
+  order: 5
+---
+
+ratatui-kit 附带一个 **AI agent skill** —— 一份打包好的知识库，把框架真实的组件、props、Hooks、`element!` 宏、输入层系统、路由，以及构建精美 TUI 的惯用法教给 AI 编程助手。它采用开放的 [skills](https://www.npmjs.com/package/skills) 约定，任何支持该约定的助手都能用。装上它之后，你可以直接对助手说 *“给我做一个终端 todo 应用”* 或 *“加一个删除确认弹窗”*，得到的是**能编译、且符合框架约定**的代码，而不是凭记忆猜出来的 API。
+
+为什么有用：ratatui-kit 是个相对小众的框架，助手凭记忆写很容易幻觉 API —— 用错事件 Hook、用上已删除的宏语法、写出不存在的 prop。这个 skill 给它一份从源码提炼、准确的参考，外加一套以 `cargo check` 收尾的开发流程。
+
+## 安装
+
+skill 就在本仓库的 `skills/ratatui-kit/` 下。用 [`skills`](https://www.npmjs.com/package/skills) CLI 添加：
+
+```bash
+npx skills add https://github.com/yexiyue/ratatui-kit
+```
+
+这会装上 `ratatui-kit` skill。之后只要你让助手构建或扩展 ratatui-kit / 终端 UI，它就会自动参考这个 skill —— 你不必专门点名。
+
+:::tip[搭配 Rust skill 一起用]
+ratatui-kit skill 只覆盖**框架本身**，它假定你具备通用 Rust 能力，不会重复讲所有权、`mut` 绑定、借用规则或异步。这些建议再装上配套 skill：
+
+```bash
+npx skills add rust-best-practices
+npx skills add rust-async-patterns
+```
+:::
+
+## 里面有什么
+
+- **`SKILL.md`** —— 心智模型、从零搭建的工作流、一个最小可编译的应用模板、`element!` 要点、输入/状态指引、调色板中立的视觉打磨原则，以及一份陷阱清单。
+- **`references/`** —— 助手按需深入阅读的参考：每个内置组件及其精确 props、每个 Hook 的签名、宏语法、事件 / 状态 / 路由模型，以及构建精美 UI 的惯用法。
+
+## 怎么用
+
+直接把你想要的告诉助手就行：
+
+- *“用 ratatui-kit 起一个 todo 应用：一个文本输入框、j/k 列表、删除确认。”*
+- *“用路由给我的应用加第二个屏幕。”*
+- *“让这个弹窗独占键盘，打开时背景列表不再响应按键。”*
+
+助手会读取 skill，用对真实的 API 与惯用法（`element!` 宏、`#[component]`、`use_state` / `use_event_handler`、输入层、`routes!` 路由），并按 skill 的指引在交付前先确认代码能编译。

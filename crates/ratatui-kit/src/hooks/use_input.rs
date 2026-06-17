@@ -1,12 +1,12 @@
-//! 输入层与事件 handler 钩子：取代旧的 `use_events` / `use_local_events`。
-//!
-//! - [`UseInputLayer::use_input_layer`]：声明一个输入层（模态独占等)，返回**同帧**句柄。
-//! - [`UseEventHandler::use_event_handler`]：注册一个可消费的事件 handler。
-//!
-//! 两者均在组件函数体内经 `SystemContext` 当帧登记到 `InputRuntime`（取得守卫即用即弃)。
-//! 因此必须在 **context-aware** 的 `Hooks` 上调用：函数组件（`#[component]`)由宏自动
-//! `with_context_stack` 升级,开箱即用;**手写 `Component`** 需在 `update` 体内先
-//! `let mut hooks = hooks.with_context_stack(updater.component_context_stack());`。
+// 输入层与事件 handler 钩子：取代旧的 `use_events` / `use_local_events`。
+//
+// - [`UseInputLayer::use_input_layer`]：声明一个输入层（模态独占等)，返回**同帧**句柄。
+// - [`UseEventHandler::use_event_handler`]：注册一个可消费的事件 handler。
+//
+// 两者均在组件函数体内经 `SystemContext` 当帧登记到 `InputRuntime`（取得守卫即用即弃)。
+// 因此必须在 **context-aware** 的 `Hooks` 上调用：函数组件（`#[component]`)由宏自动
+// `with_context_stack` 升级,开箱即用;**手写 `Component`** 需在 `update` 体内先
+// `let mut hooks = hooks.with_context_stack(updater.component_context_stack());`。
 
 use std::{cell::Cell, rc::Rc};
 
@@ -25,21 +25,21 @@ mod private {
 }
 
 pub trait UseInputLayer: private::Sealed {
-    /// 声明一个输入层。`open=true` 时本帧参与分发;`blocks_lower=true` 时作为活跃栈顶截断更低层。
-    ///
-    /// 返回的 [`InputLayer`] 句柄仅**同帧**有效（每帧重新铸造)：可传给子树（`Modal` 的 `layer` prop)
-    /// 或本组件 handler 的 [`EventScope::Layer`]。**禁止**存入 `use_state` 跨帧使用。
+    // 声明一个输入层。`open=true` 时本帧参与分发;`blocks_lower=true` 时作为活跃栈顶截断更低层。
+    //
+    // 返回的 [`InputLayer`] 句柄仅**同帧**有效（每帧重新铸造)：可传给子树（`Modal` 的 `layer` prop)
+    // 或本组件 handler 的 [`EventScope::Layer`]。**禁止**存入 `use_state` 跨帧使用。
     fn use_input_layer(&mut self, open: bool, blocks_lower: bool) -> InputLayer;
 }
 
 pub trait UseEventHandler: private::Sealed {
-    /// 注册一个事件 handler。`scope` 决定归属层、`priority` 决定同层投递顺序;闭包返回
-    /// [`EventResult::Consumed`] 截断后续 handler。
+    // 注册一个事件 handler。`scope` 决定归属层、`priority` 决定同层投递顺序;闭包返回
+    // [`EventResult::Consumed`] 截断后续 handler。
     fn use_event_handler<F>(&mut self, scope: EventScope, priority: EventPriority, f: F)
     where
         F: FnMut(Event) -> EventResult + 'static;
 
-    /// 带选项（如鼠标 `hit_test` 命中过滤)的注册。
+    // 带选项（如鼠标 `hit_test` 命中过滤)的注册。
     fn use_event_handler_with_options<F>(
         &mut self,
         scope: EventScope,
@@ -50,7 +50,7 @@ pub trait UseEventHandler: private::Sealed {
         F: FnMut(Event) -> EventResult + 'static;
 }
 
-/// `use_input_layer` 的占位 hook：无跨帧状态,仅占用一个稳定的 hook 顺序槽（满足 React 式顺序规则)。
+// `use_input_layer` 的占位 hook：无跨帧状态,仅占用一个稳定的 hook 顺序槽（满足 React 式顺序规则)。
 struct UseInputLayerImpl;
 impl Hook for UseInputLayerImpl {}
 
@@ -63,8 +63,8 @@ impl UseInputLayer for Hooks<'_, '_> {
     }
 }
 
-/// `use_event_handler` 的 hook：跨帧持有 `Rc<Cell<Rect>>`,在 `pre_component_draw` 回填**上一帧** area
-/// 供鼠标 `hit_test`。闭包本身不跨帧保存（每帧经 `register_handler` 移交 `InputRuntime`,下帧重建)。
+// `use_event_handler` 的 hook：跨帧持有 `Rc<Cell<Rect>>`,在 `pre_component_draw` 回填**上一帧** area
+// 供鼠标 `hit_test`。闭包本身不跨帧保存（每帧经 `register_handler` 移交 `InputRuntime`,下帧重建)。
 struct UseEventHandlerImpl {
     area: Rc<Cell<Rect>>,
 }

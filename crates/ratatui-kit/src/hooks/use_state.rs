@@ -1,6 +1,6 @@
-//! 响应式状态管理 Hook 实现。
-//!
-//! 本模块为 ratatui-kit 提供了类似 React useState 的响应式状态管理能力，适用于计数器、输入框等本地状态。
+// 响应式状态管理 Hook 实现。
+//
+// 本模块为 ratatui-kit 提供了类似 React useState 的响应式状态管理能力，适用于计数器、输入框等本地状态。
 
 use std::task::Poll;
 
@@ -14,17 +14,17 @@ mod private {
     impl Sealed for crate::hooks::Hooks<'_, '_> {}
 }
 
-/// 响应式状态持有者。
+// 响应式状态持有者。
 pub type State<T> = ReactiveHandle<T, SingleWaker>;
-/// 状态的只读引用。
+// 状态的只读引用。
 pub type StateRef<'a, T> = ReactiveRef<'a, T, SingleWaker>;
-/// 状态的可变引用，支持变更通知。
+// 状态的可变引用，支持变更通知。
 pub type StateMutRef<'a, T> = ReactiveMutRef<'a, T, SingleWaker>;
-/// 状态的可变引用，不触发变更通知。
+// 状态的可变引用，不触发变更通知。
 pub type StateMutNoUpdate<'a, T> = ReactiveMutNoUpdate<'a, T, SingleWaker>;
 
 pub trait UseState: private::Sealed {
-    /// 为 [`Hooks`] 提供 use_state 方法，创建响应式状态。
+    // 为 [`Hooks`] 提供 use_state 方法，创建响应式状态。
     fn use_state<T, F>(&mut self, init: F) -> State<T>
     where
         F: FnOnce() -> T,
@@ -43,7 +43,7 @@ impl<T> UseStateImpl<T>
 where
     T: Unpin + Send + Sync + 'static,
 {
-    /// use_state 的内部实现，持有状态和存储。
+    // use_state 的内部实现，持有状态和存储。
     pub fn new(initial_value: T) -> Self {
         let storage = Owner::default();
         UseStateImpl {

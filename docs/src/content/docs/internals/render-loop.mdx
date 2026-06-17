@@ -1,15 +1,15 @@
 ---
-title: 渲染循环
-description: update、draw、wait、waker 和输入分发如何组成终端 UI runtime。
+title: Render Loop
+description: How update, draw, wait, waker, and input dispatch form the terminal UI runtime.
 sidebar:
   order: 1
 ---
 
 import Mermaid from '../../../components/Mermaid.astro';
 
-这一页面向框架贡献者和需要调试运行时的人。日常写应用时，先读 [组件模型](/ratatui-kit/core/component-model/)、[Hooks](/ratatui-kit/core/hooks/) 和 [输入层](/ratatui-kit/core/input-layers/) 就够了；只有当你要改 `render/`、`component/`、`hooks/` 或 `input/` 时，才需要把这里的调用链读完整。
+This page is for framework contributors and people debugging runtime behavior. For everyday app development, [Component Model](/ratatui-kit/core/component-model/), [Hooks](/ratatui-kit/core/hooks/), and [Input Layers](/ratatui-kit/core/input-layers/) are enough. Read this full call chain only when you are changing `render/`, `component/`, `hooks/`, or `input/`.
 
-Ratatui Kit 的 runtime 不是“每个组件自己重绘终端”。它只有一个根循环：先运行组件树的 `update`，再把树 `draw` 到 ratatui buffer，然后等待组件树变化或终端事件。
+Ratatui Kit's runtime is not "each component redraws the terminal on its own". There is one root loop: first run `update` on the component tree, then `draw` the tree into the ratatui buffer, then wait for either component-tree changes or terminal events.
 
 <Mermaid
 	chart={`
@@ -30,19 +30,19 @@ flowchart TD
     ctrlc -->|no| dispatch["input.dispatch(event)"]
     dispatch --> loop
 	`}
-	caption="一次循环包含 update、draw、退出检查、等待变化或事件；事件 dispatch 后无条件回到循环顶。"
+	caption="A loop contains update, draw, exit check, waiting for change or event; after event dispatch it always returns to the top."
 />
 
-## 一帧里发生什么
+## What happens in one frame
 
-`Tree::render()` 只做两件事：
+`Tree::render()` does only two things:
 
-1. `update_once(terminal)`：自顶向下运行组件 `update`，执行 hooks，协调子树，并重新登记本帧输入层和事件 handler。
-2. `terminal.draw(...)`：自顶向下运行 `draw`，把组件内容和子组件区域写到 ratatui frame。
+1. `update_once(terminal)`: runs component `update` top-down, executes hooks, reconciles the subtree, and registers this frame's input layers and event handlers again.
+2. `terminal.draw(...)`: runs `draw` top-down and writes component content and child areas into the ratatui frame.
 
-这两个阶段故意分开。`update` 可以读取 props、运行 hooks、登记输入和 context；`draw` 只负责把当前组件画进传入的 `ComponentDrawer`。不要在 `draw` 里创建需要参与下一帧调度的状态，也不要在 `update` 借用 `SystemContext` 期间分发事件。
+These two stages are intentionally separate. `update` can read props, run hooks, register input, and work with context; `draw` only draws the current component into the provided `ComponentDrawer`. Do not create state in `draw` that needs to participate in next-frame scheduling, and do not dispatch events while `SystemContext` is borrowed during `update`.
 
-源码入口：
+Source entry points:
 
 ```text
 crates/ratatui-kit/src/render/tree.rs
@@ -52,59 +52,59 @@ Tree::update_once
 Tree::draw_root
 ```
 
-## 终端抽象
+## Terminal abstraction
 
-应用入口来自 `ElementExt`：
+App entry starts from `ElementExt`:
 
 ```rust
 element!(App).fullscreen().await?;
 element!(App).render_loop(options).await?;
 ```
 
-`fullscreen()` 用默认 `CrossTerminal::new()` 进入 ratatui 全屏模式；`render_loop(options)` 用 `CrossTerminal::with_options(options)`，适合需要自定义 `TerminalOptions` 的场景。两者最后都会创建 `Terminal<CrossTerminal>`，然后进入同一个 `render_loop`。
+`fullscreen()` enters ratatui fullscreen mode with the default `CrossTerminal::new()`. `render_loop(options)` uses `CrossTerminal::with_options(options)`, which fits custom `TerminalOptions`. Both eventually create `Terminal<CrossTerminal>` and enter the same `render_loop`.
 
-底层分成三层：
+The lower layer has three parts:
 
-| 类型 | 职责 |
+| Type | Responsibility |
 | --- | --- |
-| `CrossTerminal` | 默认 crossterm + ratatui backend，负责 `ratatui::init` / `init_with_options`、draw、raw event stream |
-| `Terminal<T>` | 持有任意 `TerminalImpl`，向 runtime 暴露 `draw`、`insert_before` 和 `next_event` |
-| `TerminalImpl` | 自定义终端后端需要实现的 trait：事件流、Ctrl+C 判定、draw、前置插入区域 |
+| `CrossTerminal` | Default crossterm + ratatui backend; owns `ratatui::init` / `init_with_options`, draw, and raw event stream |
+| `Terminal<T>` | Holds any `TerminalImpl` and exposes `draw`, `insert_before`, and `next_event` to the runtime |
+| `TerminalImpl` | Trait for custom terminal backends: event stream, Ctrl+C detection, draw, and leading insert area |
 
-`Terminal` 不再保存长期事件订阅者。它只是 raw event source：`next_event()` 产出一个事件，runtime 先检查 `TerminalImpl::received_ctrl_c(event)`，再交给 `InputRuntime::dispatch(event)`。
+`Terminal` no longer stores long-lived event subscribers. It is only the raw event source: `next_event()` yields one event, the runtime checks `TerminalImpl::received_ctrl_c(event)`, then passes it to `InputRuntime::dispatch(event)`.
 
-update 阶段拿到的不是完整 `Terminal<T>`，而是对象安全的 `UpdaterTerminal` 投影。原因是组件树通过 trait object 分发，`ComponentUpdater` 不能带具体泛型终端；同时 update 阶段真正需要的终端能力只有 `insert_before`。普通组件应该通过 `use_insert_before()` 使用这条能力，不要直接依赖终端实现。
+During update, components do not receive the full `Terminal<T>`, but an object-safe `UpdaterTerminal` projection. The component tree is dispatched through trait objects, so `ComponentUpdater` cannot carry a concrete generic terminal type. Also, the update stage only needs one terminal ability: `insert_before`. Ordinary components should use `use_insert_before()` for this instead of depending directly on a terminal implementation.
 
-## update 阶段
+## Update stage
 
-每帧 update 开头先调用：
+At the beginning of every frame, update calls:
 
 ```rust
 self.system_context.input.begin_frame();
 ```
 
-这会清空上一帧的输入层和 handler，并铸造 root layer。随后才创建：
+This clears the previous frame's input layers and handlers and mints the root layer. Only after that does it create:
 
 ```rust
 let mut component_context_stack = ContextStack::root(&mut self.system_context);
 ```
 
-这个顺序很重要：`ContextStack::root` 会借走 `&mut SystemContext`，所以输入表必须在借用开始前重建。组件函数、hooks 和手写 `Component::update` 只能在这个 context 作用域内登记当帧资源。
+The order matters: `ContextStack::root` borrows `&mut SystemContext`, so the input table must be rebuilt before that borrow starts. Component functions, hooks, and handwritten `Component::update` calls can register frame resources only inside this context scope.
 
-`InstantiatedComponent::update` 的顺序是：
+`InstantiatedComponent::update` runs in this order:
 
-1. 创建 `ComponentUpdater`，它持有当前 key、context stack、终端投影、子组件表和 layout style。
-2. 跑 hooks 的 `pre_component_update`。
-3. 调用组件自己的 `update` 或宏生成的函数组件体。
-4. 跑 hooks 的 `post_component_update`。
-5. 记录本帧是否是 transparent layout。
-6. 如果是 transparent layout，就继承第一个子组件的 `LayoutStyle`；没有子节点时重置为默认 layout。
+1. Create `ComponentUpdater`, which holds the current key, context stack, terminal projection, child component table, and layout style.
+2. Run hooks' `pre_component_update`.
+3. Call the component's own `update` or the function component body generated by the macro.
+4. Run hooks' `post_component_update`.
+5. Record whether this frame uses transparent layout.
+6. If it is transparent layout, inherit the first child component's `LayoutStyle`; if there are no children, reset to the default layout.
 
-函数组件默认是 transparent layout。也就是说，函数组件本身更像逻辑包装器，真正参与父级布局的是它返回的根子组件。
+Function components are transparent layout by default. In other words, a function component itself is more like a logic wrapper; the root child component it returns is what actually participates in parent layout.
 
-## 协调子树
+## Reconciling children
 
-`ComponentUpdater::update_children` 是 Element 变成持久 Component 的地方：
+`ComponentUpdater::update_children` is where `Element` becomes persistent `Component`:
 
 ```text
 incoming Element
@@ -116,22 +116,22 @@ reuse old InstantiatedComponent       create new InstantiatedComponent
 update child with new props
 ```
 
-这解释了为什么列表要使用稳定 key。`Element` 每帧都会重建，但 `InstantiatedComponent` 会在 key 和类型都匹配时复用，hooks、局部状态和子树都跟着保留。key 相同但组件类型不同，会丢弃旧实例并创建新实例。
+This explains why lists need stable keys. `Element`s are rebuilt every frame, but `InstantiatedComponent`s are reused when key and type both match, preserving hooks, local state, and subtrees. If the key is the same but the component type differs, the old instance is discarded and a new one is created.
 
-更多使用层面的解释见 [组件模型](/ratatui-kit/core/component-model/) 和 [控制流](/ratatui-kit/core/control-flow/)。
+For usage-level explanation, see [Component Model](/ratatui-kit/core/component-model/) and [Control Flow](/ratatui-kit/core/control-flow/).
 
-## draw 阶段
+## Draw stage
 
-`InstantiatedComponent::draw` 的职责是把当前组件和子组件按区域画出来：
+`InstantiatedComponent::draw` draws the current component and its children into regions:
 
-1. 如果不是 transparent layout，先把 `margin` 和 `offset` 应用到当前区域。
-2. 跑 hooks 的 `pre_component_draw`。
-3. 调用组件自己的 `draw`。
-4. 调用 `calc_children_areas` 计算每个子组件的区域。
-5. 逐个把区域写入 drawer，并递归 draw 子组件。
-6. 跑 hooks 的 `post_component_draw`。
+1. If it is not transparent layout, apply `margin` and `offset` to the current region.
+2. Run hooks' `pre_component_draw`.
+3. Call the component's own `draw`.
+4. Call `calc_children_areas` to compute each child region.
+5. Write each region into the drawer and recursively draw children.
+6. Run hooks' `post_component_draw`.
 
-`calc_children_areas` 必须返回和子组件数量相同的 `Rect` 数组。运行时在 debug 下有断言：
+`calc_children_areas` must return the same number of `Rect`s as there are children. The runtime asserts this in debug mode:
 
 ```rust
 debug_assert_eq!(
@@ -141,11 +141,11 @@ debug_assert_eq!(
 );
 ```
 
-这是自定义布局组件最容易破坏的契约。`ScrollView`、`Modal` 和自定义 widget 类组件可以重写布局，但不能让区域数量和子节点数量不一致。
+This is the contract most easily broken by custom layout components. `ScrollView`, `Modal`, and custom widget components can override layout, but they must not return a region count that differs from the child count.
 
-## wait 和 waker
+## wait and waker
 
-draw 完成后，循环检查 `SystemContext::should_exit()`。如果没有退出，就等待两类信号：
+After draw completes, the loop checks `SystemContext::should_exit()`. If it should not exit, it waits for two kinds of signals:
 
 ```rust
 select(
@@ -154,19 +154,19 @@ select(
 )
 ```
 
-`root_component.wait()` 底层会 poll 整棵组件树的变化。`InstantiatedComponent::poll_change` 聚合三路：
+`root_component.wait()` ultimately polls the whole component tree for changes. `InstantiatedComponent::poll_change` aggregates three sources:
 
-| 来源 | 例子 | 作用 |
+| Source | Example | Purpose |
 | --- | --- | --- |
-| 组件自身 | 手写 `Component::poll_change` | 自定义异步或外部资源 |
-| 子组件 | 子树里任意状态变化 | 向上传播重新渲染需求 |
-| hooks | `use_state`、`use_future`、`use_async_state` | hooks 保存的响应式状态和任务 |
+| Component itself | Handwritten `Component::poll_change` | Custom async or external resources |
+| Children | Any state change in the subtree | Propagate redraw demand upward |
+| Hooks | `use_state`, `use_future`, `use_async_state` | Reactive state and tasks stored by hooks |
 
-这里不能写成短路判断。即使组件自身已经 `Ready`，子组件和 hooks 的 `Pending` 分支也必须在本轮注册 waker。否则后续变化可能没有唤醒目标，UI 会等到下一个无关事件才刷新。
+This must not be written as a short-circuit check. Even if the component itself is already `Ready`, the `Pending` branches for children and hooks must still register their wakers in the same poll. Otherwise later changes may have no target to wake, and the UI will refresh only after some unrelated event.
 
-## 输入事件为什么在 render 后分发
+## Why input events dispatch after render
 
-终端事件来自 `terminal.next_event()`。拿到事件后，runtime 先检查 `Ctrl+C`：
+Terminal events come from `terminal.next_event()`. After receiving an event, the runtime checks `Ctrl+C` first:
 
 ```rust
 if CrossTerminal::received_ctrl_c(event.clone()) {
@@ -174,34 +174,34 @@ if CrossTerminal::received_ctrl_c(event.clone()) {
 }
 ```
 
-`Ctrl+C` 先于 input layer，是进程级退出信号，不会被任何 handler 的 `Consumed` 吞掉。
+`Ctrl+C` is a process-level exit signal before input layers, so no handler's `Consumed` can swallow it.
 
-普通事件进入：
+Ordinary events enter:
 
 ```rust
 self.system_context.input.dispatch(event);
 continue;
 ```
 
-dispatch 发生在 `render()` 完整返回之后。此时 `ContextStack` 已经 drop，组件 update/draw 的借用期结束，事件 handler 里写 `State`、`AtomState` 或调用 `use_exit` 捕获到的退出函数都不会和 update 阶段重入借用。
+Dispatch happens only after `render()` has fully returned. At that point, `ContextStack` has been dropped and component update/draw borrows have ended, so handlers can write `State`, `AtomState`, or call an exit function captured from `use_exit` without re-entering the update borrow.
 
-dispatch 后必须无条件 `continue` 回到循环顶。原因是有些 handler 只做副作用或设置退出状态，不一定写入能唤醒 waker 的响应式 state。如果 dispatch 后继续阻塞在 `select`，这些事件就可能永远没有机会触发下一次 render 和退出检查。
+After dispatch, the loop must unconditionally `continue` to the top. Some handlers only perform side effects or set exit state and may not write reactive state that wakes a waker. If dispatch continued to block in `select`, those events might never trigger the next render and exit check.
 
-## 每帧重建输入表
+## Rebuilding the input table every frame
 
-输入系统不是订阅者长期挂在终端事件流上，而是每帧重建：
+The input system is not a set of subscribers hanging on the terminal event stream forever. It is rebuilt every frame:
 
-1. `begin_frame()` 清空上一帧的 layer 和 handler。
-2. 组件 update 期间用 `use_input_layer` 和 `use_event_handler` 重新登记。
-3. render 完成后，`dispatch` 只面对当前帧登记的候选。
-4. 下一帧重新开始。
+1. `begin_frame()` clears the previous frame's layers and handlers.
+2. During component update, `use_input_layer` and `use_event_handler` register again.
+3. After render completes, `dispatch` sees only the candidates registered for the current frame.
+4. The next frame starts over.
 
-这个设计解决两个问题：
+This design solves two problems:
 
-- 关闭的弹窗、卸载的组件和条件分支里的 handler 下一帧自然消失，不需要手动 unsubscribe。
-- 输入互斥由活跃 layer 栈决定，不会退化成“所有组件广播收到同一个键”。
+- Closed modals, unmounted components, and handlers in conditional branches disappear naturally on the next frame without manual unsubscribe.
+- Input exclusivity is decided by the active layer stack instead of degrading into "every component broadcasts the same key".
 
-分发顺序见 [输入层](/ratatui-kit/core/input-layers/)。实现入口在：
+See [Input Layers](/ratatui-kit/core/input-layers/) for dispatch order. Implementation entry points:
 
 ```text
 crates/ratatui-kit/src/input/mod.rs
@@ -210,16 +210,16 @@ InputRuntime::dispatch
 crates/ratatui-kit/src/hooks/use_input.rs
 ```
 
-## 贡献时守住这些不变量
+## Invariants for contributors
 
-| 不变量 | 破坏后会怎样 |
+| Invariant | What breaks if violated |
 | --- | --- |
-| `begin_frame` 必须早于 `ContextStack::root` | `SystemContext` 可变借用冲突，输入表无法按帧重建 |
-| dispatch 必须发生在 update/draw 之后 | handler 写状态可能和 context 借用重入 |
-| dispatch 后必须回到循环顶 | 退出型 handler 或纯副作用 handler 可能卡住 |
-| `poll_change` 必须 poll 组件、子树和 hooks 三路 | waker 注册丢失，后续变化不刷新 |
-| `calc_children_areas` 数量必须等于子组件数量 | 子组件绘制区域错位或被静默丢弃 |
-| transparent layout 空子树要重置 layout | 上一帧继承的 layout 可能污染下一帧 |
-| `ElementKey + TypeId` 才能复用组件实例 | 列表状态可能串台，或不该保留的状态被保留 |
+| `begin_frame` must run before `ContextStack::root` | Mutable borrow conflict on `SystemContext`; input table cannot be rebuilt per frame |
+| dispatch must happen after update/draw | Handler state writes can re-enter context borrows |
+| dispatch must return to the loop top | Exit handlers or side-effect-only handlers can stall |
+| `poll_change` must poll component, subtree, and hooks | Waker registration is lost and later changes do not refresh |
+| `calc_children_areas` count must equal child count | Child draw regions drift or are silently dropped |
+| transparent layout with an empty subtree must reset layout | Layout inherited from the previous frame can pollute the next frame |
+| `ElementKey + TypeId` are both required to reuse component instances | List state can cross rows, or state that should not be preserved is preserved |
 
-如果你在改 runtime 后遇到“状态写了但 UI 不醒”“弹窗背后还能响应键盘”“列表状态跳到别的行”“自定义布局少画一个子节点”，优先沿着上面这些不变量排查。
+If you change runtime code and then see "state was written but UI did not wake", "the background still responds behind a modal", "list state jumped to another row", or "custom layout skipped a child", start by checking these invariants.

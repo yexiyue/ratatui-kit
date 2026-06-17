@@ -92,8 +92,8 @@ mod tests {
         RouterHistory::new(ctx("/"), max_length)
     }
 
-    /// 回归:历史栈达到 `max_length` 后继续 push 不再越界 panic
-    /// （反复触发同一导航即复现旧 bug）。
+    // 回归:历史栈达到 `max_length` 后继续 push 不再越界 panic
+    // （反复触发同一导航即复现旧 bug）。
     #[test]
     fn push_far_past_max_length_never_panics() {
         let mut h = new_history(10);
@@ -106,7 +106,7 @@ mod tests {
         assert_eq!(h.current_context().path, "/r99");
     }
 
-    /// 回归:在历史中部(back 之后)继续 push 同样不越界。
+    // 回归:在历史中部(back 之后)继续 push 同样不越界。
     #[test]
     fn back_then_push_stays_in_bounds() {
         let mut h = new_history(10);
