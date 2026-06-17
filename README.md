@@ -89,7 +89,7 @@ The default feature set is intentionally empty. Enable only the capabilities you
 
 ### Counter example
 
-```rust
+```rust,no_run
 use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,

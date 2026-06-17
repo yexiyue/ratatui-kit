@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-kit"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/yexiyue/ratatui-kit"
@@ -14,7 +14,7 @@ readme = "README.md"
 futures = "0.3.32"
 generational-box = "0.7.9"
 any_key = "0.1.1"
-ratatui-kit-macros = { version = "0.6.0", path = "../ratatui-kit-macros" }
+ratatui-kit-macros = { version = "0.6.1", path = "../ratatui-kit-macros" }
 crossterm = { version = "0.29.0", features = ["event-stream"] }
 regex = { version = "1.12.4", optional = true }
 ratatui = "0.30.1"
@@ -26,6 +26,9 @@ tui-widget-list = { version = "0.15.2", optional = true }
 [dev-dependencies]
 # proc-macro 的 UI 编译测试（pass/compile_fail）。失败用例只断言本库稳定报错。
 trybuild = "1.0"
+# README 的 Counter 示例用 `#[tokio::main]`;doctest 标 `no_run`(只编译验证、不真正跑 fullscreen),
+# 但仍需 tokio 才能编译过该示例。
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 [features]
 default = []
