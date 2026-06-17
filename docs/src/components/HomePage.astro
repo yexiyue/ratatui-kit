@@ -1,49 +1,340 @@
 ---
-const pillars = [
+import { Code } from 'astro:components';
+import { RK_VERSION } from '../consts';
+
+const rawBaseUrl = import.meta.env.BASE_URL;
+const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
+const recording = (name: string) => `${baseUrl}recordings/${name}.gif`;
+const repoUrl = 'https://github.com/yexiyue/ratatui-kit';
+
+// Dual light/dark code highlighting: light page → light theme, dark page → dark
+// theme (toggled by the CSS below via --shiki-dark).
+const codeThemes = { light: 'github-light-default', dark: 'github-dark-default' };
+
+// Real code: the input-layer API from examples/input/input_mutex.rs (framework-level input mutex)
+const layerCode = `// Request an input layer when entering edit mode
+let edit_layer = hooks.use_input_layer(editing.get(), true);
+
+// The handler only receives key events while this layer is active
+hooks.use_event_handler(
+    EventScope::Layer(edit_layer),
+    EventPriority::High,
+    move |event| {
+        let Event::Key(key) = event else {
+            return EventResult::Ignored;
+        };
+        match key.code {
+            KeyCode::Enter => editing.set(false),
+            KeyCode::Char(c) => draft.write().push(c),
+            _ => {}
+        }
+        // The background list never sees these keys
+        EventResult::Consumed
+    },
+);`;
+
+const features = [
 	{
-		title: 'Declarative UI',
-		text: 'Build terminal screens from component trees with `element!`, first-class control flow, props, and stable keys.',
+		span: 'lg',
+		token: 'element!',
+		title: 'Declarative syntax',
+		text: 'A JSX-style proc-macro — describe UI with data instead of hand-written draw calls. A syntax you already know, compiling component trees into terminal layout.',
+		points: [
+			'if / for / match are first-class inside child blocks',
+			'{ expr } embeds any Rust expression returning an Element',
+			'widget() / stateful() bridge native ratatui widgets',
+		],
 	},
 	{
-		title: 'Reactive hooks',
-		text: 'Keep local state, async tasks, effects, memoized values, context, and input handlers attached to component instances.',
+		span: 'wide',
+		token: 'use_state · use_future',
+		title: 'Hooks & state',
+		text: 'use_state, use_future, use_effect and custom hooks are organized by call order. State handles are Copy, support operator overloading like count += 1, and release automatically when the component unmounts.',
 	},
 	{
-		title: 'Input isolation',
-		text: 'Use layers and consumable handlers so modals, search boxes, and edit modes do not leak keys to background views.',
+		span: 'wide',
+		token: 'use_input_layer',
+		title: 'Input-layer mutex',
+		text: 'Events are no longer broadcast to every component — they route to the active input layer. Request a layer when opening a modal or entering edit mode, and the background list yields the keyboard, killing focus contention at the root.',
 	},
 	{
-		title: 'Ratatui-native escape hatches',
-		text: 'Drop down to native widgets or hand-written components when the built-in abstractions should stay out of your way.',
+		span: 'wide',
+		token: 'Waker',
+		title: 'Reactive rendering',
+		text: 'State writes wake the render loop, so the framework only repaints on real change instead of imperatively redrawing. generational-box-based reactive handles let a terminal UI update on demand, like a frontend framework.',
+	},
+	{
+		span: 'sm',
+		token: 'Select · Modal',
+		title: 'Built-in components',
+		text: 'Layout, input, overlays, selection and virtual lists work out of the box — business-neutral and composable.',
+	},
+	{
+		span: 'sm',
+		token: 'RouterProvider · Atom',
+		title: 'Routing & global state',
+		text: 'Router manages multiple pages and a history stack; Atom manages business state shared across pages.',
 	},
 ];
 
-const paths = [
+// All built-in components: used by the "component showcase" scroll switcher. Snippets are taken from real usage in each component's docs.
+const components = [
 	{
-		title: 'Start with a counter',
-		href: 'start/quick-start/',
-		text: 'Run the smallest reactive app and see state writes wake the render loop.',
+		name: 'View · Border · Text',
+		desc: 'The most basic layout and text primitives: flex containers, bordered grouping, paragraph rendering — slicing the component tree into predictable terminal regions.',
+		gif: null,
+		href: 'components/layout-primitives/',
+		example: 'hello_world',
+		code: `View(flex_direction: Direction::Vertical, gap: 1) {
+    Text(text: "header")
+    View(height: Constraint::Fill(1)) {
+        Text(text: "body")
+    }
+    Text(text: "footer")
+}`,
 	},
 	{
-		title: 'Learn the runtime model',
-		href: 'core/component-model/',
-		text: 'Understand elements, components, instantiated nodes, hooks, keys, and transparent layout.',
+		name: 'ScrollView',
+		desc: 'Scrollable container: content beyond the viewport renders into a larger buffer first, then displays by offset — supports j/k, paging and a scrollbar.',
+		gif: 'scrollview',
+		href: 'components/scroll-view/',
+		example: 'scrollview',
+		code: `ScrollView(
+    flex_direction: Direction::Vertical,
+    block: Block::bordered(),
+) {
+    for (i, row) in rows.iter().enumerate() {
+        View(key: i, height: Constraint::Length(1)) {
+            Text(text: row)
+        }
+    }
+}`,
 	},
 	{
-		title: 'Handle real input',
-		href: 'tutorials/input-mutex/',
-		text: 'Use input layers to coordinate lists, modals, and edit modes without shortcut conflicts.',
+		name: 'WrappedText',
+		desc: 'Long body text: hard-wraps at a given width, then writes the real line count back into layout height so the outer ScrollView computes the scroll range correctly.',
+		gif: 'wrapped-text',
+		href: 'components/wrapped-text/',
+		example: 'wrapped_text',
+		code: `ScrollView(scroll_view_state: scroll_state, block: Block::bordered()) {
+    WrappedText(
+        text: BODY,
+        wrap_width: 72,
+        style: Style::new().white(),
+    )
+}`,
 	},
 	{
-		title: 'Compose a full app',
-		href: 'apps/todo-app/',
-		text: 'Combine state, search input, confirmation modals, and routing into a complete workflow.',
+		name: 'Input',
+		desc: 'Display component for a single-line input box, rendering tui_input state; writing, submitting and exiting are all driven by the page handler.',
+		gif: 'input',
+		href: 'components/input/',
+		example: 'input',
+		code: `Border(height: Constraint::Length(3)) {
+    Input(
+        input: input.read().clone(),
+        placeholder: "Type and press Enter".to_string(),
+        cursor_style: Style::new().bg(Color::Yellow),
+    )
+}`,
+	},
+	{
+		name: 'SearchInput',
+		desc: 'Search box with an edit mode: press s to enter input and open an exclusive layer — wraps activation, submission, clearing, validation and input mutex.',
+		gif: 'search-input',
+		href: 'components/search-input/',
+		example: 'search_input',
+		code: `SearchInput(
+    value: query.read().to_string(),
+    placeholder: "Press s to search".to_string(),
+    on_change: move |next: String| query.set(next),
+    on_submit: move |value: String| {
+        submitted.set(value);
+        true
+    },
+)`,
+	},
+	{
+		name: 'Modal',
+		desc: 'Low-level overlay: draws the backdrop, positions content and provides the current input layer to its subtree — confirm and close logic are composed on top.',
+		gif: 'modal',
+		href: 'components/modal/',
+		example: 'modal',
+		code: `Modal(
+    open: open.get(),
+    width: Constraint::Length(68),
+    height: Constraint::Length(12),
+) {
+    Border(top_title: Line::from("Details").centered()) {
+        Text(text: Line::from("Modal content"))
+    }
+}`,
+	},
+	{
+		name: 'ConfirmModal',
+		desc: 'Confirmation dialog: builds an exclusive input layer internally, wrapping confirm/cancel, button focus switching and input mutex — controlled by open.',
+		gif: 'confirm-modal',
+		href: 'components/confirm-modal/',
+		example: 'confirm_modal',
+		code: `ConfirmModal(
+    open: confirm_open.get(),
+    title: Line::from("Delete release?"),
+    content: format!("Remove {selected_label}?"),
+    confirm_text: "Delete".to_string(),
+    on_confirm: move |_: ()| confirm_open.set(false),
+    on_cancel: move |_: ()| confirm_open.set(false),
+)`,
+	},
+	{
+		name: 'AlertModal',
+		desc: 'Notice dialog: no confirm/cancel buttons, just shows a message and fires on_close when the close key is pressed, intercepting lower-layer input meanwhile.',
+		gif: 'alert-modal',
+		href: 'components/alert-modal/',
+		example: 'alert_modal',
+		code: `AlertModal(
+    open: alert_open.get(),
+    title: Line::from("Workspace is current"),
+    message: format!("{selected_label} is synced."),
+    on_close: move |_: ()| alert_open.set(false),
+)`,
+	},
+	{
+		name: 'ShortcutInfoModal',
+		desc: 'Shortcut help dialog: shows shortcuts grouped by section; when content overflows it scrolls via an internal ScrollView while keeping the modal input mutex.',
+		gif: 'shortcut-info-modal',
+		href: 'components/shortcut-info-modal/',
+		example: 'shortcut_info_modal',
+		code: `ShortcutInfoModal(
+    open: shortcuts_open.get(),
+    title: Line::from("Shortcut reference"),
+    sections: vec![ShortcutInfoSection::new(
+        "Navigation",
+        [("Down", "j"), ("Up", "k")],
+    )],
+    on_close: move |_: ()| shortcuts_open.set(false),
+)`,
+	},
+	{
+		name: 'Select',
+		desc: 'Single-select list: holds a ListState internally, turning j/k, arrow keys, Home/End and Enter into list navigation and a select callback.',
+		gif: 'select',
+		href: 'components/select/',
+		example: 'select',
+		code: `Select<&'static str>(
+    items: items,
+    default_index: Some(1),
+    highlight_symbol: "> ",
+    empty_message: "No environments",
+    on_select: move |item: &'static str| {
+        selected.set(item);
+    },
+)`,
+	},
+	{
+		name: 'MultiSelect',
+		desc: 'Multi-select list: interaction has two levels — Space toggles the draft selection (fires on_change), Enter commits the selection (fires on_select).',
+		gif: 'multi-select',
+		href: 'components/multi-select/',
+		example: 'multi_select',
+		code: `MultiSelect<&'static str>(
+    items: items,
+    highlight_symbol: "> ",
+    on_change: move |items: Vec<&'static str>| {
+        selected_count.set(items.len());
+    },
+    on_select: move |items: Vec<&'static str>| {
+        submitted.set(items.len());
+    },
+)`,
+	},
+	{
+		name: 'TreeSelect',
+		desc: 'Tree selection (tree feature): reuses tui-tree-widget for hierarchical navigation, collapse/expand, path-style selection and input mutex.',
+		gif: 'tree-select',
+		href: 'components/tree-select/',
+		example: 'tree_select',
+		code: `TreeSelect<&'static str>(
+    active: true,
+    items: demo_items(),
+    default_selection: vec!["components", "select"],
+    node_open_symbol: "- ",
+    node_closed_symbol: "+ ",
+    on_select: move |id: &'static str| {
+        submitted.set(id);
+    },
+)`,
+	},
+	{
+		name: 'VirtualList',
+		desc: 'Long list (virtual-list feature): reuses tui-widget-list to render only the visible window — handles tens of thousands of rows with custom row rendering.',
+		gif: 'virtual-list',
+		href: 'components/virtual-list/',
+		example: 'virtual_list',
+		code: `VirtualList<Line<'static>>(
+    item_count: 10_000,
+    default_index: Some(42),
+    render_item: |ctx: &ListBuildContext| {
+        let style = if ctx.is_selected {
+            Style::new().black().on_green()
+        } else {
+            Style::new()
+        };
+        (Line::styled(format!("row {:05}", ctx.index + 1), style), 1u16)
+    },
+)`,
+	},
+	{
+		name: 'VirtualMultiSelect',
+		desc: 'Composition for multi-selecting a long list: VirtualList manages the cursor and windowed rendering, while business code keeps the selection set in an external HashSet.',
+		gif: 'virtual-multi-select',
+		href: 'components/virtual-multi-select/',
+		example: 'virtual_multi_select',
+		code: `VirtualList<Line<'static>>(
+    state: list_state,
+    item_count: item_count,
+    render_item: move |ctx: &ListBuildContext| {
+        let mark = if selected.contains(&ctx.index) { "[x]" } else { "[ ]" };
+        (Line::styled(format!("{mark} Row {:05}", ctx.index + 1), Style::default()), 1u16)
+    },
+)`,
 	},
 ];
 
-const counterCode = `#[component]
+const pathItems = [
+	{ title: 'Get it running', href: 'start/quick-start/', text: 'Build component intuition from hello world and counter.' },
+	{ title: 'Understand the core model', href: 'core/component-model/', text: 'Grasp the boundaries of element, component, hooks, context and the render loop.' },
+	{ title: 'Handle real input', href: 'tutorials/input-mutex/', text: 'Use input layers to resolve event ownership between modals, lists and edit modes.' },
+	{ title: 'Extend the framework layer', href: 'advanced/custom-hook/', text: 'Distill providers, hooks and widgets to turn business constraints into reusable capability.' },
+];
+
+// Act one, "the collapse": the same counter that increments every second.
+// Left: the imperative plain-ratatui version where you manage the terminal lifecycle, render loop, timer and event polling by hand.
+const rawCode = `fn main() -> std::io::Result<()> {
+    let mut terminal = ratatui::init(); // enter / exit the terminal by hand
+    let mut count = 0_u64;              // state scattered across main
+    let mut last = Instant::now();      // keep your own timer
+    loop {                             // hand-written render loop
+        terminal.draw(|f| ui(f, count))?;
+        if last.elapsed() >= Duration::from_secs(1) {
+            count += 1;                // advance state manually
+            last = Instant::now();
+        }
+        if event::poll(Duration::from_millis(50))? {
+            if let Event::Key(k) = event::read()? {
+                if k.code == KeyCode::Char('q') {
+                    break;             // handle exit yourself
+                }
+            }
+        }
+    }
+    ratatui::restore();               // don't forget to restore the terminal
+    Ok(())
+}`;
+
+// Right: the declarative ratatui-kit core. The runtime owns the terminal, loop and exit — you only describe state and UI.
+const kitCoreCode = `#[component]
 fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let mut count = hooks.use_state(|| 0);
+    let mut count = hooks.use_state(|| 0_u64);
 
     hooks.use_future(async move {
         loop {
@@ -52,254 +343,2135 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         }
     });
 
-    element!(Text(text: format!("Counter: {}", count.get())))
+    element!(
+        Border(border_style: Style::new().yellow()) {
+            Text(text: Line::from(format!("Counter: {:02}", count.get())))
+        }
+    )
 }`;
+
+// The left copy switches between the two acts as you scroll (matching the two snippets in the right code window).
+const rawNarr = {
+	kicker: 'plain ratatui · manual',
+	title: 'You do everything yourself',
+	text: 'Enter and exit the terminal, hand-write the render loop, keep a timer with Instant, poll and dispatch every key — before the counter even starts, boilerplate already fills main.',
+};
+const kitNarr = {
+	kicker: 'ratatui-kit · automatic',
+	title: 'Just describe state and UI',
+	text: 'use_state holds state, use_future runs async, element! declares the UI. Terminal lifecycle, render loop and exit are handled by the runtime — the same counter, half the code.',
+};
+
+// Act two, "running in three steps": install → write a component → run.
+const cargoTomlCode = `[dependencies]
+ratatui-kit = "${RK_VERSION}"
+tokio = { version = "1", features = [
+    "rt-multi-thread", "macros", "time",
+] }`;
+
+const counterFileCode = `use ratatui_kit::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    element!(Counter).fullscreen().await.unwrap();
+}
+
+#[component]
+fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut count = hooks.use_state(|| 0_u64);
+
+    hooks.use_future(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            count += 1;
+        }
+    });
+
+    element!(
+        Border(border_style: Style::new().yellow()) {
+            Text(text: Line::from(format!("Counter: {:02}", count.get())))
+        }
+    )
+}`;
+
+const qsSteps = [
+	{
+		n: '01',
+		title: 'Add the dependency',
+		text: 'Add ratatui-kit and Tokio to Cargo.toml. The framework enables no feature by default — turn on router, atom, input and so on as needed.',
+	},
+	{
+		n: '02',
+		title: 'Write your first component',
+		text: 'use_state holds state, use_future runs async, element! declares UI. Component instances are retained across frames by the runtime, and writing state wakes rendering automatically.',
+	},
+	{
+		n: '03',
+		title: 'Run it',
+		text: 'cargo run, and the terminal goes fullscreen. The counter increments every second — press q to quit, Ctrl+C to force-stop, and the terminal restores on exit.',
+	},
+];
 ---
 
-<section class="rk-en-home" aria-labelledby="rk-en-title">
-	<div class="rk-en-home__hero">
-		<div>
-			<p class="rk-en-home__eyebrow">Ratatui component framework</p>
-			<h1 id="rk-en-title">Build terminal apps with components, hooks, and async state.</h1>
-			<p class="rk-en-home__lead">
-				Ratatui Kit adds React-style composition, identity, state retention, scoped input routing, and
-				Tokio-friendly rendering on top of Ratatui.
+<div class="rk-home" data-rk-home>
+	<div class="rk-home__grain" aria-hidden="true"></div>
+
+	<section class="rk-hero" aria-labelledby="rk-home-title">
+		<div class="rk-hero__copy">
+			<p class="rk-brand" data-rk-reveal>
+				<span class="rk-brand__mark" aria-hidden="true">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 724" aria-hidden="true">
+<path d="M0,0 L434,0 L454,3 L474,9 L497,20 L511,30 L525,42 L535,53 L547,70 L558,93 L564,113 L567,133 L567,591 L564,611 L558,631 L547,654 L537,668 L525,682 L514,692 L497,704 L474,715 L454,721 L434,724 L0,724 L-20,721 L-40,715 L-63,704 L-77,694 L-91,682 L-101,671 L-113,654 L-124,631 L-130,611 L-133,591 L-133,133 L-130,113 L-124,93 L-113,70 L-103,56 L-91,42 L-80,32 L-63,20 L-40,9 L-20,3 Z " fill="#064A4F" transform="translate(133,0)"/>
+<path d="M0,0 L96,0 L96,160 L93,180 L87,200 L76,223 L66,237 L54,251 L43,261 L26,273 L3,284 L-17,290 L-37,293 L-195,292 L-195,200 L-189,188 L-180,178 L-158,156 L-151,148 L-125,122 L-118,114 L-95,91 L-88,83 L-67,62 L-60,54 L-36,30 L-29,22 L-12,5 L-4,1 Z " fill="#FCA91C" transform="translate(604,431)"/>
+<path d="M0,0 L8,0 L19,3 L28,9 L43,23 L56,35 L71,49 L86,63 L99,75 L114,89 L126,100 L143,116 L158,130 L171,142 L187,157 L200,169 L215,183 L228,195 L236,203 L241,213 L243,222 L242,233 L238,243 L231,252 L216,267 L208,274 L175,307 L167,314 L142,339 L134,346 L108,372 L100,379 L76,403 L68,410 L44,434 L36,441 L30,446 L22,450 L17,451 L5,451 L-6,447 L-15,440 L-21,430 L-23,424 L-23,408 L-18,396 L-9,386 L8,369 L15,361 L72,304 L79,296 L133,242 L137,234 L139,226 L138,215 L134,206 L127,198 L120,191 L112,184 L96,169 L81,155 L65,140 L52,128 L37,114 L22,100 L9,88 L-7,73 L-22,59 L-28,49 L-30,43 L-31,34 L-29,24 L-24,14 L-20,9 L-11,3 Z " fill="#FCF8EF" transform="translate(146,128)"/>
+<path d="M0,0 L7,0 L7,60 L4,80 L-2,100 L-10,99 L-22,93 L-32,84 L-39,73 L-43,61 L-44,56 L-44,45 L-41,33 L-36,23 L-27,13 L-18,6 L-9,2 Z " fill="#064A4F" transform="translate(693,531)"/>
+<path d="M0,0 L12,2 L20,7 L26,14 L30,24 L30,35 L27,44 L18,54 L9,58 L-1,59 L-11,56 L-20,50 L-26,40 L-27,37 L-27,22 L-22,12 L-17,7 L-9,2 Z " fill="#064A4F" transform="translate(557,565)"/>
+<path d="M0,0 L8,1 L14,5 L18,12 L18,20 L13,28 L7,31 L-3,31 L-10,26 L-13,20 L-13,13 L-9,5 L-4,1 Z " fill="#064A4F" transform="translate(501,634)"/>
+</svg>
+				</span>
+				<span class="rk-brand__word">RATATUI KIT</span>
 			</p>
-			<div class="rk-en-home__actions">
-				<a class="rk-en-home__button rk-en-home__button--primary" href="start/quick-start/">Quick start</a>
-				<a class="rk-en-home__button" href="components/">Browse components</a>
+			<h1 id="rk-home-title" data-rk-reveal style="--i:1">Write terminal UIs as composable apps</h1>
+			<p class="rk-hero__lead" data-rk-reveal style="--i:2">
+				Components, hooks, input layers, routing and global state — the React-style model you already
+				know, built on top of Ratatui and Tokio.
+			</p>
+			<div class="rk-actions" data-rk-reveal style="--i:3" aria-label="Homepage actions">
+				<a class="rk-button rk-button--primary" data-magnetic href={`${baseUrl}start/quick-start/`}>
+					<span>Get started</span>
+					<span class="rk-button__icon" aria-hidden="true">→</span>
+				</a>
+				<a class="rk-button rk-button--ghost" href={repoUrl} target="_blank" rel="noreferrer">
+					<span>View on GitHub</span>
+					<span class="rk-button__icon" aria-hidden="true">↗</span>
+				</a>
 			</div>
 		</div>
-		<pre class="rk-en-home__code" aria-label="Ratatui Kit counter sketch"><code>{counterCode}</code></pre>
-	</div>
 
-	<div class="rk-en-home__grid" aria-label="Framework pillars">
-		{pillars.map((pillar) => (
-			<article>
-				<h2>{pillar.title}</h2>
-				<p>{pillar.text}</p>
-			</article>
-		))}
-	</div>
-
-	<section class="rk-en-home__path" aria-labelledby="rk-en-path-title">
-		<div>
-			<p class="rk-en-home__eyebrow">Learning path</p>
-			<h2 id="rk-en-path-title">From one component to a complete terminal workflow</h2>
-		</div>
-		<ol>
-			{paths.map((item) => (
-				<li>
-					<a href={item.href}>{item.title}</a>
-					<p>{item.text}</p>
-				</li>
-			))}
-		</ol>
+		<figure class="rk-window rk-window--term rk-hero__window" data-rk-reveal style="--i:2">
+			<div class="rk-window__bar">
+				<span class="rk-window__dots"><i></i><i></i><i></i></span>
+				<span class="rk-window__name">cargo run --example todo_app</span>
+			</div>
+			<div class="rk-window__screen">
+				<img
+					src={recording('todo-app')}
+					alt="Recording of a todo app built with ratatui-kit: add/remove tasks, filter and toggle status"
+					loading="eager"
+					decoding="async"
+				/>
+			</div>
+		</figure>
 	</section>
-</section>
+
+	<section class="rk-qs" aria-labelledby="rk-qs-title">
+		{/* Act one: left copy + single right code window, scroll progress drives a typewriter (types raw in the first half, switches copy and retypes kit in the second) */}
+		<div class="rk-qs-act rk-qs-act--versus" data-qs-act1 data-phase="raw">
+			<div class="rk-qs-act__sticky">
+				<header class="rk-qs-head">
+					<p class="rk-qs-eyebrow" data-rk-reveal>Quick start</p>
+					<h2 id="rk-qs-title" data-rk-reveal style="--i:1">The same counter, half the code</h2>
+				</header>
+
+				<div class="rk-qs-split">
+					<div class="rk-qs-narrate">
+						<div class="rk-qs-copy" data-qs-copy="raw">
+							<span class="rk-qs-copy__kicker">{rawNarr.kicker}</span>
+							<h3 class="rk-qs-copy__title">{rawNarr.title}</h3>
+							<p>{rawNarr.text}</p>
+						</div>
+						<div class="rk-qs-copy" data-qs-copy="kit">
+							<span class="rk-qs-copy__kicker">{kitNarr.kicker}</span>
+							<h3 class="rk-qs-copy__title">{kitNarr.title}</h3>
+							<p>{kitNarr.text}</p>
+						</div>
+						<div class="rk-qs-switch" aria-hidden="true">
+							<span class="rk-qs-switch__tab" data-phase="raw">plain ratatui</span>
+							<span class="rk-qs-switch__tab" data-phase="kit">ratatui-kit</span>
+							<span class="rk-qs-switch__bar"><span class="rk-qs-switch__fill" data-qs-phasefill></span></span>
+						</div>
+					</div>
+
+					<figure class="rk-window rk-window--code rk-qs-typer">
+						<div class="rk-window__bar">
+							<span class="rk-window__dots"><i></i><i></i><i></i></span>
+							<span class="rk-window__name" data-qs-title>main.rs · plain ratatui</span>
+						</div>
+						<div class="rk-window__body rk-code rk-qs-typer__body">
+							<div class="rk-qs-codelayer" data-qs-code="raw">
+								<Code code={rawCode} lang="rust" themes={codeThemes} />
+							</div>
+							<div class="rk-qs-codelayer" data-qs-code="kit">
+								<Code code={kitCoreCode} lang="rust" themes={codeThemes} />
+							</div>
+						</div>
+					</figure>
+				</div>
+			</div>
+		</div>
+
+		{/* Act two: three steps to run — step progress advances with scroll, code window and terminal window switch in sync */}
+		<div class="rk-qs-act rk-qs-act--steps" data-qs-act2 data-step="1">
+			<div class="rk-qs-act2__grid">
+				<div class="rk-qs-rail">
+					<p class="rk-qs-rail__lead" data-rk-reveal>From an empty directory to a moving terminal — three steps.</p>
+					<ol class="rk-qs-steps" data-qs-steps>
+						<span class="rk-qs-steps__track" aria-hidden="true"><span class="rk-qs-steps__fill" data-qs-fill></span></span>
+						{qsSteps.map((step, index) => (
+							<li class="rk-qs-step" data-qs-step={index + 1}>
+								<span class="rk-qs-step__dot" aria-hidden="true">{step.n}</span>
+								<div class="rk-qs-step__body">
+									<span class="rk-qs-step__title">{step.title}</span>
+									<p>{step.text}</p>
+								</div>
+							</li>
+						))}
+					</ol>
+				</div>
+
+				<div class="rk-qs-stage">
+					<div class="rk-qs-panel" data-qs-panel="1">
+						<figure class="rk-window rk-window--code">
+							<div class="rk-window__bar">
+								<span class="rk-window__dots"><i></i><i></i><i></i></span>
+								<span class="rk-window__name">Cargo.toml</span>
+							</div>
+							<div class="rk-window__body rk-code">
+								<Code code={cargoTomlCode} lang="toml" themes={codeThemes} />
+							</div>
+						</figure>
+					</div>
+					<div class="rk-qs-panel" data-qs-panel="2">
+						<figure class="rk-window rk-window--code">
+							<div class="rk-window__bar">
+								<span class="rk-window__dots"><i></i><i></i><i></i></span>
+								<span class="rk-window__name">src/main.rs</span>
+							</div>
+							<div class="rk-window__body rk-code">
+								<Code code={counterFileCode} lang="rust" themes={codeThemes} />
+							</div>
+						</figure>
+					</div>
+					<div class="rk-qs-panel" data-qs-panel="3">
+						<figure class="rk-window rk-window--term">
+							<div class="rk-window__bar">
+								<span class="rk-window__dots"><i></i><i></i><i></i></span>
+								<span class="rk-window__name">cargo run --example counter</span>
+							</div>
+							<div class="rk-window__screen">
+								<img
+									src={recording('counter')}
+									alt="Recording of the counter example incrementing every second, press q to quit"
+									loading="lazy"
+									decoding="async"
+								/>
+							</div>
+						</figure>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="rk-system" aria-labelledby="rk-system-title">
+		<header class="rk-section-copy">
+			<h2 id="rk-system-title" data-rk-reveal>Write terminal UIs like a frontend app</h2>
+			<p data-rk-reveal style="--i:1">
+				Ratatui Kit doesn't replace Ratatui — it adds component updates, state management and event
+				routing on top, so even large terminal apps stay clearly structured.
+			</p>
+		</header>
+
+		<div class="rk-feat" aria-label="Framework capabilities">
+			{features.map((feature, index) => (
+				<article class={`rk-feat-card rk-feat-card--${feature.span}`} data-spot data-rk-reveal style={`--i:${index % 3}`}>
+					<code class="rk-feat-card__token" aria-hidden="true">{feature.token}</code>
+					<h3 class="rk-feat-card__title">{feature.title}</h3>
+					<p>{feature.text}</p>
+					{feature.points && (
+						<ul class="rk-feat-card__points">
+							{feature.points.map((pt) => (
+								<li>{pt}</li>
+							))}
+						</ul>
+					)}
+				</article>
+			))}
+		</div>
+	</section>
+
+	<section class="rk-layer" aria-labelledby="rk-layer-title">
+		<div class="rk-layer__copy">
+			<h2 id="rk-layer-title" data-rk-reveal>Events route by layer, not broadcast</h2>
+			<p data-rk-reveal style="--i:1">
+				When you open a modal or enter edit mode, the framework hands the keyboard to the active layer
+				and background components yield input automatically. These few lines are exactly what
+				<code>examples/input/input_mutex.rs</code> does.
+			</p>
+			<a class="rk-textlink" data-rk-reveal style="--i:2" href={`${baseUrl}core/input-layers/`}>
+				Read the input-layer reference
+				<span aria-hidden="true">→</span>
+			</a>
+		</div>
+
+		<div class="rk-layer__demo">
+			<div class="rk-window rk-window--code" data-spot data-rk-reveal>
+				<div class="rk-window__bar">
+					<span class="rk-window__dots"><i></i><i></i><i></i></span>
+					<span class="rk-window__name">input_mutex.rs</span>
+				</div>
+				<div class="rk-window__body rk-code">
+					<Code code={layerCode} lang="rust" themes={codeThemes} />
+				</div>
+			</div>
+
+			<figure class="rk-window rk-window--term" data-rk-reveal style="--i:1">
+				<div class="rk-window__bar">
+					<span class="rk-window__dots"><i></i><i></i><i></i></span>
+					<span class="rk-window__name">cargo run --example input_mutex</span>
+				</div>
+				<div class="rk-window__screen">
+					<img
+						src={recording('input_mutex')}
+						alt="Recording where a modal takes over key events and the background list stops responding to input"
+						loading="lazy"
+						decoding="async"
+					/>
+				</div>
+			</figure>
+		</div>
+	</section>
+
+	<section class="rk-deck-section" aria-labelledby="rk-deck-title">
+		<header class="rk-section-copy">
+			<h2 id="rk-deck-title" data-rk-reveal>Most components you need are already built in</h2>
+			<p data-rk-reveal style="--i:1">
+				From layout primitives to virtual lists, {components.length} built-in components stay
+				business-neutral, composable and clear about input semantics. Scroll down to browse them one
+				by one — each has a runnable example and a real recording.
+			</p>
+		</header>
+
+		<div class="rk-cmp" data-cmp data-index="0" style={`--cmp-count:${components.length}`}>
+			<div class="rk-cmp__grid">
+				<div class="rk-cmp__nav">
+					<div class="rk-cmp__copies">
+						{components.map((c, index) => (
+							<div class={`rk-cmp__copy${index === 0 ? ' is-active' : ''}`} data-cmp-copy={index}>
+								<span class="rk-cmp__count">{String(index + 1).padStart(2, '0')} / {String(components.length).padStart(2, '0')}</span>
+								<h3 class="rk-cmp__name">{c.name}</h3>
+								<p>{c.desc}</p>
+								<a class="rk-textlink" href={`${baseUrl}${c.href}`}>
+									View {c.name} docs
+									<span aria-hidden="true">→</span>
+								</a>
+							</div>
+						))}
+					</div>
+					<div class="rk-cmp__progress" aria-hidden="true">
+						<span class="rk-cmp__progress-fill" data-cmp-fill></span>
+					</div>
+					<a class="rk-textlink rk-cmp__all" href={`${baseUrl}components/`}>
+						View all component docs
+						<span aria-hidden="true">→</span>
+					</a>
+				</div>
+
+				<div class="rk-cmp__stage">
+					{components.map((c, index) => (
+						<div class={`rk-cmp__panel${index === 0 ? ' is-active' : ''}`} data-cmp-panel={index}>
+							<figure class="rk-window rk-window--code rk-cmp__code">
+								<div class="rk-window__bar">
+									<span class="rk-window__dots"><i></i><i></i><i></i></span>
+									<span class="rk-window__name">{c.example}.rs</span>
+								</div>
+								<div class="rk-window__body rk-code">
+									<Code code={c.code} lang="rust" themes={codeThemes} />
+								</div>
+							</figure>
+							{c.gif && (
+								<figure class="rk-window rk-window--term rk-cmp__demo">
+									<div class="rk-window__bar">
+										<span class="rk-window__dots"><i></i><i></i><i></i></span>
+										<span class="rk-window__name">cargo run --example {c.example}</span>
+									</div>
+									<div class="rk-window__screen">
+										<img src={recording(c.gif)} alt={`${c.name} component recording`} loading="lazy" decoding="async" />
+									</div>
+								</figure>
+							)}
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="rk-path" aria-labelledby="rk-path-title">
+		<div class="rk-path__intro">
+			<h2 id="rk-path-title" data-rk-reveal>From one component to a complete app</h2>
+			<p data-rk-reveal style="--i:1">
+				The homepage does just one thing: take you to the right first doc, then let examples and
+				reference material take over.
+			</p>
+		</div>
+
+		<div class="rk-path__grid">
+			{pathItems.map((item, index) => (
+				<a class="rk-path-card" data-spot data-rk-reveal style={`--i:${index}`} href={`${baseUrl}${item.href}`}>
+					<span class="rk-path-card__num" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+					<div>
+						<span class="rk-path-card__title">{item.title}</span>
+						<p>{item.text}</p>
+					</div>
+				</a>
+			))}
+		</div>
+	</section>
+
+	<section class="rk-final" aria-labelledby="rk-final-title">
+		<div class="rk-final__shell" data-spot data-rk-reveal>
+			<div class="rk-final__core">
+				<div>
+					<h2 id="rk-final-title">Start with a counter that moves</h2>
+					<p>Write a component that increments every second, then layer on async state, input layers and routing.</p>
+					<code class="rk-final__install">cargo add ratatui-kit</code>
+				</div>
+				<a class="rk-button rk-button--primary" data-magnetic href={`${baseUrl}start/quick-start/`}>
+					<span>Get started</span>
+					<span class="rk-button__icon" aria-hidden="true">→</span>
+				</a>
+			</div>
+		</div>
+	</section>
+</div>
+
+<script>
+	const root = document.querySelector('[data-rk-home]');
+	if (root) {
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const fine = window.matchMedia('(pointer: fine)').matches;
+
+		// Scroll reveal
+		const revealItems = root.querySelectorAll('[data-rk-reveal]');
+		if (reduce || !('IntersectionObserver' in window)) {
+			revealItems.forEach((item) => item.classList.add('is-visible'));
+		} else {
+			const observer = new IntersectionObserver(
+				(entries) => {
+					entries.forEach((entry) => {
+						if (entry.isIntersecting) {
+							entry.target.classList.add('is-visible');
+							observer.unobserve(entry.target);
+						}
+					});
+				},
+				{ threshold: 0.16, rootMargin: '0px 0px -8% 0px' },
+			);
+			revealItems.forEach((item) => observer.observe(item));
+		}
+
+		// Advanced interactions: pointer spotlight + magnetic primary button (fine pointer only, respects reduce-motion)
+		if (fine && !reduce) {
+			root.querySelectorAll('[data-spot]').forEach((card) => {
+				let raf = 0;
+				card.addEventListener('pointermove', (event) => {
+					if (raf) return;
+					raf = requestAnimationFrame(() => {
+						raf = 0;
+						const rect = card.getBoundingClientRect();
+						card.style.setProperty('--mx', `${((event.clientX - rect.left) / rect.width) * 100}%`);
+						card.style.setProperty('--my', `${((event.clientY - rect.top) / rect.height) * 100}%`);
+					});
+				});
+			});
+
+			root.querySelectorAll('[data-magnetic]').forEach((btn) => {
+				let raf = 0;
+				btn.addEventListener('pointermove', (event) => {
+					if (raf) return;
+					raf = requestAnimationFrame(() => {
+						raf = 0;
+						const rect = btn.getBoundingClientRect();
+						const x = (event.clientX - rect.left - rect.width / 2) / rect.width;
+						const y = (event.clientY - rect.top - rect.height / 2) / rect.height;
+						btn.style.transform = `translate(${x * 7}px, ${y * 7}px)`;
+					});
+				});
+				btn.addEventListener('pointerleave', () => {
+					btn.style.transform = '';
+				});
+			});
+		}
+	}
+</script>
+
+<script>
+	// Component showcase: the right panel scrolls naturally, an IntersectionObserver detects which component is at the viewport midline and smoothly switches the left copy
+	import { scroll } from 'motion';
+
+	const cmp = document.querySelector('[data-cmp]');
+	const reduceCmp = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	if (cmp && !reduceCmp && window.innerWidth > 980) {
+		const copies = Array.from(cmp.querySelectorAll('[data-cmp-copy]'));
+		const panels = Array.from(cmp.querySelectorAll('[data-cmp-panel]'));
+		const fill = cmp.querySelector('[data-cmp-fill]');
+		let cur = -1;
+		const setActive = (i) => {
+			if (i < 0 || i === cur) return;
+			cur = i;
+			cmp.dataset.index = String(i);
+			copies.forEach((el, k) => el.classList.toggle('is-active', k === i));
+		};
+
+		// Whichever panel crosses the viewport midline activates the matching copy
+		const io = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) {
+					if (e.isIntersecting) setActive(panels.indexOf(e.target));
+				}
+			},
+			{ rootMargin: '-50% 0px -50% 0px' },
+		);
+		panels.forEach((p) => io.observe(p));
+
+		// Progress bar follows the overall scroll
+		if (fill) {
+			scroll(
+				(progress) => {
+					fill.style.width = `${Math.min(100, progress * 100).toFixed(1)}%`;
+				},
+				{ target: cmp, offset: ['start start', 'end end'] },
+			);
+		}
+	}
+</script>
+
+<script>
+	// Quick-start two acts: driven by Motion scroll() (desktop, non-reduce-motion; narrow screens and fallbacks use static CSS)
+	import { scroll } from 'motion';
+
+	const qs = document.querySelector('.rk-qs');
+	const reduceQs = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	if (qs && !reduceQs && window.innerWidth > 980) {
+		// Act one: left copy + right code window, scroll progress drives a typewriter (types raw in the first half, switches copy and retypes kit in the second)
+		const act1 = qs.querySelector('[data-qs-act1]');
+		if (act1) {
+			const titleEl = act1.querySelector('[data-qs-title]');
+			const phaseFill = act1.querySelector('[data-qs-phasefill]');
+			const rawLayer = act1.querySelector('[data-qs-code="raw"]');
+			const kitLayer = act1.querySelector('[data-qs-code="kit"]');
+			const rawLines = rawLayer ? Array.from(rawLayer.querySelectorAll('.line')) : [];
+			const kitLines = kitLayer ? Array.from(kitLayer.querySelectorAll('.line')) : [];
+			const titles = { raw: 'main.rs · plain ratatui', kit: 'counter.rs · ratatui-kit' };
+
+			const typeset = (lines, n) => {
+				const caret = n > 0 && n <= lines.length ? n - 1 : -1;
+				for (let i = 0; i < lines.length; i++) {
+					lines[i].classList.toggle('typed', i < n);
+					lines[i].classList.toggle('caret', i === caret);
+				}
+			};
+
+			act1.classList.add('is-typing');
+			let phase = '';
+			scroll(
+				(progress) => {
+					const next = progress < 0.5 ? 'raw' : 'kit';
+					if (next !== phase) {
+						phase = next;
+						act1.dataset.phase = phase;
+						if (titleEl) titleEl.textContent = titles[phase];
+					}
+					if (phaseFill) phaseFill.style.width = `${Math.min(100, progress * 100).toFixed(1)}%`;
+					if (phase === 'raw') {
+						const t = Math.min(1, progress / 0.46); // finish typing raw within the first half
+						typeset(rawLines, Math.round(t * rawLines.length));
+						typeset(kitLines, 0);
+					} else {
+						const t = Math.min(1, (progress - 0.5) / 0.46); // finish typing kit within the second half
+						typeset(rawLines, rawLines.length);
+						typeset(kitLines, Math.round(t * kitLines.length));
+					}
+				},
+				{ target: act1, offset: ['start start', 'end end'] },
+			);
+		}
+
+		// Act two: the three right blocks scroll naturally, an IntersectionObserver cumulatively lights up the left steps (passed steps stay highlighted)
+		const act2 = qs.querySelector('[data-qs-act2]');
+		const fill2 = act2 ? act2.querySelector('[data-qs-fill]') : null;
+		const steps2 = act2 ? Array.from(act2.querySelectorAll('.rk-qs-step')) : [];
+		const panels2 = act2 ? Array.from(act2.querySelectorAll('[data-qs-panel]')) : [];
+
+		if (act2 && panels2.length) {
+			let curStep = 0;
+			const setStep = (n) => {
+				if (n === curStep) return;
+				curStep = n;
+				act2.dataset.step = String(n);
+				steps2.forEach((el, k) => el.classList.toggle('is-on', k < n));
+			};
+
+			const io = new IntersectionObserver(
+				(entries) => {
+					for (const e of entries) {
+						if (e.isIntersecting) setStep(Number(e.target.dataset.qsPanel));
+					}
+				},
+				{ rootMargin: '-50% 0px -50% 0px' },
+			);
+			panels2.forEach((p) => io.observe(p));
+			setStep(1);
+
+			if (fill2) {
+				scroll(
+					(progress) => {
+						fill2.style.height = `${Math.min(100, progress * 100).toFixed(1)}%`;
+					},
+					{ target: act2, offset: ['start start', 'end end'] },
+				);
+			}
+		}
+	}
+</script>
 
 <style>
-	.rk-en-home {
-		--rk-ink: #122021;
-		--rk-muted: #526467;
-		--rk-surface: #f7faf8;
-		--rk-line: color-mix(in srgb, var(--sl-color-gray-5), transparent 30%);
-		--rk-accent: #0a7c7f;
-		--rk-accent-strong: #075c62;
-		max-width: 1120px;
-		margin: 0 auto;
-		padding: clamp(2rem, 5vw, 5rem) 1rem 4rem;
-		color: var(--sl-color-white);
+	/* ===== Starlight / nova integration: full-bleed homepage, header blended in, light/dark adaptive ===== */
+	/* nova's .main-pane uses overflow:auto as the scroll container, which makes position:sticky
+	   inside the homepage relative to it (it doesn't self-scroll) and thus fail (stacked cards,
+	   both two-act scroll animations break). The homepage switches it back to visible so sticky
+	   and motion scroll() both behave relative to the window. Horizontal overflow is contained by
+	   .rk-home's own overflow-x:clip. */
+	:global(.main-pane:has(.rk-home)) {
+		overflow-x: clip;
+		overflow-y: visible;
 	}
 
-	:root[data-theme='light'] .rk-en-home {
+	:global(.sl-container:has(.rk-home)) {
+		max-width: none;
+		padding-inline: 0;
+	}
+
+	:global(main > .content-panel:has(+ .content-panel .rk-home)) {
+		display: none;
+	}
+
+	:global([data-theme='dark'] body:has(.rk-home)) {
+		background: #052a2d;
+	}
+
+	:global([data-theme='light'] body:has(.rk-home)) {
+		background: #fdf9f1;
+	}
+
+	/* nova renders the fixed nav <header> as a sibling of .main-frame (see
+	   starlight-theme-nova/PageFrame.astro), so it must be targeted directly —
+	   a `.main-frame header` descendant selector matches nothing and leaves the
+	   default --sl-color-bg-nav, which clashes with the homepage background. */
+	:global(body:has(.rk-home) header) {
+		backdrop-filter: blur(20px) saturate(140%);
+		-webkit-backdrop-filter: blur(20px) saturate(140%);
+	}
+
+	:global([data-theme='dark'] body:has(.rk-home) header) {
+		border-bottom-color: rgba(252, 169, 27, 0.14);
+		background: rgba(5, 42, 45, 0.72);
+	}
+
+	:global([data-theme='light'] body:has(.rk-home) header) {
+		border-bottom-color: rgba(6, 74, 79, 0.1);
+		background: rgba(253, 249, 241, 0.74);
+	}
+
+	/* ===== Tokens: dark is the baseline, light overrides (single amber accent) ===== */
+	.rk-home {
+		--rk-ease: cubic-bezier(0.32, 0.72, 0, 1);
+		--rk-radius: 1.5rem;
+		--rk-radius-sm: 1.1rem;
+		--rk-pad: 0.5rem;
+
+		--rk-teal: #0e6b70;
+		--rk-teal-deep: #064a4f;
+		--rk-bg-base: #052a2d;
+		--rk-bg1: rgba(252, 169, 27, 0.13);
+		--rk-bg2: rgba(14, 107, 112, 0.18);
+		--rk-ink: #f3f0e7;
+		--rk-muted: rgba(243, 240, 231, 0.66);
+		--rk-soft: rgba(243, 240, 231, 0.42);
+		--rk-line: rgba(233, 231, 222, 0.1);
+		--rk-line-strong: rgba(252, 169, 27, 0.34);
+		--rk-grain: rgba(233, 231, 222, 0.03);
+		--rk-card: rgba(233, 231, 222, 0.025);
+		--rk-elev: #08363a;
+		--rk-core-1: rgba(9, 50, 54, 0.92);
+		--rk-core-2: rgba(5, 38, 41, 0.94);
+		--rk-accent: #fca91b;
+		--rk-accent-display: #fca91b;
+		--rk-accent-glow: rgba(252, 169, 27, 0.15);
+		--rk-spot: rgba(252, 169, 27, 0.13);
+		--rk-btn-bg: #fca91b;
+		--rk-btn-ink: #06262a;
+		--rk-shadow: rgba(0, 0, 0, 0.5);
+
+		position: relative;
+		overflow-x: clip;
+		margin-inline: calc(50% - 50vw);
+		padding: clamp(1rem, 2vw, 2rem) clamp(1.1rem, 5vw, 4.5rem) 0;
 		color: var(--rk-ink);
+		background:
+			radial-gradient(circle at 14% -4%, var(--rk-bg1), transparent 34rem),
+			radial-gradient(circle at 88% 6%, var(--rk-bg2), transparent 28rem),
+			var(--rk-bg-base);
+		font-family: var(--__sl-font, ui-sans-serif), "Plus Jakarta Sans", system-ui, sans-serif;
+		font-feature-settings: "ss01", "cv01";
 	}
 
-	.rk-en-home__hero {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.82fr);
-		gap: clamp(1.5rem, 4vw, 4rem);
-		align-items: center;
-		min-height: min(660px, calc(100vh - 8rem));
+	:global([data-theme='light']) .rk-home {
+		--rk-teal: #0a5b60;
+		--rk-teal-deep: #064a4f;
+		--rk-bg-base: #fdf9f1;
+		--rk-bg1: rgba(252, 169, 27, 0.12);
+		--rk-bg2: rgba(6, 74, 79, 0.09);
+		--rk-ink: #06363a;
+		--rk-muted: rgba(7, 54, 58, 0.66);
+		--rk-soft: rgba(7, 54, 58, 0.45);
+		--rk-line: rgba(6, 74, 79, 0.13);
+		--rk-line-strong: rgba(6, 74, 79, 0.3);
+		--rk-grain: rgba(6, 74, 79, 0.03);
+		--rk-card: #ffffff;
+		--rk-elev: #ffffff;
+		--rk-core-1: #ffffff;
+		--rk-core-2: #fbf6ec;
+		--rk-accent: #0a5b60;
+		--rk-accent-display: #07565b;
+		--rk-accent-glow: rgba(6, 74, 79, 0.1);
+		--rk-spot: rgba(6, 74, 79, 0.1);
+		--rk-btn-bg: #064a4f;
+		--rk-btn-ink: #fdf9f1;
+		--rk-shadow: rgba(6, 50, 54, 0.14);
 	}
 
-	.rk-en-home__eyebrow {
-		margin: 0 0 0.85rem;
-		color: var(--rk-accent);
-		font-size: 0.78rem;
-		font-weight: 800;
-		text-transform: uppercase;
-		letter-spacing: 0;
+	.rk-home__grain {
+		position: fixed;
+		inset: 0;
+		z-index: 1;
+		pointer-events: none;
+		opacity: 0.7;
+		background-image:
+			linear-gradient(var(--rk-grain) 1px, transparent 1px),
+			linear-gradient(90deg, var(--rk-grain) 1px, transparent 1px);
+		background-size: 44px 44px;
+		mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.1));
 	}
 
-	.rk-en-home h1 {
-		max-width: 12ch;
+	.rk-home :where(section) {
+		position: relative;
+		z-index: 2;
+		max-width: 1320px;
+		margin-inline: auto;
+	}
+
+	.rk-home h1,
+	.rk-home h2 {
 		margin: 0;
-		font-size: clamp(3rem, 8vw, 6.8rem);
-		line-height: 0.94;
-		letter-spacing: 0;
+		color: var(--rk-ink);
+		font-weight: 720;
+		letter-spacing: -0.018em;
+		line-height: 1.08;
+		text-wrap: balance;
 	}
 
-	.rk-en-home__lead {
-		max-width: 42rem;
-		margin: 1.35rem 0 0;
+	.rk-section-copy {
+		max-width: 44rem;
+		margin-bottom: clamp(2.2rem, 4.5vw, 3.4rem);
+	}
+
+	.rk-section-copy h2,
+	.rk-path h2 {
+		font-size: clamp(1.75rem, 3vw, 2.55rem);
+	}
+
+	.rk-section-copy p,
+	.rk-layer__copy p,
+	.rk-path__intro p {
+		margin: 1rem 0 0;
+		max-width: 40rem;
 		color: var(--rk-muted);
-		font-size: clamp(1.05rem, 2vw, 1.3rem);
-		line-height: 1.65;
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
 	}
 
-	:root[data-theme='dark'] .rk-en-home__lead {
-		color: var(--sl-color-gray-3);
+	.rk-system,
+	.rk-layer,
+	.rk-deck-section,
+	.rk-path,
+	.rk-final {
+		padding-block: clamp(4rem, 8vw, 7.5rem);
 	}
 
-	.rk-en-home__actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.75rem;
-		margin-top: 2rem;
+	/* ===== Hero ===== */
+	.rk-hero {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+		align-items: center;
+		gap: clamp(2rem, 5vw, 5rem);
+		min-height: min(600px, calc(100dvh - 9rem));
+		padding-block: clamp(2.25rem, 4.5vw, 4rem) clamp(2rem, 4vw, 3.4rem);
 	}
 
-	.rk-en-home__button {
+	.rk-brand {
 		display: inline-flex;
 		align-items: center;
-		justify-content: center;
-		min-height: 2.75rem;
-		padding: 0.7rem 1rem;
-		border: 1px solid var(--rk-line);
-		border-radius: 0.45rem;
-		color: inherit;
-		font-weight: 750;
+		gap: 0.6rem;
+		margin: 0 0 1.25rem;
 		text-decoration: none;
 	}
 
-	.rk-en-home__button--primary {
-		border-color: var(--rk-accent);
-		background: var(--rk-accent);
-		color: #fff;
-	}
-
-	.rk-en-home__button:hover {
-		border-color: var(--rk-accent-strong);
-		color: var(--rk-accent-strong);
-	}
-
-	.rk-en-home__button--primary:hover {
-		color: #fff;
-		background: var(--rk-accent-strong);
-	}
-
-	.rk-en-home__code {
-		margin: 0;
-		padding: clamp(1rem, 2vw, 1.35rem);
-		overflow-x: auto;
-		border: 1px solid var(--rk-line);
-		border-radius: 0.5rem;
-		background: color-mix(in srgb, var(--sl-color-bg-nav), var(--sl-color-gray-6) 20%);
-		box-shadow: 0 1rem 3rem color-mix(in srgb, #001014, transparent 86%);
-		font-size: clamp(0.72rem, 1.4vw, 0.92rem);
-		line-height: 1.65;
-	}
-
-	.rk-en-home__grid {
+	.rk-brand__mark {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 1px;
-		margin-top: clamp(1.5rem, 5vw, 4rem);
-		border: 1px solid var(--rk-line);
-		background: var(--rk-line);
+		place-items: center;
+		width: 1.65rem;
+		height: 1.65rem;
+		color: var(--rk-accent);
 	}
 
-	.rk-en-home__grid article {
-		min-height: 13rem;
-		padding: 1.25rem;
-		background: var(--sl-color-bg);
+	.rk-brand__mark svg {
+		width: 100%;
+		height: 100%;
 	}
 
-	.rk-en-home__grid h2,
-	.rk-en-home__path h2 {
-		margin: 0;
-		font-size: clamp(1.3rem, 2.4vw, 2rem);
-		line-height: 1.1;
-		letter-spacing: 0;
+	.rk-brand__word {
+		color: var(--rk-soft);
+		font-size: 0.72rem;
+		font-weight: 680;
+		letter-spacing: 0.24em;
 	}
 
-	.rk-en-home__grid p,
-	.rk-en-home__path p {
-		margin: 1rem 0 0;
+	.rk-hero h1 {
+		max-width: 16ch;
+		font-size: clamp(2.2rem, 3.8vw, 3.4rem);
+		letter-spacing: -0.022em;
+	}
+
+	.rk-hero__lead {
+		max-width: 32rem;
+		margin: 1.3rem 0 0;
 		color: var(--rk-muted);
-		line-height: 1.65;
+		font-size: clamp(1rem, 1.1vw, 1.08rem);
+		line-height: 1.7;
 	}
 
-	:root[data-theme='dark'] .rk-en-home__grid p,
-	:root[data-theme='dark'] .rk-en-home__path p {
-		color: var(--sl-color-gray-3);
+	.rk-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.8rem;
+		margin-top: 2rem;
 	}
 
-	.rk-en-home__path {
+	.rk-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.8rem;
+		min-height: 3rem;
+		padding: 0.45rem 0.5rem 0.45rem 1.3rem;
+		border-radius: 999px;
+		color: var(--rk-ink);
+		text-decoration: none;
+		font-weight: 640;
+		font-size: 0.92rem;
+		line-height: 1;
+		white-space: nowrap;
+		transition:
+			transform 600ms var(--rk-ease),
+			background 600ms var(--rk-ease),
+			border-color 600ms var(--rk-ease),
+			box-shadow 600ms var(--rk-ease);
+	}
+
+	.rk-button--primary {
+		background: var(--rk-btn-bg);
+		color: var(--rk-btn-ink);
+		box-shadow: 0 16px 40px var(--rk-accent-glow);
+	}
+
+	.rk-button--primary:hover {
+		box-shadow: 0 20px 52px var(--rk-accent-glow);
+	}
+
+	.rk-button--ghost {
+		border: 1px solid var(--rk-line);
+		background: var(--rk-card);
+		color: var(--rk-ink);
+	}
+
+	.rk-button--ghost:hover {
+		transform: translateY(-2px);
+		border-color: var(--rk-line-strong);
+		background: var(--rk-accent-glow);
+	}
+
+	.rk-button:active {
+		transform: translateY(0) scale(0.98);
+	}
+
+	.rk-button__icon {
 		display: grid;
-		grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-		gap: clamp(1.5rem, 4vw, 4rem);
-		margin-top: clamp(2.5rem, 6vw, 5rem);
-		padding-top: clamp(2rem, 4vw, 4rem);
+		width: 2rem;
+		height: 2rem;
+		place-items: center;
+		border-radius: 999px;
+		font-size: 0.9rem;
+		background: rgba(0, 0, 0, 0.14);
+		transition:
+			transform 600ms var(--rk-ease),
+			background 600ms var(--rk-ease);
+	}
+
+	.rk-button--ghost .rk-button__icon {
+		background: var(--rk-accent-glow);
+		color: var(--rk-accent);
+	}
+
+	.rk-button:hover .rk-button__icon {
+		transform: translate3d(3px, -1px, 0);
+	}
+
+	/* ===== Window shell: always a dark "terminal", floating on both light and dark pages ===== */
+	.rk-window {
+		margin: 0;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: var(--rk-radius);
+		background: #0a2e32;
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.06),
+			0 34px 84px var(--rk-shadow);
+		overflow: hidden;
+	}
+
+	:global([data-theme='light']) .rk-window {
+		border-color: rgba(6, 74, 79, 0.12);
+		box-shadow: 0 26px 60px rgba(6, 50, 54, 0.18);
+	}
+
+	.rk-window__bar {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.5rem 0.85rem;
+		background: rgba(0, 0, 0, 0.18);
+	}
+
+	.rk-window__dots {
+		display: flex;
+		align-items: center;
+		gap: 0.42rem;
+	}
+
+	.rk-window__dots i {
+		display: block;
+		margin: 0;
+		width: 0.6rem;
+		height: 0.6rem;
+		border-radius: 999px;
+		background: rgba(243, 240, 231, 0.18);
+	}
+
+	.rk-window__dots i:first-child {
+		background: #fca91b;
+	}
+
+	.rk-window__name {
+		color: rgba(243, 240, 231, 0.5);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.74rem;
+		letter-spacing: 0.01em;
+	}
+
+	.rk-window--code .rk-window__body {
+		background:
+			radial-gradient(circle at 80% -10%, rgba(252, 169, 27, 0.08), transparent 22rem),
+			rgba(8, 7, 5, 0.5);
+	}
+
+	.rk-code :global(pre.astro-code) {
+		margin: 0;
+		padding: clamp(0.7rem, 1.2vw, 0.95rem) clamp(0.85rem, 1.3vw, 1.1rem);
+		background: transparent !important;
+		overflow-x: auto;
+	}
+
+	/* Code window: light pages use a light card (terminal window stays dark for the gif recordings) */
+	:global([data-theme='light']) .rk-window {
+		background: #ffffff;
+		border-color: rgba(6, 74, 79, 0.1);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.7),
+			0 18px 44px rgba(6, 50, 54, 0.1);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__bar {
+		background: #f6f1e7;
+		border-bottom-color: rgba(6, 74, 79, 0.08);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__name {
+		color: rgba(7, 54, 58, 0.5);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__dots i {
+		background: rgba(6, 74, 79, 0.16);
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__dots i:first-child {
+		background: #fca91b;
+	}
+
+	:global([data-theme='light']) .rk-window .rk-window__body {
+		background: #ffffff;
+	}
+
+	/* shiki dual themes: light by default, dark pages switch to the --shiki-dark variable */
+	:global([data-theme='dark']) .rk-code :global(pre.astro-code),
+	:global([data-theme='dark']) .rk-code :global(pre.astro-code span) {
+		color: var(--shiki-dark) !important;
+		font-style: var(--shiki-dark-font-style) !important;
+		font-weight: var(--shiki-dark-font-weight) !important;
+		text-decoration: var(--shiki-dark-text-decoration) !important;
+	}
+
+	.rk-code :global(pre.astro-code code) {
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.8rem;
+		line-height: 1.7;
+	}
+
+	.rk-window--term .rk-window__screen {
+		padding: clamp(0.8rem, 1.4vw, 1.15rem);
+		background:
+			radial-gradient(circle at 50% 120%, rgba(252, 169, 27, 0.08), transparent 18rem),
+			rgba(6, 5, 4, 0.6);
+	}
+
+	.rk-window--term img {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 10;
+		object-fit: cover;
+		border-radius: 0.7rem;
+		background: #06201f;
+	}
+
+	/* ===== Capability area: asymmetric bento (2×2 hero card + wide cards + small cards) ===== */
+	.rk-feat {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		grid-auto-rows: minmax(168px, auto);
+		gap: clamp(0.7rem, 1.3vw, 1.1rem);
+	}
+
+	.rk-feat-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+		padding: clamp(1.4rem, 2.2vw, 1.9rem);
+		border: 1px solid var(--rk-line);
+		border-radius: var(--rk-radius-sm);
+		background:
+			radial-gradient(circle at 0% 0%, var(--rk-accent-glow), transparent 16rem),
+			var(--rk-card);
+		box-shadow: 0 24px 56px var(--rk-shadow);
+		transition:
+			transform 700ms var(--rk-ease),
+			border-color 700ms var(--rk-ease),
+			box-shadow 700ms var(--rk-ease);
+	}
+
+	.rk-feat-card--lg {
+		grid-column: span 2;
+		grid-row: span 2;
+		gap: 0.85rem;
+		padding: clamp(1.7rem, 2.6vw, 2.4rem);
+	}
+
+	.rk-feat-card--wide {
+		grid-column: span 2;
+	}
+
+	.rk-feat-card--sm {
+		grid-column: span 1;
+	}
+
+	.rk-feat-card:hover {
+		transform: translateY(-5px);
+		border-color: var(--rk-line-strong);
+		box-shadow: 0 36px 74px var(--rk-shadow);
+	}
+
+	.rk-feat-card__token {
+		align-self: flex-start;
+		padding: 0.32rem 0.62rem;
+		border-radius: 0.55rem;
+		background: var(--rk-accent-glow);
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.76rem;
+		letter-spacing: -0.01em;
+	}
+
+	.rk-feat-card__title {
+		margin: 0;
+		color: var(--rk-ink);
+		font-size: 1.05rem;
+		font-weight: 660;
+		letter-spacing: -0.012em;
+		line-height: 1.2;
+	}
+
+	.rk-feat-card--lg .rk-feat-card__title {
+		font-size: clamp(1.25rem, 2vw, 1.6rem);
+		letter-spacing: -0.02em;
+	}
+
+	.rk-feat-card p {
+		margin: 0;
+		color: var(--rk-muted);
+		font-size: 0.92rem;
+		line-height: 1.68;
+	}
+
+	.rk-feat-card--lg p {
+		font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+		max-width: 34rem;
+	}
+
+	.rk-feat-card__points {
+		margin: 0.4rem 0 0;
+		margin-top: auto;
+		padding: 1rem 0 0;
+		list-style: none;
+		display: grid;
+		gap: 0.62rem;
 		border-top: 1px solid var(--rk-line);
 	}
 
-	.rk-en-home__path ol {
-		display: grid;
-		gap: 1rem;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-		counter-reset: path;
-	}
-
-	.rk-en-home__path li {
+	.rk-feat-card__points li {
 		position: relative;
-		padding-left: 3rem;
-		counter-increment: path;
+		padding-left: 1.3rem;
+		color: var(--rk-muted);
+		font-size: 0.92rem;
+		line-height: 1.55;
 	}
 
-	.rk-en-home__path li::before {
+	.rk-feat-card__points li::before {
+		content: "";
 		position: absolute;
-		left: 0;
-		top: 0.05rem;
-		width: 2rem;
-		height: 2rem;
+		left: 0.15rem;
+		top: 0.52em;
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 999px;
+		background: var(--rk-accent);
+	}
+
+	/* ===== Input-layer showcase ===== */
+	.rk-layer {
+		display: grid;
+		grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+		gap: clamp(2rem, 5vw, 4.5rem);
+		align-items: start;
+	}
+
+	/* Left copy is vertically centered and sticky within the viewport; the right demo (code window + recording) scrolls */
+	.rk-layer__copy {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	@media (max-width: 980px) {
+		.rk-layer__copy {
+			position: static;
+			height: auto;
+			display: block;
+		}
+	}
+
+	.rk-layer h2 {
+		font-size: clamp(1.7rem, 2.8vw, 2.4rem);
+	}
+
+	.rk-layer__copy code {
+		padding: 0.1rem 0.4rem;
+		border-radius: 0.4rem;
+		background: var(--rk-accent-glow);
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.88em;
+	}
+
+	.rk-layer__demo {
+		display: grid;
+		gap: clamp(1rem, 2vw, 1.4rem);
+	}
+
+	.rk-textlink {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 1.5rem;
+		color: var(--rk-accent);
+		font-weight: 600;
+		font-size: 0.94rem;
+		text-decoration: none;
+		transition: gap 500ms var(--rk-ease);
+	}
+
+	.rk-textlink span {
+		transition: transform 500ms var(--rk-ease);
+	}
+
+	.rk-textlink:hover span {
+		transform: translateX(4px);
+	}
+
+	/* ===== Quick start: two scroll-driven acts (the collapse → running in three steps) ===== */
+	.rk-qs {
+		padding-block: clamp(2rem, 4vw, 3.5rem);
+	}
+
+	.rk-qs-act--versus {
+		min-height: 210vh;
+	}
+
+
+	.rk-qs-act__sticky,
+	.rk-qs-act2__grid {
+		position: sticky;
+		top: 5.5rem;
+	}
+
+	.rk-qs-act__sticky {
+		display: grid;
+		gap: clamp(1.4rem, 3vw, 2.4rem);
+		min-height: calc(100dvh - 7rem);
+		align-content: center;
+		padding-block: clamp(1rem, 3vh, 2rem);
+	}
+
+	.rk-qs-head {
+		max-width: 46rem;
+	}
+
+	.rk-qs-eyebrow {
+		margin: 0 0 0.8rem;
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.74rem;
+		font-weight: 680;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+	}
+
+	.rk-qs-head h2 {
+		font-size: clamp(1.75rem, 3vw, 2.55rem);
+	}
+
+	.rk-qs-head p {
+		margin: 1rem 0 0;
+		max-width: 42rem;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	/* — Act one: left copy + right code window + scroll-driven typewriter — */
+	.rk-qs .rk-code :global(pre.astro-code code) {
+		font-size: 0.74rem;
+		line-height: 1.62;
+	}
+
+	.rk-qs-split {
+		display: grid;
+		grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+		gap: clamp(1.6rem, 4vw, 3.5rem);
+		align-items: center;
+	}
+
+	/* Left: copy (two stacked blocks that cross-fade by phase) */
+	.rk-qs-narrate {
+		position: relative;
+		display: grid;
+	}
+
+	.rk-qs-copy {
+		grid-area: 1 / 1;
+		max-width: 30rem;
+		opacity: 0;
+		transform: translateY(10px);
+		transition:
+			opacity 0.5s var(--rk-ease),
+			transform 0.5s var(--rk-ease);
+		pointer-events: none;
+	}
+
+	[data-qs-act1][data-phase="raw"] .rk-qs-copy[data-qs-copy="raw"],
+	[data-qs-act1][data-phase="kit"] .rk-qs-copy[data-qs-copy="kit"] {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+	}
+
+	.rk-qs-copy__kicker {
+		display: inline-block;
+		margin-bottom: 0.75rem;
+		padding: 0.25rem 0.66rem;
+		border-radius: 999px;
+		border: 1px solid var(--rk-line-strong);
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.72rem;
+		letter-spacing: 0.01em;
+	}
+
+	.rk-qs-copy__title {
+		margin: 0;
+		color: var(--rk-ink);
+		font-size: clamp(1.4rem, 2.4vw, 2rem);
+		font-weight: 680;
+		letter-spacing: -0.02em;
+		line-height: 1.16;
+	}
+
+	.rk-qs-copy p {
+		margin: 0.85rem 0 0;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	/* Left: phase-switch progress indicator */
+	.rk-qs-switch {
+		display: grid;
+		grid-template-columns: auto auto 1fr;
+		align-items: center;
+		gap: 0.7rem;
+		margin-top: clamp(1.6rem, 3vw, 2.4rem);
+	}
+
+	.rk-qs-switch__tab {
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.76rem;
+		font-weight: 640;
+		color: var(--rk-soft);
+		transition: color 0.4s var(--rk-ease);
+	}
+
+	[data-qs-act1][data-phase="raw"] .rk-qs-switch__tab[data-phase="raw"],
+	[data-qs-act1][data-phase="kit"] .rk-qs-switch__tab[data-phase="kit"] {
+		color: var(--rk-accent);
+	}
+
+	.rk-qs-switch__bar {
+		position: relative;
+		height: 3px;
+		border-radius: 3px;
+		background: var(--rk-line);
+		overflow: hidden;
+	}
+
+	.rk-qs-switch__fill {
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 0%;
+		background: var(--rk-accent);
+		transition: width 0.1s linear;
+	}
+
+	/* Right: typewriter code window (two stacked snippets, switched by phase) */
+	.rk-qs-typer {
+		margin: 0;
+		will-change: opacity;
+	}
+
+	.rk-qs-typer__body {
+		position: relative;
+		height: clamp(400px, 52vh, 520px);
+		overflow: hidden;
+	}
+
+	.rk-qs-codelayer {
+		position: absolute;
+		inset: 0;
+		opacity: 0;
+		transition: opacity 0.35s var(--rk-ease);
+		pointer-events: none;
+	}
+
+	[data-qs-act1][data-phase="raw"] .rk-qs-codelayer[data-qs-code="raw"],
+	[data-qs-act1][data-phase="kit"] .rk-qs-codelayer[data-qs-code="kit"] {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	/* Typewriter: line-by-line reveal driven by JS adding .typed per scroll progress; the .is-typing gate guarantees the whole block shows without JS */
+	[data-qs-act1].is-typing .rk-qs-codelayer :global(.astro-code .line) {
+		opacity: 0;
+	}
+
+	[data-qs-act1].is-typing .rk-qs-codelayer :global(.astro-code .line.typed) {
+		opacity: 1;
+	}
+
+	.rk-qs-codelayer :global(.astro-code .line.caret)::after {
+		content: "▋";
+		margin-left: 1px;
+		color: var(--rk-accent);
+		animation: rk-caret 1s steps(1) infinite;
+	}
+
+	@keyframes rk-caret {
+		50% {
+			opacity: 0;
+		}
+	}
+
+	/* — Act two: left sticky three steps (cumulative highlight) + right Cargo.toml / main.rs / gif scrolling naturally — */
+	.rk-qs-act2__grid {
+		display: grid;
+		grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+		gap: clamp(1.6rem, 4vw, 3.5rem);
+		align-items: start;
+	}
+
+	.rk-qs-rail {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	.rk-qs-rail__lead {
+		margin: 0 0 1.8rem;
+		color: var(--rk-ink);
+		font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+		font-weight: 660;
+		letter-spacing: -0.015em;
+	}
+
+	.rk-qs-steps {
+		position: relative;
+		list-style: none;
+		margin: 0;
+		padding: 0 0 0 2.6rem;
+		display: grid;
+		gap: clamp(1.4rem, 3vw, 2.2rem);
+	}
+
+	.rk-qs-steps__track {
+		position: absolute;
+		left: 0.95rem;
+		top: 0.7rem;
+		bottom: 0.7rem;
+		width: 2px;
+		border-radius: 2px;
+		background: var(--rk-line);
+		overflow: hidden;
+	}
+
+	.rk-qs-steps__fill {
+		position: absolute;
+		inset: 0 0 auto 0;
+		height: 0%;
+		background: var(--rk-accent);
+		transition: height 0.3s var(--rk-ease);
+	}
+
+	.rk-qs-step {
+		position: relative;
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1rem;
+		align-items: start;
+		opacity: 0.4;
+		transition: opacity 0.45s var(--rk-ease);
+	}
+
+	.rk-qs-step.is-on {
+		opacity: 1;
+	}
+
+	.rk-qs-step__dot {
+		position: relative;
+		z-index: 1;
 		display: grid;
 		place-items: center;
-		border: 1px solid var(--rk-line);
+		width: 1.9rem;
+		height: 1.9rem;
+		margin-left: -2.6rem;
 		border-radius: 999px;
-		content: counter(path);
-		color: var(--rk-accent);
-		font-weight: 800;
+		border: 1px solid var(--rk-line-strong);
+		background: var(--rk-bg-base);
+		color: var(--rk-soft);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.72rem;
+		font-weight: 660;
+		transition:
+			background 0.4s var(--rk-ease),
+			border-color 0.4s var(--rk-ease),
+			color 0.4s var(--rk-ease),
+			box-shadow 0.4s var(--rk-ease);
 	}
 
-	.rk-en-home__path a {
-		color: inherit;
-		font-size: 1.1rem;
-		font-weight: 800;
-		text-decoration-color: color-mix(in srgb, var(--rk-accent), transparent 55%);
-		text-underline-offset: 0.25rem;
+	.rk-qs-step.is-on .rk-qs-step__dot {
+		border-color: var(--rk-accent);
+		background: var(--rk-accent);
+		color: var(--rk-btn-ink);
+		box-shadow: 0 0 0 5px var(--rk-accent-glow);
 	}
 
-	@media (max-width: 840px) {
-		.rk-en-home__hero,
-		.rk-en-home__path {
-			grid-template-columns: 1fr;
+	.rk-qs-step__title {
+		display: block;
+		color: var(--rk-ink);
+		font-size: 1.02rem;
+		font-weight: 660;
+		letter-spacing: -0.01em;
+	}
+
+	.rk-qs-step__body p {
+		margin: 0.35rem 0 0;
+		color: var(--rk-muted);
+		font-size: 0.9rem;
+		line-height: 1.6;
+	}
+
+	.rk-qs-stage {
+		display: flex;
+		flex-direction: column;
+		gap: clamp(2rem, 5vh, 4rem);
+	}
+
+	.rk-qs-panel {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		min-height: clamp(420px, 56vh, 540px);
+	}
+
+	.rk-qs-panel .rk-window {
+		margin: 0;
+	}
+
+	.rk-qs-panel .rk-window--term .rk-window__screen {
+		display: block;
+	}
+
+	.rk-qs-panel .rk-window--term img {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: auto;
+		object-fit: contain;
+		border-radius: 0.6rem;
+		background: #06201f;
+	}
+
+	/* — Quick start: narrow screens degrade to a static comparison + vertical steps — */
+	@media (max-width: 980px) {
+		.rk-qs-act--versus,
+		.rk-qs-act--steps {
 			min-height: 0;
 		}
 
-		.rk-en-home h1 {
-			max-width: 13ch;
+		.rk-qs-act__sticky,
+		.rk-qs-act2__grid {
+			position: static;
+			min-height: 0;
+			align-content: start;
 		}
 
-		.rk-en-home__grid {
+		.rk-qs-split {
+			grid-template-columns: 1fr;
+			gap: 1.5rem;
+		}
+
+		.rk-qs-narrate {
+			gap: 1.4rem;
+		}
+
+		.rk-qs-copy {
+			grid-area: auto;
+			max-width: none;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-qs-switch {
+			display: none;
+		}
+
+		.rk-qs-typer__body {
+			height: auto;
+		}
+
+		.rk-qs-codelayer {
+			position: static;
+			opacity: 1 !important;
+		}
+
+		.rk-qs-codelayer[data-qs-code="kit"] {
+			margin-top: 0.4rem;
+			border-top: 1px solid var(--rk-line);
+		}
+
+		.rk-qs-act2__grid {
+			grid-template-columns: 1fr;
+			gap: 1.6rem;
+		}
+
+		.rk-qs-rail {
+			position: static;
+			height: auto;
+		}
+
+		.rk-qs-step {
+			opacity: 1 !important;
+		}
+
+		.rk-qs-step__dot {
+			border-color: var(--rk-accent);
+		}
+
+		.rk-qs-steps__fill {
+			height: 100% !important;
+		}
+
+		.rk-qs-stage {
+			gap: 1.4rem;
+		}
+
+		.rk-qs-panel {
+			min-height: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.rk-qs-act--versus,
+		.rk-qs-act--steps {
+			min-height: 0;
+		}
+
+		.rk-qs-act__sticky,
+		.rk-qs-act2__grid {
+			position: static;
+			min-height: 0;
+		}
+
+		.rk-qs-copy {
+			grid-area: auto;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-qs-switch {
+			display: none;
+		}
+
+		.rk-qs-typer__body {
+			height: auto;
+		}
+
+		.rk-qs-codelayer {
+			position: static;
+			opacity: 1 !important;
+		}
+
+		[data-qs-act1].is-typing .rk-qs-codelayer :global(.astro-code .line) {
+			opacity: 1 !important;
+		}
+
+		.rk-qs-steps__fill {
+			height: 100% !important;
+		}
+
+		.rk-qs-step {
+			opacity: 1 !important;
+		}
+
+		.rk-qs-rail {
+			position: static;
+			height: auto;
+		}
+
+		.rk-qs-panel {
+			min-height: 0;
+		}
+	}
+
+	/* ===== Component showcase: left copy centered & sticky + right code/gif scrolling naturally, copy switches smoothly with scroll ===== */
+	.rk-cmp {
+		margin-top: clamp(1rem, 2vw, 2rem);
+	}
+
+	.rk-cmp__grid {
+		display: grid;
+		grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+		gap: clamp(1.6rem, 4vw, 3.5rem);
+		align-items: start;
+	}
+
+	.rk-cmp__nav {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	.rk-cmp__copies {
+		position: relative;
+		display: grid;
+	}
+
+	.rk-cmp__copy {
+		grid-area: 1 / 1;
+		opacity: 0;
+		transform: translateY(12px);
+		transition:
+			opacity 0.45s var(--rk-ease),
+			transform 0.45s var(--rk-ease);
+		pointer-events: none;
+	}
+
+	.rk-cmp__copy.is-active {
+		opacity: 1;
+		transform: none;
+		pointer-events: auto;
+	}
+
+	.rk-cmp__count {
+		display: inline-block;
+		margin-bottom: 0.7rem;
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.78rem;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.08em;
+	}
+
+	.rk-cmp__name {
+		margin: 0;
+		color: var(--rk-ink);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: clamp(1.4rem, 2.4vw, 2rem);
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		line-height: 1.15;
+	}
+
+	.rk-cmp__copy p {
+		margin: 0.85rem 0 0;
+		max-width: 30rem;
+		color: var(--rk-muted);
+		font-size: clamp(0.95rem, 1vw, 1.05rem);
+		line-height: 1.72;
+	}
+
+	.rk-cmp__copy .rk-textlink {
+		margin-top: 1.2rem;
+	}
+
+	.rk-cmp__progress {
+		position: relative;
+		height: 3px;
+		margin-top: clamp(1.6rem, 3vw, 2.4rem);
+		border-radius: 3px;
+		background: var(--rk-line);
+		overflow: hidden;
+	}
+
+	.rk-cmp__progress-fill {
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: 0%;
+		background: var(--rk-accent);
+		transition: width 0.12s linear;
+	}
+
+	.rk-cmp__all {
+		margin-top: 1.2rem;
+	}
+
+	.rk-cmp__stage {
+		display: flex;
+		flex-direction: column;
+		gap: clamp(2rem, 5vh, 4rem);
+	}
+
+	.rk-cmp__panel {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: clamp(0.85rem, 1.6vw, 1.25rem);
+		min-height: clamp(420px, 58vh, 560px);
+	}
+
+	.rk-cmp__code {
+		flex: none;
+	}
+
+	.rk-cmp__demo {
+		flex: none;
+	}
+
+	.rk-cmp__demo .rk-window__screen {
+		display: block;
+	}
+
+	.rk-cmp__demo img {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: auto;
+		object-fit: contain;
+		border-radius: 0.6rem;
+	}
+
+	@media (max-width: 980px) {
+		.rk-cmp__grid {
 			grid-template-columns: 1fr;
 		}
 
-		.rk-en-home__grid article {
+		.rk-cmp__nav {
+			position: static;
+			height: auto;
+			display: block;
+		}
+
+		.rk-cmp__copies {
+			gap: 1.4rem;
+		}
+
+		.rk-cmp__copy {
+			grid-area: auto;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-cmp__progress,
+		.rk-cmp__stage {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.rk-cmp__nav {
+			position: static;
+			height: auto;
+			display: block;
+		}
+
+		.rk-cmp__copies {
+			gap: 1.4rem;
+		}
+
+		.rk-cmp__copy {
+			grid-area: auto;
+			opacity: 1 !important;
+			transform: none !important;
+			pointer-events: auto;
+		}
+
+		.rk-cmp__progress,
+		.rk-cmp__stage {
+			display: none;
+		}
+	}
+
+	/* ===== Learning path ===== */
+	.rk-path {
+		display: grid;
+		grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+		gap: clamp(2rem, 5vw, 4.5rem);
+		align-items: center;
+	}
+
+	.rk-path__intro {
+		position: sticky;
+		top: 5.5rem;
+		height: calc(100dvh - 9rem);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	@media (max-width: 980px) {
+		.rk-path__intro {
+			position: static;
+			height: auto;
+			display: block;
+		}
+	}
+
+	.rk-path__grid {
+		display: grid;
+		gap: 0.9rem;
+	}
+
+	.rk-path-card {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1.2rem;
+		align-items: start;
+		padding: clamp(1.15rem, 2vw, 1.55rem) clamp(1.3rem, 2.2vw, 1.75rem);
+		border: 1px solid var(--rk-line);
+		border-radius: var(--rk-radius-sm);
+		background: var(--rk-card);
+		text-decoration: none;
+		transition:
+			transform 600ms var(--rk-ease),
+			border-color 600ms var(--rk-ease),
+			background 600ms var(--rk-ease);
+	}
+
+	.rk-path-card:hover {
+		transform: translateX(8px);
+		border-color: var(--rk-line-strong);
+		background: var(--rk-accent-glow);
+	}
+
+	.rk-path-card__num {
+		color: var(--rk-accent);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.92rem;
+		opacity: 0.8;
+	}
+
+	.rk-path-card__title {
+		display: block;
+		color: var(--rk-ink);
+		font-size: 1rem;
+		font-weight: 660;
+		letter-spacing: -0.012em;
+	}
+
+	.rk-path-card p {
+		margin: 0.4rem 0 0;
+		color: var(--rk-muted);
+		font-size: 0.92rem;
+		line-height: 1.62;
+	}
+
+	/* ===== Final CTA ===== */
+	.rk-final__shell {
+		padding: var(--rk-pad);
+		border: 1px solid var(--rk-line);
+		border-radius: var(--rk-radius);
+		background: var(--rk-card);
+		box-shadow: 0 38px 90px var(--rk-shadow);
+		overflow: hidden;
+	}
+
+	.rk-final__core {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 2rem;
+		padding: clamp(1.6rem, 4.5vw, 3.2rem);
+		border-radius: calc(var(--rk-radius) - var(--rk-pad));
+		background:
+			radial-gradient(circle at 88% 8%, var(--rk-accent-glow), transparent 24rem),
+			linear-gradient(135deg, var(--rk-core-1), var(--rk-core-2));
+	}
+
+	.rk-final__core h2 {
+		font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+	}
+
+	.rk-final__core p {
+		margin: 0.7rem 0 0;
+		color: var(--rk-muted);
+		font-size: clamp(0.98rem, 1.1vw, 1.06rem);
+		line-height: 1.68;
+	}
+
+	.rk-final__install {
+		display: inline-flex;
+		align-items: center;
+		margin-top: 1.2rem;
+		padding: 0.5rem 0.9rem;
+		border-radius: 0.7rem;
+		border: 1px solid rgba(252, 169, 27, 0.22);
+		background: #0a2e32;
+		color: rgba(243, 240, 231, 0.78);
+		font-family: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+		font-size: 0.84rem;
+	}
+
+	.rk-final__install::before {
+		content: "$";
+		margin-right: 0.6rem;
+		color: #fca91b;
+	}
+
+	/* ===== Spotlight (--mx/--my injected by JS on fine pointers) ===== */
+	[data-spot] {
+		position: relative;
+	}
+
+	[data-spot]::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		opacity: 0;
+		background: radial-gradient(
+			420px circle at var(--mx, 50%) var(--my, 50%),
+			var(--rk-spot),
+			transparent 62%
+		);
+		transition: opacity 500ms var(--rk-ease);
+	}
+
+	[data-spot]:hover::after {
+		opacity: 1;
+	}
+
+	[data-spot] > * {
+		position: relative;
+		z-index: 1;
+	}
+
+	/* ===== Scroll reveal ===== */
+	[data-rk-reveal] {
+		opacity: 0;
+		transform: translate3d(0, 32px, 0);
+		filter: blur(8px);
+		transition:
+			opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
+			transform 900ms cubic-bezier(0.16, 1, 0.3, 1),
+			filter 900ms cubic-bezier(0.16, 1, 0.3, 1);
+		transition-delay: calc(var(--i, 0) * 70ms);
+	}
+
+	[data-rk-reveal].is-visible {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+		filter: blur(0);
+	}
+
+	/* Hero code window float */
+	@media (prefers-reduced-motion: no-preference) {
+		.rk-hero__window {
+			animation: rk-float 9s ease-in-out infinite alternate;
+		}
+
+		@keyframes rk-float {
+			from {
+				transform: translate3d(0, 0, 0);
+			}
+			to {
+				transform: translate3d(0, -12px, 0);
+			}
+		}
+	}
+
+	/* ===== Responsive ===== */
+	@media (max-width: 980px) {
+		.rk-hero,
+		.rk-layer,
+		.rk-path,
+		.rk-final__core {
+			grid-template-columns: 1fr;
+		}
+
+		.rk-hero {
 			min-height: auto;
+			padding-block: 2.5rem;
+		}
+
+		.rk-feat {
+			grid-template-columns: repeat(2, 1fr);
+		}
+
+		.rk-feat-card--lg,
+		.rk-feat-card--wide {
+			grid-column: span 2;
+			grid-row: auto;
+		}
+
+		.rk-feat-card--sm {
+			grid-column: span 1;
+		}
+
+		.rk-path__intro {
+			position: static;
+		}
+
+		.rk-final__core {
+			justify-items: start;
+		}
+	}
+
+	@media (max-width: 600px) {
+		.rk-home {
+			padding-inline: 1rem;
+		}
+
+		.rk-feat {
+			grid-template-columns: 1fr;
+		}
+
+		.rk-feat-card--lg,
+		.rk-feat-card--wide,
+		.rk-feat-card--sm {
+			grid-column: span 1;
+			grid-row: auto;
+		}
+
+		.rk-actions {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.rk-button {
+			width: 100%;
+		}
+
+		.rk-hero h1 {
+			font-size: clamp(2rem, 9vw, 2.8rem);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.rk-home *,
+		.rk-home *::before,
+		.rk-home *::after {
+			animation-duration: 1ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 1ms !important;
+			scroll-behavior: auto !important;
+		}
+
+		[data-rk-reveal] {
+			opacity: 1;
+			transform: none;
+			filter: none;
 		}
 	}
 </style>

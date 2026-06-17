@@ -961,17 +961,20 @@ const qsSteps = [
 		background: #fdf9f1;
 	}
 
-	:global(body:has(.rk-home) .main-frame header) {
+	/* nova 把 fixed 导航 <header> 渲染为 .main-frame 的兄弟节点(见
+	   starlight-theme-nova/PageFrame.astro),必须直接命中它——`.main-frame header`
+	   后代选择器匹配不到任何元素,会保留默认的 --sl-color-bg-nav,与首页背景色冲突。 */
+	:global(body:has(.rk-home) header) {
 		backdrop-filter: blur(20px) saturate(140%);
 		-webkit-backdrop-filter: blur(20px) saturate(140%);
 	}
 
-	:global([data-theme='dark'] body:has(.rk-home) .main-frame header) {
+	:global([data-theme='dark'] body:has(.rk-home) header) {
 		border-bottom-color: rgba(252, 169, 27, 0.14);
 		background: rgba(5, 42, 45, 0.72);
 	}
 
-	:global([data-theme='light'] body:has(.rk-home) .main-frame header) {
+	:global([data-theme='light'] body:has(.rk-home) header) {
 		border-bottom-color: rgba(6, 74, 79, 0.1);
 		background: rgba(253, 249, 241, 0.74);
 	}
