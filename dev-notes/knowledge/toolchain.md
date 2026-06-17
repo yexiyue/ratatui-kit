@@ -51,6 +51,18 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 
 **相关文件**：`docs/astro.config.mjs`、`README.md`、`docs/README.md`
 
+### docs 依赖升级：starlight ↔ astro 版本耦合 + nova 主题改 header 类名
+
+文档站用 `@astrojs/starlight` + 第三方主题 `starlight-theme-nova`，升级有两个易踩的耦合点：
+
+- **Starlight 的 astro peer 是硬约束**：`@astrojs/starlight@0.40` 的 `peerDependencies.astro` 是 `^6`，升 Starlight 必须连带把 astro 升到对应主版本（5→6）。升级时用 `pnpm add astro@latest @astrojs/starlight@latest starlight-theme-nova@latest sharp@latest` 一次性装齐，让 pnpm 一把满足 peer。nova 的 peer 是 `@astrojs/starlight: *`（宽松），跟随即可。实测 astro 6 对这个纯 Starlight 站无 breaking（40 页 build 直通）。
+- **nova 主版本会改 DOM 类名**：`HomePage.astro` 给 nova 顶栏做了品牌化（背景/边框跟随首页 teal/amber/cream + backdrop-blur）。nova 0.9→0.11 把顶栏从 `.nova-page-frame-header` 重写成 Tailwind 风格的 `.main-frame header`，旧选择器会**静默失效**（规则不匹配任何元素，header 退回主题默认色，不会报错）。升 nova 后必须真机复验首页 header，把样式选择器同步到新结构（现用 `body:has(.rk-home) .main-frame header`）。
+- 首页的 sticky 修复（`.main-pane:has(.rk-home){overflow-x:clip;overflow-y:visible}` —— nova 的 `.main-pane{overflow:auto}` 会让 `position:sticky` 相对它而非 window 失效）依赖的 `.main-pane` 在 0.11 仍在，不受本次升级影响。
+
+**正确做法**：升级文档站依赖后务必 `pnpm build` + 起 dev 真机核对首页（header 融入、sticky 钉住、亮/暗配色），不要只看 build 绿就收工。
+
+**相关文件**：`docs/package.json`、`docs/src/components/HomePage.astro`、`docs/astro.config.mjs`
+
 ### VHS 录制必须显式设置彩色终端环境
 
 Codex / CI shell 可能带 `TERM=dumb` 或 `NO_COLOR=1`。裸 ANSI `printf` 仍会显示颜色，但 ratatui/crossterm 会按环境降级，导致 example 真实运行有颜色，VHS GIF 却只剩灰度样式。

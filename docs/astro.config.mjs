@@ -33,6 +33,11 @@ export default defineConfig({
 				]
 			})],
 			title: 'Ratatui Kit',
+			logo: {
+				src: './src/assets/logo.svg',
+			},
+			favicon: '/favicon.svg',
+			customCss: ['./src/styles/brand.css'],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/yexiyue/ratatui-kit' }],
 			sidebar: [
 				{

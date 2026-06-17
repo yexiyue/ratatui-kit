@@ -1,0 +1,19 @@
+/* Ratatui Kit 品牌色：取自 logo 的 teal(青绿) + amber(奶酪黄) 双色体系。
+   暗色页用 amber 强调(像 logo 奶酪在深色上发光)，亮色页用 teal 强调(像 logo 主体)。
+   用 :root:root 提升优先级覆盖 starlight-theme-nova 默认中性 accent，
+   让文档内页的链接、侧边栏激活项、焦点环、callout 等都跟随品牌色。 */
+:root:root {
+	--sl-color-accent-low: #3a2808;
+	--sl-color-accent: #c47512;
+	--sl-color-accent-high: #ffdca6;
+	--sl-color-text-accent: #fca91b;
+	--sl-color-asides-text-accent: #fca91b;
+}
+
+:root:root[data-theme='light'] {
+	--sl-color-accent-low: #cfe6e4;
+	--sl-color-accent: #0a5b60;
+	--sl-color-accent-high: #053034;
+	--sl-color-text-accent: #0a5b60;
+	--sl-color-asides-text-accent: #0a5b60;
+}
