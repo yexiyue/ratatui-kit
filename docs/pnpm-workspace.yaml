@@ -1,0 +1,5 @@
+# pnpm 11 起，onlyBuiltDependencies 等设置从 package.json 的 "pnpm" 字段迁到这里。
+# 放行 esbuild / sharp 的安装/构建脚本，否则 CI 的 pnpm@latest 会报 ERR_PNPM_IGNORED_BUILDS 退出 1。
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
