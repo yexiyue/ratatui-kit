@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This is a Rust 2024 Cargo workspace for a ratatui-based terminal UI framework. The main library lives in `packages/ratatui-kit/`; its modules are split by runtime concern: `components/`, `hooks/`, `render/`, `element/`, `terminal/`, `atom/`, and `context.rs`. Procedural macros live in `packages/ratatui-kit-macros/src/` and provide `element!`, `#[component]`, `#[derive(Props)]`, router, and layout helpers. The root crate `ratatui-kit-examples` only hosts runnable examples in `examples/`. Compile-fail/pass UI tests live under `packages/ratatui-kit/tests/ui/`. Design proposals and active specs are under `openspec/changes/`; project knowledge notes are under `dev-notes/knowledge/`.
+This is a Rust 2024 Cargo workspace for a ratatui-based terminal UI framework. The main library lives in `crates/ratatui-kit/`; its modules are split by runtime concern: `components/`, `hooks/`, `render/`, `element/`, `terminal/`, `atom/`, and `context.rs`. Procedural macros live in `crates/ratatui-kit-macros/src/` and provide `element!`, `#[component]`, `#[derive(Props)]`, router, and layout helpers. The root crate `ratatui-kit-examples` only hosts runnable examples in `examples/`. Compile-fail/pass UI tests live under `crates/ratatui-kit/tests/ui/`. Design proposals and active specs are under `openspec/changes/`; project knowledge notes are under `dev-notes/knowledge/`.
 
 ## Build, Test, and Development Commands
 
@@ -18,7 +18,7 @@ Use `rustfmt` with `tab_spaces = 4`. Keep code idiomatic Rust and edition 2024 c
 
 ## Testing Guidelines
 
-The project uses standard Cargo tests plus `trybuild` UI tests for macro behavior. Add runtime unit/integration tests near the affected crate when possible, and add macro pass/fail cases in `packages/ratatui-kit/tests/ui/pass/` or `fail/` with matching `.stderr` files. Always test feature-gated code with `--all-features`; the default feature set is intentionally empty.
+The project uses standard Cargo tests plus `trybuild` UI tests for macro behavior. Add runtime unit/integration tests near the affected crate when possible, and add macro pass/fail cases in `crates/ratatui-kit/tests/ui/pass/` or `fail/` with matching `.stderr` files. Always test feature-gated code with `--all-features`; the default feature set is intentionally empty.
 
 ## Commit & Pull Request Guidelines
 

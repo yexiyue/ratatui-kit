@@ -45,7 +45,7 @@ flowchart TD
 源码入口：
 
 ```text
-packages/ratatui-kit/src/render/tree.rs
+crates/ratatui-kit/src/render/tree.rs
 Tree::render_loop
 Tree::render
 Tree::update_once
@@ -204,10 +204,10 @@ dispatch 后必须无条件 `continue` 回到循环顶。原因是有些 handler
 分发顺序见 [输入层](/ratatui-kit/core/input-layers/)。实现入口在：
 
 ```text
-packages/ratatui-kit/src/input/mod.rs
+crates/ratatui-kit/src/input/mod.rs
 InputRuntime::begin_frame
 InputRuntime::dispatch
-packages/ratatui-kit/src/hooks/use_input.rs
+crates/ratatui-kit/src/hooks/use_input.rs
 ```
 
 ## 贡献时守住这些不变量

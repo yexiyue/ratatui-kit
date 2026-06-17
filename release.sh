@@ -9,7 +9,7 @@ set -eo pipefail
 #   ./release.sh 0.6.0 ratatui-kit-macros ratatui-kit-examples   # 非交互
 #
 # 标签形如 <crate>-v<version>,由 .github/workflows/CD.yaml(on: tags '*-v*')
-# 触发 `cargo publish packages/<crate>` 自动发布到 crates.io。
+# 触发 `cargo publish crates/<crate>` 自动发布到 crates.io。
 
 LEVEL="${1:-patch}"
 if [ "$#" -gt 0 ]; then shift; fi
