@@ -1,4 +1,58 @@
-## [0.5.9] - 2026-06-10
+## [0.7.0] - 2026-06-17
+
+### 🚀 Features
+
+- Element! 一等 if/for/match 控制流 + Text 文本节点 + adapter 按引用渲染
+- *(router)* Routes! 宏支持像 element! 一样传 props
+- *(core)* 重写事件系统为输入层 + 中央分发器,实现框架级输入互斥
+- 重写文档示例与内置组件体系
+- *(docs)* 首页重设计 + 品牌 logo/配色 + 依赖升级到 astro 6
+- 新增 ratatui-kit AI agent skill 及配套文档,并修正过时文档
+
+### 🐛 Bug Fixes
+
+- *(atom)* Use_atom 跟随传入 atom 并在切换/卸载时退订 waker
+- *(router)* 动态路由正则锚定开头 + 静态段转义，补全路由测试网
+- *(core)* 实施 harden-audit-findings 审查修复(借用安全/反 panic/状态重构/hooks)
+- *(ci)* GitHub Pages 部署 Node 升到 22(pnpm@latest 需 Node≥22.13,否则缺 node:sqlite 崩溃)
+- *(ci)* Pnpm onlyBuiltDependencies 放行 esbuild/sharp 构建脚本(否则 CI 报 ERR_PNPM_IGNORED_BUILDS 退出 1)
+- *(ci)* OnlyBuiltDependencies 迁到 pnpm-workspace.yaml(pnpm 11 不再读 package.json 的 pnpm 字段,改用 workspace 文件放行 esbuild/sharp)
+- *(ci)* Pnpm-workspace.yaml 改用 allowBuilds(pnpm 11 移除 onlyBuiltDependencies)放行 esbuild/sharp 构建脚本
+
+### 🚜 Refactor
+
+- Element! DSL 去 sigil，$/#() 改为 widget()/stateful()/{ } 语法
+- *(components)* Border/Positioned 用 from_props 单一构造源消除 new/update 重复
+- *(runtime)* Drop component send sync bounds
+- [**breaking**] 全局 store 重设计为 Atom（Jotai 式）+ 命名统一 + 运算符去重
+- *(macros)* 抽出 ParsedElementHead，element codegen 单一真源（行为零变化）
+
+### 📚 Documentation
+
+- 新增 dev-workflow 项目知识库（dev-notes/knowledge）
+- 纳入 AGENTS.md（Codex 项目指引，CLAUDE.md 的兄弟文件）
+- *(openspec)* 提案 extract-parsed-element-head（ParsedElementHead 重构）
+- 添加终端录制博客素材
+- *(knowledge)* 记录 Pages 部署 Node22 + pnpm11 allowBuilds 坑
+
+### ⚡ Performance
+
+- *(router)* 路由匹配正则改为构造期一次性编译并缓存
+
+### 🧪 Testing
+
+- 全库测试网(一) 运行时单测 + 宏 trybuild UI 测试
+- 全库测试网(二) 抽出 Route::match_path + router/store 单测
+- *(render)* 终端抽象对象安全化 + 离屏渲染 harness + 组件渲染测试
+
+### ⚙️ Miscellaneous Tasks
+
+- .gitignore 放开 agent 配置，纳入 .claude/ CLAUDE.md openspec/
+- Drop-send-sync 收尾 + gitignore .codex/
+- *(openspec)* 归档 6 个已实现变更，spec deltas 落入 specs/
+- *(openspec)* 归档 extract-parsed-element-head，spec delta 落入 specs/
+- 重命名 workspace 目录 packages→crates 并重写 README
+## [0.6.0] - 2026-06-10
 
 ### 🚀 Features
 
@@ -7,6 +61,10 @@
 ### 📚 Documentation
 
 - Migrate docs
+
+### ⚙️ Miscellaneous Tasks
+
+- Release
 ## [0.5.9] - 2025-10-30
 
 ### 🐛 Bug Fixes
@@ -291,7 +349,7 @@
 
 - Release
 - Release
-## [ratatui-kit-v0.2.0] - 2025-06-11
+## [0.2.0] - 2025-06-11
 
 ### 🚀 Features
 
@@ -304,7 +362,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Release
-## [ratatui-kit-v0.1.0] - 2025-06-09
+## [0.1.0] - 2025-06-09
 
 ### 🚀 Features
 
