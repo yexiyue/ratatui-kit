@@ -70,12 +70,25 @@ fn parse_children(input: ParseStream) -> syn::Result<Vec<ParsedElementChild>> {
         } else if input.peek(syn::token::Brace) {
             // `{ expr }`:把子节点位置交还给任意 Rust 表达式(返回 Option/Vec/Iterator/Element)。
             children.push(ParsedElementChild::Expr(input.parse()?));
+        } else if is_macro_call(input) {
+            // 宏调用 `path!(...)`(典型是嵌套的 `element!(...)`,也含 `vec![...]` 等)在子节点位
+            // 等同 `{ expr }` embed——整段当 Rust 表达式解析。否则 `element` 会被当成无 props
+            // 组件头、剩下的 `!(...)` 在下一轮以 `TypePath` 解析 `!` → 误报 `expected identifier`
+            // (这正是把 `Comp(..) { element!(..) }` 误当 children 时最坑的报错)。
+            children.push(ParsedElementChild::Expr(input.parse()?));
         } else {
             // 嵌套元素 `Comp(..){..}` 或 `widget(...)` / `stateful(...)` 适配器。
             children.push(ParsedElementChild::Element(input.parse()?));
         }
     }
     Ok(children)
+}
+
+// 子节点是否为宏调用 `path!(...)`:fork 出去试解析一个 path,其后紧跟 `!` 即是。
+// 组件头 `Comp(props)` 与适配器 `widget(...)` 的 path 之后都是 `(`,不会误判。
+fn is_macro_call(input: ParseStream) -> bool {
+    let fork = input.fork();
+    fork.parse::<syn::Path>().is_ok() && fork.peek(Token![!])
 }
 
 fn parse_if(input: ParseStream) -> syn::Result<ControlFlow> {
