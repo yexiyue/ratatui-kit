@@ -143,6 +143,21 @@ element!(View { { rows } })
 
 > Removed legacy syntax (writing it will fail to compile): `$widget` → use `widget(...)`; `#(expr)` children → use `{ expr }`.
 
+> **Footgun — a `{ … }` written *immediately after a self-closing component* is consumed as that component's children block, not a sibling embed.** `SearchInput(props) { if cond { … } }` makes the brace `SearchInput`'s children — and a children block parses `if`/`for`/`match` as **first-class control flow over element children**, so an `element!(…)` or arbitrary Rust expression inside fails with a cryptic `expected identifier`. This bites hardest when mechanically migrating `#(if … )` → `{ if … }`. The fix: write a **sibling conditional with first-class control flow** — no wrapping braces, native element children, and *no* inner `element!(…)`/`.into_any()`:
+>
+> ```rust
+> element!(View {
+>     SearchInput(props)
+>     if cond {
+>         Border(/* … */) { Center { Text(text: "empty") } }   // native children, not element!(Border(…))
+>     } else {
+>         TreeSelect<T>(/* … */)
+>     }
+> })
+> ```
+>
+> Reserve the `{ expr }` embed for injecting *pre-computed values* (a `Vec`, an iterator, a variable) — not for nesting `element!` calls or returning elements from control flow.
+
 ---
 
 ## 2. `widget(expr)` / `stateful(widget, state)` adapters
@@ -168,6 +183,16 @@ element!(Border(...) {
 ```
 
 Adapters may only appear in a children position of `element!` (or as the single argument of `element!()`).
+
+> **`widget(expr)` requires `for<'a> &'a T: Widget`** — it renders the widget *by reference* each frame (and additionally `T: Clone + Unpin`). Widgets that only impl `Widget` **by value** (e.g. `tui-big-text`'s `BigText`, and historically several ratatui widgets — even the framework's own `TextParagraph` carries a hand-written `&TextParagraph: Widget` impl to satisfy this) fail with `the trait bound for<'a> &'a T: Widget is not satisfied`. Two fixes: **(a)** use a widget version that impls `WidgetRef` (which yields `&T: Widget`), or **(b)** wrap it in a newtype that impls `Widget` for the *reference* by cloning:
+> ```rust
+> struct ByRef<W>(W);
+> impl<W: Widget + Clone> Widget for &ByRef<W> {
+>     fn render(self, area: Rect, buf: &mut Buffer) { self.0.clone().render(area, buf); }
+> }
+> // then: widget(ByRef(big_text))
+> ```
+> `stateful(w, s)` likewise needs `for<'a> &'a T: StatefulWidget`.
 
 ---
 

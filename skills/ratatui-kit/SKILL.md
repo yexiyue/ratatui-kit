@@ -413,6 +413,18 @@ in `references/building-polished-uis.md`.
   handle goes deaf. Pass it within the same frame only.
 - **`Block` is not `Send + Sync`** since Ratatui 0.30 — hold `Option<Block<'static>>`
   directly in props; don't reintroduce any `SendBlock` wrapper.
+- **A `{ … }` right after a self-closing component is eaten as its children**, not a
+  sibling embed. `SearchInput(props) { if x { Foo } }` makes the brace `SearchInput`'s
+  *children block* — which parses `if`/`for`/`match` as first-class control flow over
+  **element children**, so an `element!(…)` or arbitrary Rust expr inside yields a cryptic
+  `expected identifier`. For a conditional **sibling**, use first-class control flow with
+  **native** element children (no wrapping `{}`, no inner `element!(…)`/`.into_any()`):
+  `SearchInput(props)` then `if x { Border(…){…} } else { TreeSelect<T>(…) }`.
+- **`widget(w)` needs `for<'a> &'a w: Widget`** (renders by reference). Widgets that only
+  impl `Widget` *by value* (e.g. `tui-big-text`'s `BigText`) fail with `&T: Widget is not
+  satisfied`. Use a version that impls `WidgetRef` (→ `&T: Widget`), or wrap it:
+  `struct W(BigText); impl Widget for &W { fn render(self, a, b){ self.0.clone().render(a,b) } }`
+  then `widget(W(bt))`.
 
 ---
 
