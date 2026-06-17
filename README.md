@@ -17,7 +17,7 @@
 **[Quick Start](https://yexiyue.github.io/ratatui-kit/start/quick-start/)** ·
 **[Components](https://yexiyue.github.io/ratatui-kit/components/)** ·
 **[Examples](https://yexiyue.github.io/ratatui-kit/examples/)** ·
-**[Simplified Chinese](https://github.com/yexiyue/ratatui-kit/blob/main/README.zh-CN.md)**
+**[简体中文](https://github.com/yexiyue/ratatui-kit/blob/main/README.zh-CN.md)**
 
 </div>
 

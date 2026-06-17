@@ -1,4 +1,11 @@
-name: Publish Rust Crate by Tag
+name: Publish & Release by Tag
+
+# 发布流程（AI/人工驱动，无需本地 cargo-release / git-cliff）：
+#   1. 改 crates/<crate>/Cargo.toml 的 version，commit
+#   2. git tag <crate>-v<version>（如 ratatui-kit-v0.7.0；主库依赖 macros 时先发 macros）
+#   3. git push origin main --tags
+# 本工作流据标签自动：校验版本 → 发布 crates.io →（仅主库）git-cliff 生成
+# CHANGELOG + GitHub Release，并把更新后的 CHANGELOG.md 回写 main。
 
 on:
   push:
@@ -6,59 +13,83 @@ on:
       - "*-v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   publish:
-    permissions:
-      contents: write
-
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Extract crate prefix and version from tag
-        id: extract
+        id: meta
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           PREFIX=$(echo "$TAG_NAME" | sed -E 's/(.*)-v[0-9].*/\1/')
           VERSION=$(echo "$TAG_NAME" | sed -E 's/.*-v([0-9].*)/\1/')
-          echo "prefix=$PREFIX" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Publish crate
+      - name: Verify Cargo.toml version matches the tag
+        run: |
+          CRATE_PATH="crates/${{ steps.meta.outputs.prefix }}"
+          test -f "$CRATE_PATH/Cargo.toml" || { echo "::error::$CRATE_PATH/Cargo.toml not found"; exit 1; }
+          CARGO_VER=$(grep -m1 '^version' "$CRATE_PATH/Cargo.toml" | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "$CARGO_VER" != "${{ steps.meta.outputs.version }}" ]; then
+            echo "::error::tag version ${{ steps.meta.outputs.version }} != $CRATE_PATH Cargo.toml version $CARGO_VER (先改 Cargo.toml 版本号再打标签)"
+            exit 1
+          fi
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          CRATE_PATH="crates/${{ steps.extract.outputs.prefix }}"
-          if [ ! -f "$CRATE_PATH/Cargo.toml" ]; then
-            echo "Crate path $CRATE_PATH not found!" && exit 1
-          fi
-          cd "$CRATE_PATH"
-          cargo publish --token "$CARGO_REGISTRY_TOKEN"
+        run: cargo publish --manifest-path "crates/${{ steps.meta.outputs.prefix }}/Cargo.toml" --token "$CARGO_REGISTRY_TOKEN"
 
-      - name: Extract release notes from CHANGELOG
-        id: changelog
+  release:
+    # 仅主库标签生成 CHANGELOG 与 GitHub Release；macros 标签只发布 crates.io。
+    needs: publish
+    if: startsWith(github.ref_name, 'ratatui-kit-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main (full history for git-cliff)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Generate release notes (latest section)
+        run: git cliff --config cliff.toml --latest --strip header --output RELEASE_NOTES.md
+
+      - name: Regenerate full CHANGELOG.md
+        run: git cliff --config cliff.toml --output CHANGELOG.md
+
+      - name: Commit updated CHANGELOG.md back to main
         run: |
-          VERSION=${{ steps.extract.outputs.version }}
-          # 先尝试 [0.2.1] 这种格式
-          awk "/^##? \\[${VERSION}]/ {flag=1;next} /^##? /{flag=0}flag" CHANGELOG.md > RELEASE_BODY.md
-          # 如果没内容，再尝试 [ratatui-kit-v0.2.1] 这种格式
-          if [ ! -s RELEASE_BODY.md ]; then
-            awk "/^##? \\[ratatui-kit-v${VERSION}]/ {flag=1;next} /^##? /{flag=0}flag" CHANGELOG.md > RELEASE_BODY.md
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged, nothing to commit"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.md
+            git commit -m "docs(changelog): update for ${{ github.ref_name }} [skip ci]"
+            git push origin HEAD:main
           fi
-          echo 'body<<EOF' >> $GITHUB_OUTPUT
-          cat RELEASE_BODY.md >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        if: steps.extract.outputs.prefix == 'ratatui-kit'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          body: ${{ steps.changelog.outputs.body }}
+          body_path: RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

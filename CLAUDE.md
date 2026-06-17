@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 知识库主题：
 
-- `dev-notes/knowledge/toolchain.md` — cargo 命令矩阵、feature flags 门控、lefthook/CI、release.sh 发布、单元测试与「编译即基线」约定
+- `dev-notes/knowledge/toolchain.md` — cargo 命令矩阵、feature flags 门控、lefthook/CI、打 tag 触发的 CI 发布(git-cliff 生成 CHANGELOG)、单元测试与「编译即基线」约定
 - `dev-notes/knowledge/runtime-architecture.md` — Element/Component、协调(reconciliation)、渲染循环 + Waker 响应式、布局/透明布局
 - `dev-notes/knowledge/hooks-and-state.md` — Hook 顺序规则、自定义 Hook 的 Sealed 约定、use_state vs 全局 Atom、State/AtomState 运算符重载
 - `dev-notes/knowledge/macros-and-props.md` — 过程宏(element!/#[component] 等)、Props 类型擦除、ratatui Block props、AnyProps unsafe
@@ -43,7 +43,7 @@ cargo run --example counter      # 其它：custom_list hello_world input list m
 # 注：textarea 示例随 textarea 特性下线已禁用（examples/textarea.rs.disabled）
 ```
 
-发布由 [release.sh](release.sh) 驱动（`cargo release` 逐 crate 升版本 + git-cliff 生成 CHANGELOG，见 [release.toml](release.toml)）。
+发布由「打 tag 触发 CI」驱动：改 `crates/<crate>/Cargo.toml` 版本 → commit → `git tag <crate>-v<version>` → `git push --tags`，[.github/workflows/CD.yaml](.github/workflows/CD.yaml) 据标签 `cargo publish` 并（仅主库标签）用 git-cliff（[cliff.toml](cliff.toml)）生成 CHANGELOG 与 GitHub Release（弃用了 release.sh）。详见 [dev-notes/knowledge/toolchain.md](dev-notes/knowledge/toolchain.md)。
 
 ## 特性开关（feature flags）
 

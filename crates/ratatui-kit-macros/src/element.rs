@@ -308,6 +308,8 @@ impl Parse for ParsedElementHead {
 impl ParsedElementHead {
     // 返回 `key:` 字段的 span(若存在)。`routes!` 借此拒绝路由元素上的 `key:`——
     // 路由身份由 path 决定,元素 key 在路由场景下无意义(详见 `router.rs`)。
+    // 仅 `routes!`(router 特性)调用,故随 router 特性门控,避免无特性时的 dead_code 警告。
+    #[cfg(feature = "router")]
     pub fn key_span(&self) -> Option<Span> {
         self.props
             .iter()

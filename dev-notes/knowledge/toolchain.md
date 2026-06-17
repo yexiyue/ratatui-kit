@@ -189,15 +189,23 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 
 **相关文件**：`examples/`、`crates/ratatui-kit/tests/ui.rs`、各模块 `#[cfg(test)] mod tests`、`CLAUDE.md`
 
-### 发布走 release.sh + tag 触发 CD
+### 发布：打 tag → CI 用 git-cliff 生成 CHANGELOG + Release
 
-`release.sh [level] [exclude-crate ...]` 用 `cargo release` 逐 crate 升版本 + git-cliff 生成 CHANGELOG，最后 `git push origin main --tags`。tag 形如 `<crate>-v<version>`，由 `.github/workflows/CD.yaml`（`on: tags '*-v*'`）触发 `cargo publish crates/<crate>`。
+已弃用 `release.sh`/`release.toml`（cargo-release 那套），改为「**AI/人工打 tag，CHANGELOG 在 CI 生成**」。本地无需装 `cargo-release`/`git-cliff`。步骤：
 
-**正确做法**：三个 crate（`ratatui-kit-macros` / `ratatui-kit` / `ratatui-kit-examples`）版本相互独立，按需用 `--exclude` 或交互式选择跳过不发布的 crate。`ratatui-kit-examples` 通常不发布到 crates.io。
+1. 改 `crates/<crate>/Cargo.toml` 的 `version`，commit（建议 `chore(release): <crate> v<version>`）。
+2. 打标签 `git tag <crate>-v<version>`（如 `ratatui-kit-v0.7.0`）。
+3. `git push origin main --tags`。
 
-**不要做**：手动 `cargo publish` 绕过脚本——会漏掉 CHANGELOG 生成与 tag 约定，导致 CD 的 release notes 抽取（按 CHANGELOG 段落 awk）拿到空内容。
+`.github/workflows/CD.yaml`（`on: tags '*-v*'`）据标签自动：① **校验** `crates/<prefix>/Cargo.toml` 的 version 与 tag 一致（不一致 fail，防忘升版本就打 tag）；② `cargo publish` 到 crates.io；③ **仅主库标签**（`ratatui-kit-v*`）用 `git cliff`（配置 `cliff.toml`）把 `--latest` 段落作 GitHub Release 正文、全量重写 `CHANGELOG.md` 回写 `main`（commit 带 `[skip ci]`）。`ratatui-kit-macros` 标签只发布、不建 Release。
 
-**相关文件**：`release.sh`、`release.toml`、`.github/workflows/CD.yaml`
+**cliff.toml 约定**：`tag_pattern = "^ratatui-kit-v[0-9].*"` 只把主库标签当 release 边界，模板用 `trim_start_matches` 去前缀 → CHANGELOG 显示裸 `## [x.y.z]`（与历史一致，且消除了曾有的重复 `## [0.5.9]`）。
+
+**发布顺序坑**：`ratatui-kit` 用 `ratatui-kit-macros = { version = "x.y.z", path = ... }`——`cargo publish` 按 `version` 字段要求该版本已在 crates.io。**若本次同时升 macros 且把主库依赖改成新版，必须先 push macros 标签、待发布完成，再 push 主库标签**；只发主库（依赖版本不变）无此约束。`ratatui-kit-examples` 不发布（不打 `*-v*` 标签即可）。
+
+**不要做**：本地手动跑 git-cliff 或恢复 `release.sh`——CHANGELOG 由 CI 统一生成回写，本地另生成会冲突。
+
+**相关文件**：`.github/workflows/CD.yaml`、`cliff.toml`
 
 ### 主库 README 是指向根 README 的符号链接（单一数据源）
 

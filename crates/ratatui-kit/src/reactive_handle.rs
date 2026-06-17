@@ -115,10 +115,13 @@ where
         }
     }
 
+    // 仅 `use_atom`(atom 特性)用于参数同步/退订,故随 atom 特性门控,避免无特性时的 dead_code 警告。
+    #[cfg(feature = "atom")]
     pub(crate) fn same_storage(&self, other: &Self) -> bool {
         self.inner.ptr_eq(&other.inner)
     }
 
+    #[cfg(feature = "atom")]
     pub(crate) fn remove_waker(&self, key: &ElementKey) {
         if let Ok(mut value) = self.inner.try_write() {
             value.notifier.remove(key);
