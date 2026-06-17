@@ -13,7 +13,7 @@
 
 **正确做法**：理解「Element 廉价、可随意重建；Instantiated 昂贵、靠协调复用」。给组件的副作用/状态都挂在 hooks 上，而不是塞进 props 或 element。
 
-**相关文件**：`packages/ratatui-kit/src/element/mod.rs`、`packages/ratatui-kit/src/component/instantiated_component.rs`
+**相关文件**：`crates/ratatui-kit/src/element/mod.rs`、`crates/ratatui-kit/src/component/instantiated_component.rs`
 
 ### 协调按 `ElementKey + TypeId` 复用——key 决定状态去留
 
@@ -23,7 +23,7 @@
 
 **不要做**：用数组下标当 key 渲染会增删的列表——会导致状态串台。
 
-**相关文件**：`packages/ratatui-kit/src/render/updater.rs`、`packages/ratatui-kit/src/element/key.rs`
+**相关文件**：`crates/ratatui-kit/src/render/updater.rs`、`crates/ratatui-kit/src/element/key.rs`
 
 ## 渲染循环与响应式
 
@@ -48,7 +48,7 @@ loop {
 
 **不要做**：在组件外用普通变量/`static mut` 存 UI 状态再期望它自动重绘——没有 Waker 唤醒，`select` 不会醒，画面卡住直到下一个无关事件。
 
-**相关文件**：`packages/ratatui-kit/src/render/tree.rs`、`packages/ratatui-kit/src/component/mod.rs`（`poll_change`）
+**相关文件**：`crates/ratatui-kit/src/render/tree.rs`、`crates/ratatui-kit/src/component/mod.rs`（`poll_change`）
 
 ## 布局
 
@@ -58,7 +58,7 @@ loop {
 
 **正确做法**：写需要非 flex 排布的组件（如 `ScrollView`、`Modal`）时重写 `calc_children_areas`，参考现有两者的实现。组件想获得布局字段，用 `#[with_layout_style]` 给 Props 注入（见 `macros-and-props.md`）。
 
-**相关文件**：`packages/ratatui-kit/src/render/layout_style.rs`、`packages/ratatui-kit/src/components/scroll_view/mod.rs`、`packages/ratatui-kit/src/components/modal.rs`
+**相关文件**：`crates/ratatui-kit/src/render/layout_style.rs`、`crates/ratatui-kit/src/components/scroll_view/mod.rs`、`crates/ratatui-kit/src/components/modal.rs`
 
 ### 透明布局：函数组件是「透传包装器」，布局属性写在子根元素上
 
@@ -68,7 +68,7 @@ loop {
 
 **不要做**：在 `element!` 里给一个函数组件包装器直接挂布局属性并指望它形成独立布局区——它是透明的，属性会被忽略/穿透。
 
-**相关文件**：`packages/ratatui-kit-macros/src/component.rs`（`set_transparent_layout`）、`packages/ratatui-kit/src/components/view.rs`
+**相关文件**：`crates/ratatui-kit-macros/src/component.rs`（`set_transparent_layout`）、`crates/ratatui-kit/src/components/view.rs`
 
 ### 组件树运行时契约
 
@@ -78,7 +78,7 @@ loop {
 - 自定义 `calc_children_areas` 时始终按 children 数量返回区域。
 - 条件渲染可能返回空子树的透明组件不需要手动清布局，运行时会重置。
 
-**相关文件**：`packages/ratatui-kit/src/component/mod.rs`、`packages/ratatui-kit/src/component/instantiated_component.rs`
+**相关文件**：`crates/ratatui-kit/src/component/mod.rs`、`crates/ratatui-kit/src/component/instantiated_component.rs`
 
 ### poll_change 必须三路全 poll
 
@@ -86,7 +86,7 @@ loop {
 
 **正确做法**：改 poll 聚合逻辑时先保存三路结果，再统一判断是否有 `Ready`。
 
-**相关文件**：`packages/ratatui-kit/src/component/instantiated_component.rs`
+**相关文件**：`crates/ratatui-kit/src/component/instantiated_component.rs`
 
 ### ScrollView 内容尺寸与滚动条判定共用公式
 
@@ -94,7 +94,7 @@ loop {
 
 **正确做法**：改 ScrollView 显隐或尺寸公式时同时走 `layout_for`，不要在 `calc_children_areas` 和 `render_scrollbars` 分叉维护两套 ±1 规则。
 
-**相关文件**：`packages/ratatui-kit/src/components/scroll_view/mod.rs`、`packages/ratatui-kit/src/components/scroll_view/scrollbars.rs`
+**相关文件**：`crates/ratatui-kit/src/components/scroll_view/mod.rs`、`crates/ratatui-kit/src/components/scroll_view/scrollbars.rs`
 
 ### Context 查找区分「已借用」与「未找到」三态
 
@@ -106,7 +106,7 @@ loop {
 
 **不要做**：把「已借用」的 panic 放进 `get_context` 这种被 `try_use_context` 复用的共享方法——会让 try_ 变体跟着 panic，破坏其非 panic 契约。
 
-**相关文件**：`packages/ratatui-kit/src/context.rs`、`packages/ratatui-kit/src/hooks/use_context.rs`、`packages/ratatui-kit/src/render/updater.rs`
+**相关文件**：`crates/ratatui-kit/src/context.rs`、`crates/ratatui-kit/src/hooks/use_context.rs`、`crates/ratatui-kit/src/render/updater.rs`
 
 ## 输入事件分发
 
@@ -123,4 +123,4 @@ loop {
 
 **不要做**：恢复 `Terminal` 的 `events()`/`wait()` 广播;在 update/draw 借用期 dispatch;把 z-order 排在 priority 之后。
 
-**相关文件**：`packages/ratatui-kit/src/input/mod.rs`、`packages/ratatui-kit/src/hooks/use_input.rs`、`packages/ratatui-kit/src/render/tree.rs`、`packages/ratatui-kit/src/terminal/mod.rs`
+**相关文件**：`crates/ratatui-kit/src/input/mod.rs`、`crates/ratatui-kit/src/hooks/use_input.rs`、`crates/ratatui-kit/src/render/tree.rs`、`crates/ratatui-kit/src/terminal/mod.rs`

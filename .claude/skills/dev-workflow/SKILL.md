@@ -2,7 +2,7 @@
 name: dev-workflow
 description: |
   项目开发工作流技能。在以下场景自动调用：
-  (1) 编写或修改任何 packages/*/src/ 或 examples/ 下的代码
+  (1) 编写或修改任何 crates/*/src/ 或 examples/ 下的代码
   (2) 添加新依赖、改 feature flag 或修改配置文件
   (3) 完成一个 feature 或修复一个 bug
   触发关键词：组件开发、bug 修复、重构、新功能、依赖升级、feature 门控、宏改动、配置变更

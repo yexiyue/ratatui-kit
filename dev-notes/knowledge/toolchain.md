@@ -51,6 +51,18 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 
 **相关文件**：`docs/astro.config.mjs`、`README.md`、`docs/README.md`
 
+### docs 依赖升级：starlight ↔ astro 版本耦合 + nova 主题改 header 类名
+
+文档站用 `@astrojs/starlight` + 第三方主题 `starlight-theme-nova`，升级有两个易踩的耦合点：
+
+- **Starlight 的 astro peer 是硬约束**：`@astrojs/starlight@0.40` 的 `peerDependencies.astro` 是 `^6`，升 Starlight 必须连带把 astro 升到对应主版本（5→6）。升级时用 `pnpm add astro@latest @astrojs/starlight@latest starlight-theme-nova@latest sharp@latest` 一次性装齐，让 pnpm 一把满足 peer。nova 的 peer 是 `@astrojs/starlight: *`（宽松），跟随即可。实测 astro 6 对这个纯 Starlight 站无 breaking（40 页 build 直通）。
+- **nova 主版本会改 DOM 类名**：`HomePage.astro` 给 nova 顶栏做了品牌化（背景/边框跟随首页 teal/amber/cream + backdrop-blur）。nova 0.9→0.11 把顶栏从 `.nova-page-frame-header` 重写成 Tailwind 风格的 `.main-frame header`，旧选择器会**静默失效**（规则不匹配任何元素，header 退回主题默认色，不会报错）。升 nova 后必须真机复验首页 header，把样式选择器同步到新结构（现用 `body:has(.rk-home) .main-frame header`）。
+- 首页的 sticky 修复（`.main-pane:has(.rk-home){overflow-x:clip;overflow-y:visible}` —— nova 的 `.main-pane{overflow:auto}` 会让 `position:sticky` 相对它而非 window 失效）依赖的 `.main-pane` 在 0.11 仍在，不受本次升级影响。
+
+**正确做法**：升级文档站依赖后务必 `pnpm build` + 起 dev 真机核对首页（header 融入、sticky 钉住、亮/暗配色），不要只看 build 绿就收工。
+
+**相关文件**：`docs/package.json`、`docs/src/components/HomePage.astro`、`docs/astro.config.mjs`
+
 ### VHS 录制必须显式设置彩色终端环境
 
 Codex / CI shell 可能带 `TERM=dumb` 或 `NO_COLOR=1`。裸 ANSI `printf` 仍会显示颜色，但 ratatui/crossterm 会按环境降级，导致 example 真实运行有颜色，VHS GIF 却只剩灰度样式。
@@ -117,7 +129,7 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 
 **正确做法**：改 `src/components/router/`、`src/atom/`、`src/components/input.rs`、`src/components/search_input.rs` 等模块时，用 `--all-features` 或 `--features <name>` 编译；新增门控模块要在 `lib.rs` / `components/mod.rs` 加 `#[cfg(feature = "...")]`，并在 `full` 聚合里登记。
 
-**相关文件**：`packages/ratatui-kit/Cargo.toml`、`packages/ratatui-kit/src/lib.rs`、`packages/ratatui-kit/src/components/mod.rs`
+**相关文件**：`crates/ratatui-kit/Cargo.toml`、`crates/ratatui-kit/src/lib.rs`、`crates/ratatui-kit/src/components/mod.rs`
 
 ### `textarea` 特性已随 ratatui 0.30 迁移下线
 
@@ -125,7 +137,7 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 
 **正确做法**：待 `tui-textarea` 发布 0.30 兼容版后，恢复 feature/依赖/example 并在 `components/mod.rs` 重新 `pub mod textarea;`。todo.md 另有「用 tui-input 重写 textarea 以支持自动换行」的方案——动手前先确认走哪条路。
 
-**相关文件**：`packages/ratatui-kit/src/components/textarea.rs`、`packages/ratatui-kit/Cargo.toml`、`todo.md`
+**相关文件**：`crates/ratatui-kit/src/components/textarea.rs`、`crates/ratatui-kit/Cargo.toml`、`todo.md`
 
 ## 测试与发布
 
@@ -136,20 +148,43 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 **已有的针对性测试**（`add-test-suite` 起逐步补齐，跑在 `cargo test --tests/--lib` 下）：
 
 - **运行时单测**（各模块 `#[cfg(test)] mod tests`）：`element/key.rs`（ElementKey 不碰撞/Hash/Eq）、`multimap.rs`、`hooks/use_state.rs` 与 `atom/`（运算符重载/Copy/读写、Atom 惰性初始化、use_atom 订阅清理）、`components/router/{history,mod}.rs`（history 越界、`Route::match_path` 段边界与参数提取）。可在模块内经 `UseStateImpl::new`/`AtomState::new`/`Route::new` 构造被测对象。
-- **宏 UI 测试**（`packages/ratatui-kit/tests/ui.rs` + `tests/ui/{pass,fail}/`，trybuild）：pass 验证新 DSL 编译通过；fail 的 `.stderr` **只断言本库经 `syn::Error` 产出的稳定文案**（旧 `$`/`#()` 迁移报错、`widget`/`stateful` 参数错误、`#[component]` 非法参名），不绑定 rustc 类型错误。trybuild UI 测试须放 `ratatui-kit` crate（展开的 `::ratatui_kit::` 路径需运行时 crate 在场）。
+- **宏 UI 测试**（`crates/ratatui-kit/tests/ui.rs` + `tests/ui/{pass,fail}/`，trybuild）：pass 验证新 DSL 编译通过；fail 的 `.stderr` **只断言本库经 `syn::Error` 产出的稳定文案**（旧 `$`/`#()` 迁移报错、`widget`/`stateful` 参数错误、`#[component]` 非法参名），不绑定 rustc 类型错误。trybuild UI 测试须放 `ratatui-kit` crate（展开的 `::ratatui_kit::` 路径需运行时 crate 在场）。
 
 - **组件渲染测试**（`src/render/harness.rs`，`#[cfg(test)]`）：`render_to_buffer(el, w, h)` 单次离屏渲染——no-op 终端跑 `update`（经对象安全的 `UpdaterTerminal` trait，无需真实 TTY）+ `ratatui::Terminal<TestBackend>` 跑 `draw` → 断言 `Buffer`。终端抽象对象安全化由 `render-test-harness` 落地：`ComponentUpdater` 持 `&mut dyn UpdaterTerminal`，`Tree` 暴露 `update_once`/`draw_root`；`Terminal<T>` 泛型保留（多后端），`UpdaterTerminal` 只暴露 update 阶段需要的 `insert_before`。**门控组件**（如 `router` 的 `RouterProvider`/`Outlet`）的渲染集成测试同样写在 `harness.rs`，以 `#[cfg(feature = "router")] mod router_tests` 门控并复用 `render_to_buffer`——内部用零状态 `#[component]` 测试页（渲染可辨识文本）+ `routes!` 搭路由表，断言 `index_path` 选中并渲染正确组件、嵌套 `Outlet` 消费剩余 path。
 
 **正确做法**：改公开 API/宏后既跑 examples 冒烟,也跑 `--lib`/`--tests`;新增的纯逻辑（key/状态/路由匹配等）优先补 `#[cfg(test)]` 单测，宏的报错质量用 trybuild fail 用例锁住。
 
-**相关文件**：`examples/`、`packages/ratatui-kit/tests/ui.rs`、各模块 `#[cfg(test)] mod tests`、`CLAUDE.md`
+**相关文件**：`examples/`、`crates/ratatui-kit/tests/ui.rs`、各模块 `#[cfg(test)] mod tests`、`CLAUDE.md`
 
 ### 发布走 release.sh + tag 触发 CD
 
-`release.sh [level] [exclude-crate ...]` 用 `cargo release` 逐 crate 升版本 + git-cliff 生成 CHANGELOG，最后 `git push origin main --tags`。tag 形如 `<crate>-v<version>`，由 `.github/workflows/CD.yaml`（`on: tags '*-v*'`）触发 `cargo publish packages/<crate>`。
+`release.sh [level] [exclude-crate ...]` 用 `cargo release` 逐 crate 升版本 + git-cliff 生成 CHANGELOG，最后 `git push origin main --tags`。tag 形如 `<crate>-v<version>`，由 `.github/workflows/CD.yaml`（`on: tags '*-v*'`）触发 `cargo publish crates/<crate>`。
 
 **正确做法**：三个 crate（`ratatui-kit-macros` / `ratatui-kit` / `ratatui-kit-examples`）版本相互独立，按需用 `--exclude` 或交互式选择跳过不发布的 crate。`ratatui-kit-examples` 通常不发布到 crates.io。
 
 **不要做**：手动 `cargo publish` 绕过脚本——会漏掉 CHANGELOG 生成与 tag 约定，导致 CD 的 release notes 抽取（按 CHANGELOG 段落 awk）拿到空内容。
 
 **相关文件**：`release.sh`、`release.toml`、`.github/workflows/CD.yaml`
+
+### 主库 README 是指向根 README 的符号链接（单一数据源）
+
+仓库根 `README.md` 是唯一维护的文档；`crates/ratatui-kit/README.md` 是指向它的**符号链接**（`../../README.md`），`Cargo.toml` 用 `readme = "README.md"`。
+
+**为什么不用 `readme = "../../README.md"`**：cargo 不支持包外 readme 路径——`cargo package` 会忽略它并只打包 crate 根内的 `README.md`（实测 warning：`readme '../../README.md' appears to be a path outside of the package`）。删掉子 README 后 crates.io 将拿不到任何 readme。符号链接则被 cargo 解引用，把根 README 的**内容**嵌入 `.crate` 包（实测为真实 `-rw-` 文件而非软链），crates.io / docs.rs 正常渲染且无 warning。
+
+**正确做法**：改 README 只改根 `README.md`；新增需要 README 的可发布 crate，同样 `ln -s ../../README.md crates/<crate>/README.md` + `readme = "README.md"`。
+**验证**：`cargo package -p ratatui-kit --allow-dirty --no-verify` 后 `tar tvzf target/package/ratatui-kit-*.crate | grep README` 应看到 `-rw-`（真实文件）。
+
+**相关文件**：`README.md`、`crates/ratatui-kit/README.md`(symlink)、`crates/ratatui-kit/Cargo.toml`
+
+### workspace 成员目录为 `crates/`，多处功能引用与之耦合
+
+workspace 成员位于 `crates/ratatui-kit` 与 `crates/ratatui-kit-macros`（曾名 `packages/`，已改名）。改这个目录名要同步几处**功能性**引用，否则 CI/CD/hook 会静默失效：
+
+- 根 `Cargo.toml` 的 `members` 与 examples 的 dev-dependency `path`
+- `.github/workflows/CD.yaml` 的 `CRATE_PATH="crates/<prefix>"`（按 tag 前缀定位 crate 发布）
+- `.claude/settings.json` 的 Stop hook 正则 `^(crates/.*/src/|examples/)`
+
+文档类引用（`CLAUDE.md` / `AGENTS.md` / `dev-notes/` / docs 站）一并更新；`openspec/changes/**` 为历史快照，保持原样。
+
+**相关文件**：`Cargo.toml`、`.github/workflows/CD.yaml`、`.claude/settings.json`

@@ -6,6 +6,9 @@ license = "MIT"
 repository = "https://github.com/yexiyue/ratatui-kit"
 description = "A framework for building interactive terminal user interfaces with ratatui"
 authors = ["yexiyue <yexiyue666@qq.com>"]
+# README 是指向仓库根 README.md 的符号链接，crate 与仓库共用同一份文档；
+# cargo 打包时会把根 README 的内容嵌入 crate 包，crates.io / docs.rs 正常渲染。
+readme = "README.md"
 
 [dependencies]
 futures = "0.3.32"
