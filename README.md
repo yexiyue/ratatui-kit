@@ -165,7 +165,7 @@ cargo run --example counter
 Ratatui Kit ships an **AI agent skill** — a packaged knowledge base that teaches your AI coding assistant the framework's real components, props, and hooks, the `element!` macro, input layers, and the router — so you can ask it to *"build me a terminal todo app"* and get code that **compiles and follows the framework's idioms**, instead of guessed APIs.
 
 ```bash
-npx skills add https://github.com/yexiyue/ratatui-kit
+npx skills add yexiyue/ratatui-kit --skill ratatui-kit
 ```
 
 The skill lives in [`skills/ratatui-kit/`](skills/ratatui-kit/) and your assistant consults it automatically. Pair it with the general-purpose `rust-best-practices` and `rust-async-patterns` skills for Rust-level correctness. See [**AI-assisted development**](https://yexiyue.github.io/ratatui-kit/start/ai-skill/) for the full guide.

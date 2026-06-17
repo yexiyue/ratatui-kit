@@ -166,7 +166,7 @@ cargo run --example counter
 Ratatui Kit 附带一个 **AI agent skill**（一份打包好的知识库），把框架真实的组件、props、Hooks、`element!` 宏、输入层与路由教给 AI 编程助手 —— 于是你可以直接说 *“给我做一个终端 todo 应用”*，得到**能编译、且符合框架惯用法**的代码，而不是凭记忆猜的 API。
 
 ```bash
-npx skills add https://github.com/yexiyue/ratatui-kit
+npx skills add yexiyue/ratatui-kit --skill ratatui-kit
 ```
 
 skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参考它。再搭配通用的 `rust-best-practices` 与 `rust-async-patterns` skill 处理 Rust 层面的正确性。完整说明见[**用 AI 辅助开发**](https://yexiyue.github.io/ratatui-kit/zh-cn/start/ai-skill/)。

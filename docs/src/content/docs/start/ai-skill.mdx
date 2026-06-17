@@ -1,6 +1,6 @@
 ---
 title: AI-assisted development
-description: Install the ratatui-kit Claude skill so your AI assistant writes correct, idiomatic ratatui-kit code.
+description: Install the ratatui-kit AI agent skill so your AI assistant writes correct, idiomatic ratatui-kit code.
 sidebar:
   order: 5
 ---
@@ -14,7 +14,7 @@ Why it helps: ratatui-kit is a niche framework, so an assistant working from mem
 The skill lives in this repository under `skills/ratatui-kit/`. Add it with the [`skills`](https://www.npmjs.com/package/skills) CLI:
 
 ```bash
-npx skills add https://github.com/yexiyue/ratatui-kit
+npx skills add yexiyue/ratatui-kit --skill ratatui-kit
 ```
 
 This installs the `ratatui-kit` skill. Your assistant consults it automatically whenever you ask it to build or extend a ratatui-kit / terminal UI — you don't have to mention the skill by name.
