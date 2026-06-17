@@ -1,3 +1,26 @@
+## [0.7.1] - 2026-06-17
+
+### 🐛 Bug Fixes
+
+- *(macros)* Element! 子节点位接纳宏调用(element!/vec! 当 embed)
+- *(components)* Widget() 接纳只实现按值 Widget 的部件(如 BigText)
+
+### 💼 Other
+
+- *(brand)* 由 favicon.svg 生成 GitHub 头像(icon-512)与社交预览(social-preview) PNG
+- *(brand)* 头像改为满幅方形青底,去掉圆角/奶白外框(GitHub 自带圆角遮罩)
+- *(brand)* Icon-512 改为 favicon.svg 直接栅格化(透明背景,不加处理)
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.7.0 [skip ci]
+- *(home)* 英文首页对齐中文滚动落地页 + 修复 header 沉浸失效
+- *(skill)* 安装命令补 --skill 参数(npx skills add yexiyue/ratatui-kit --skill ratatui-kit)+ frontmatter 去 Claude 限定
+- *(skill)* 补两处 footgun(element! {} children 歧义 / widget() 按值边界)
+
+### ⚙️ Miscellaneous Tasks
+
+- Actions/checkout v4→v5(迁移到 Node 24,消除 Node 20 弃用告警)
 ## [0.7.0] - 2026-06-17
 
 ### 🚀 Features
