@@ -9,7 +9,7 @@ import Mermaid from '../../../../components/Mermaid.astro';
 
 终端应用最容易出问题的地方，是“前景正在编辑或弹窗打开，背景列表却还在响应按键”。`input_mutex` 这个例子专门展示 ratatui-kit 的解决方式：背景列表、编辑层、弹窗层各自注册 handler，上层打开时截断下层。
 
-![input mutex demo](/ratatui-kit/zh-cn/recordings/input_mutex.gif)
+![input mutex demo](/ratatui-kit/recordings/input_mutex.gif)
 
 这个录屏由 `docs/tapes/input_mutex.tape` 生成。录屏中先移动背景列表，再打开编辑层输入 `jk`，最后打开弹窗并按 `j`。这些按键没有继续移动背景列表。
 

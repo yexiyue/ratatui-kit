@@ -9,7 +9,7 @@ import Mermaid from '../../../../components/Mermaid.astro';
 
 `WrappedText` 用来渲染纯文本长正文。它会先按指定宽度把文本硬换行，再把换行后的真实行数写回布局高度，所以外层 `ScrollView` 可以正确计算滚动范围。
 
-![wrapped text demo](/ratatui-kit/zh-cn/recordings/wrapped-text.gif)
+![wrapped text demo](/ratatui-kit/recordings/wrapped-text.gif)
 
 这个录屏由 `docs/tapes/wrapped-text.tape` 生成。示例把一段中英文说明文本放进 `ScrollView`：按 `j/k` 逐行滚动，按 `PageDown/PageUp` 翻页，底部标题会显示当前 offset。
 

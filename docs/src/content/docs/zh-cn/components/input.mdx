@@ -7,7 +7,7 @@ sidebar:
 
 `Input` 是单行输入框的底层显示组件。它不自己接管键盘，也不内置输入互斥；你把 `tui_input::Input` 状态传给它渲染，再在页面 handler 里决定哪些按键写入、哪些按键提交、哪些按键退出。
 
-![input demo](/ratatui-kit/zh-cn/recordings/input.gif)
+![input demo](/ratatui-kit/recordings/input.gif)
 
 这个录屏由 `docs/tapes/input.tape` 生成。示例展示一个受控 note 输入框：输入 `ratatui` 后提交，再输入 `manual control` 提交，最后输入草稿并用 `Esc` 清空。
 

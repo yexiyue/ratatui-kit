@@ -7,7 +7,7 @@ sidebar:
 
 `control_flow` 展示 `element!` 的一个核心设计：UI 树是普通 Rust 表达式的一部分。你可以把 `if`、`if let`、`for` 和 `match` 写进树里，而且不同分支可以返回不同元素类型，不需要在业务代码里手动统一成 `AnyElement`。
 
-![control flow demo](/ratatui-kit/zh-cn/recordings/control-flow.gif)
+![control flow demo](/ratatui-kit/recordings/control-flow.gif)
 
 这个录屏由 `docs/tapes/control-flow.tape` 生成，运行的是 `examples/core/control_flow.rs`。录屏会移动高亮行、切换 count 奇偶分支，并关闭 optional name，让 `if let` 走到 `else if`。
 

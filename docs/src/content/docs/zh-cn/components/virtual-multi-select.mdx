@@ -7,7 +7,7 @@ sidebar:
 
 `Virtual Multi Select` 不是单独的内置组件，而是一个推荐组合模式：`VirtualList` 负责光标、窗口化渲染和确认键，业务代码用外部 `HashSet<usize>` 保存多选集合。这样长列表、多选状态和行展示都能各自保持清晰边界。
 
-![virtual multi select demo](/ratatui-kit/zh-cn/recordings/virtual-multi-select.gif)
+![virtual multi select demo](/ratatui-kit/recordings/virtual-multi-select.gif)
 
 这个录屏由 `docs/tapes/virtual-multi-select.tape` 生成，运行的是 `examples/components/virtual_multi_select.rs`。示例先等待 10,000 行加载，默认光标恢复到第 6 行；随后用 `Space` 勾选多行，用 `Enter` 提交当前选择数量。
 

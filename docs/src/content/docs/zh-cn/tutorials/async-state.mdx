@@ -9,7 +9,7 @@ import Mermaid from '../../../../components/Mermaid.astro';
 
 `use_async_state` 来自 TRNovel 中反复出现的页面加载模式：发起请求、显示 loading、成功写 data、失败写 error。框架侧只保留通用骨架，不引入业务文案、debounce 或 tokio timer 依赖。
 
-![async state demo](/ratatui-kit/zh-cn/recordings/async-state.gif)
+![async state demo](/ratatui-kit/recordings/async-state.gif)
 
 这个例子会刷新几次数据，并在第四次请求模拟失败。失败时旧数据仍然留在界面里，error 只表达当前请求失败。
 

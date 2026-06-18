@@ -9,7 +9,7 @@ import Mermaid from '../../../../components/Mermaid.astro';
 
 `Atom` 适合保存进程级共享状态：主题、登录用户、跨页面缓存、全局选择结果。这个例子把“已提交的状态”放进 Atom，把“输入中的草稿”留在页面局部 `use_state`，避免全局状态被每个按键污染。
 
-![atom state demo](/ratatui-kit/zh-cn/recordings/atom-state.gif)
+![atom state demo](/ratatui-kit/recordings/atom-state.gif)
 
 这个录屏由 `docs/tapes/atom-state.tape` 生成。示例先进入 focus editor 输入 `write atom docs`，提交后 dashboard 的订阅组件立即显示新值；再进入 score editor 调整分数，回到 dashboard 时另一个组件也读到同一个 Atom。
 

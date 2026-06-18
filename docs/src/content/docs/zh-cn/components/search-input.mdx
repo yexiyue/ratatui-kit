@@ -7,7 +7,7 @@ sidebar:
 
 `SearchInput` 是带局部编辑态的单行搜索框。它默认按 `s` 进入输入态，内部打开一个会截断下层 handler 的 input layer；输入态里按 `j/k/q` 只会写入输入框或被输入框处理，不会继续触发背景列表移动或退出。
 
-![search input demo](/ratatui-kit/zh-cn/recordings/search-input.gif)
+![search input demo](/ratatui-kit/recordings/search-input.gif)
 
 这个录屏由 `docs/tapes/search-input.tape` 生成。示例先在背景列表里移动一次，再进入搜索输入 `dep` 并提交；随后再次进入输入态追加 `zz`，按 `Esc` 取消并清空，背景快捷键恢复可用。
 

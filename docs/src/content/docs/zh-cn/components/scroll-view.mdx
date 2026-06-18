@@ -7,7 +7,7 @@ sidebar:
 
 `ScrollView` 是可滚动容器。它不会改变子组件的声明方式：你仍然用普通 `View`、`Text`、`Border` 组织内容，只是这些内容会先渲染到一个更大的内部缓冲区，再按当前 offset 显示到可见视口。
 
-![scrollview demo](/ratatui-kit/zh-cn/recordings/scrollview.gif)
+![scrollview demo](/ratatui-kit/recordings/scrollview.gif)
 
 这个录屏由 `docs/tapes/scrollview.tape` 生成。示例展示一个受控文档阅读器：左侧是 `ScrollView`，右侧实时显示 `ScrollViewState` 的 offset。按 `j/k` 逐行滚动，按 `PageDown/PageUp` 翻页，状态面板会跟着变化。
 
