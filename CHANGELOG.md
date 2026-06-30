@@ -1,3 +1,13 @@
+## [0.7.2] - 2026-06-30
+
+### 🐛 Bug Fixes
+
+- *(context)* Clarify missing-context panic and use English for runtime messages
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.7.1 [skip ci]
+- *(zh-cn)* 修复中文文档录屏 GIF 资源路径(去掉多余 zh-cn 前缀)
 ## [0.7.1] - 2026-06-17
 
 ### 🐛 Bug Fixes
