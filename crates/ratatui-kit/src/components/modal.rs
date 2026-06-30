@@ -133,7 +133,7 @@ impl Component for Modal {
                 None => {
                     let mut sys = updater
                         .get_context_mut::<SystemContext>()
-                        .expect("SystemContext 缺失(根 context 必有)");
+                        .expect("`SystemContext` missing (the root context always provides it)");
                     sys.input.push_layer(true, blocks).id
                 }
             };

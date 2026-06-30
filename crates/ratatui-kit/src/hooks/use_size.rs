@@ -50,7 +50,7 @@ impl Hook for UseTerminalSizeImpl {
         };
         let mut system = updater
             .get_context_mut::<SystemContext>()
-            .expect("SystemContext 缺失(根 context 必有)");
+            .expect("`SystemContext` missing (the root context always provides it)");
 
         // Resize 是真全局事件：`layer=None` 不被任何 blocks_lower 截断,返回 Ignored
         // 让多个 use_terminal_size 订阅者都能收到。

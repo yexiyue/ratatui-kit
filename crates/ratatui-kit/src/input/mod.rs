@@ -116,7 +116,8 @@ impl InputRuntime {
 
     // 当前帧 root 层 id。`begin_frame` 后必然存在。
     pub(crate) fn root_layer(&self) -> LayerId {
-        self.root_layer.expect("begin_frame 未调用")
+        self.root_layer
+            .expect("`begin_frame` was not called before `root_layer`")
     }
 
     fn mint_layer_id(&mut self) -> LayerId {
