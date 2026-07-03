@@ -29,6 +29,11 @@ pub use select::*;
 // 多选列表组件，封装多选状态与键盘选择事件。
 pub mod multi_select;
 pub use multi_select::*;
+// 表格组件，支持自绘 grid、换行、响应式列等高级表格能力。
+#[cfg(feature = "table")]
+pub mod table;
+#[cfg(feature = "table")]
+pub use table::*;
 // 滚动视图组件，支持内容滚动，适合长列表、文档阅读等。
 pub mod scroll_view;
 pub use scroll_view::*;

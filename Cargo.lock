@@ -1543,6 +1543,7 @@ dependencies = [
  "tui-input",
  "tui-tree-widget",
  "tui-widget-list",
+ "unicode-width",
 ]
 
 [[package]]
