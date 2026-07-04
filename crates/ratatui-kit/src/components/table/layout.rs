@@ -27,8 +27,7 @@ pub(super) fn resolve_column_widths(
     }
 
     let reserved = match border_mode {
-        TableBorderMode::Grid => column_count.saturating_add(1),
-        TableBorderMode::Outer => 2,
+        TableBorderMode::Outer | TableBorderMode::Grid => column_count.saturating_add(1),
         TableBorderMode::None => column_spacing.saturating_mul(column_count.saturating_sub(1)),
     }
     .saturating_add(cell_padding.saturating_mul(2).saturating_mul(column_count));

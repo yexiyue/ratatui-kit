@@ -34,6 +34,16 @@ pub use multi_select::*;
 pub mod table;
 #[cfg(feature = "table")]
 pub use table::*;
+// Diff 组件，用于对比两个文本版本的差异。
+#[cfg(feature = "diff")]
+pub mod diff;
+#[cfg(feature = "diff")]
+pub use diff::*;
+// Markdown 组件，解析和渲染 Markdown 文本。
+#[cfg(feature = "markdown")]
+pub mod markdown;
+#[cfg(feature = "markdown")]
+pub use markdown::*;
 // 滚动视图组件，支持内容滚动，适合长列表、文档阅读等。
 pub mod scroll_view;
 pub use scroll_view::*;
@@ -54,6 +64,16 @@ pub use wrapped_text::*;
 // 定位组件，支持绝对定位，适合复杂布局需求。
 pub mod positioned;
 pub use positioned::*;
+
+// 分割线组件，渲染水平分隔线。
+pub mod divider;
+pub use divider::*;
+// 引用块容器组件，支持嵌套深度和前缀样式。
+pub mod blockquote;
+pub use blockquote::*;
+// 代码块组件，支持行号和语言标签。
+pub mod code_block;
+pub use code_block::*;
 
 #[cfg(feature = "input")]
 pub mod input;

@@ -90,6 +90,33 @@ path = "examples/components/table.rs"
 required-features = ["ratatui-kit/table"]
 
 [[example]]
+name = "divider"
+path = "examples/components/divider.rs"
+
+[[example]]
+name = "blockquote"
+path = "examples/components/blockquote.rs"
+
+[[example]]
+name = "code_block"
+path = "examples/components/code_block.rs"
+
+[[example]]
+name = "diff_viewer"
+path = "examples/components/diff_viewer.rs"
+required-features = ["ratatui-kit/diff"]
+
+[[example]]
+name = "markdown"
+path = "examples/components/markdown.rs"
+required-features = ["ratatui-kit/markdown", "ratatui-kit/table"]
+
+[[example]]
+name = "markdown_streaming"
+path = "examples/components/markdown_streaming.rs"
+required-features = ["ratatui-kit/markdown", "ratatui-kit/table"]
+
+[[example]]
 name = "tree_select"
 path = "examples/components/tree_select.rs"
 
