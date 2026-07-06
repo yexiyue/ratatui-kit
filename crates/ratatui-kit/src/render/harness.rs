@@ -246,7 +246,7 @@ mod scroll_view_tests {
         let scroll_state = hooks.use_state(ScrollViewState::default);
 
         element!(ScrollView(
-            scroll_view_state: scroll_state,
+            state: scroll_state,
             block: Block::bordered(),
         ) {
             Text(text: "boxed")
@@ -263,6 +263,75 @@ mod scroll_view_tests {
             "应渲染受控内容, 实际: {:?}",
             row(&buf, 1)
         );
+    }
+
+    // D1:内区收敛为 block.inner() 后,内容不再盖掉右边框。短内容(无滚动条)时
+    // 左右边框都应完整保留(旧的 width-1 会让内容 blit 到右边框列上)。
+    #[test]
+    fn bordered_scrollview_preserves_both_side_borders() {
+        let buf = render_to_buffer(
+            element!(ScrollView(block: Block::bordered()) {
+                Text(text: "hi")
+            }),
+            10,
+            3,
+        );
+
+        assert_eq!(buf[(0, 1)].symbol(), "│", "左边框应保留");
+        assert_eq!(buf[(9, 1)].symbol(), "│", "右边框不应被内容覆盖");
+    }
+
+    // D4:ScrollView 嵌套 ScrollView 不应 panic(共享 scroll buffer 栈的 save/restore)。
+    #[component]
+    fn NestedScroll(_hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        element!(ScrollView(flex_direction: Direction::Vertical) {
+            ScrollView(flex_direction: Direction::Vertical) {
+                Text(text: "deep")
+            }
+        })
+    }
+
+    #[test]
+    fn nested_scrollview_does_not_panic() {
+        let buf = render_to_buffer(element!(NestedScroll), 12, 4);
+        assert!(
+            row(&buf, 0).contains("deep"),
+            "嵌套 ScrollView 应渲染内层内容, 实际: {:?}",
+            row(&buf, 0)
+        );
+    }
+
+    // D3:显示横向滚动条会占掉一行视口;偏移须按视口(而非原始区)裁剪,否则最后一行滚不到。
+    #[component]
+    fn TallScroll(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        let scroll_state = hooks.use_state(|| {
+            let mut state = ScrollViewState::default();
+            state.scroll_to_bottom();
+            state
+        });
+
+        element!(ScrollView(
+            flex_direction: Direction::Vertical,
+            state: scroll_state,
+            scrollbars: Scrollbars {
+                horizontal_scrollbar_visibility: ScrollbarVisibility::Always,
+                ..Default::default()
+            },
+        ) {
+            View(height: Constraint::Length(1)) { Text(text: "r0") }
+            View(height: Constraint::Length(1)) { Text(text: "r1") }
+            View(height: Constraint::Length(1)) { Text(text: "r2") }
+            View(height: Constraint::Length(1)) { Text(text: "r3") }
+            View(height: Constraint::Length(1)) { Text(text: "r4") }
+        })
+    }
+
+    #[test]
+    fn last_row_reachable_when_horizontal_scrollbar_shown() {
+        // 视口高 3,底部横向滚动条占 1 行 → 内容视口 2 行;5 行内容滚到底后末行 r4 应可见。
+        let buf = render_to_buffer(element!(TallScroll), 8, 3);
+        let text = (0..3).map(|y| row(&buf, y)).collect::<Vec<_>>().join("|");
+        assert!(text.contains("r4"), "末行应可滚到, 实际: {text:?}");
     }
 }
 

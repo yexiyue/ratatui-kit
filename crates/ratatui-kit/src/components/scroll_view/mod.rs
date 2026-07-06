@@ -4,40 +4,29 @@
 //
 // ### 自动管理滚动状态（推荐）
 // ```rust
-// element!(ScrollView(
-//     scroll_bars: ScrollBars::default(),
-// ){
-//     // 子内容
+// element!(ScrollView {
+//     // 子内容(内置键鼠滚动由 active 默认开启)
 // })
 // ```
 //
-// ### 手动管理滚动状态
+// ### 外部状态(读偏移 / 程序化滚动;与 active 正交,不会关掉内置滚动)
 // ```rust
 // let scroll_state = hooks.use_state(ScrollViewState::default);
 //
-// hooks.use_event_handler_with_options(
-//     EventScope::Current,
-//     EventPriority::Normal,
-//     EventOptions { hit_test: true },
-//     move |event| {
-//         scroll_state.write().handle_event(&event);
-//         EventResult::Ignored
-//     },
-// );
-//
 // element!(ScrollView(
-//     scroll_view_state: scroll_state,
-//     scroll_bars: ScrollBars::default(),
+//     state: scroll_state,
+//     scrollbars: Scrollbars::default(),
 // ){
 //     // 子内容
 // })
 // ```
 //
-// ScrollView 支持两种使用方式：
-// 1. 不传递 `scroll_view_state` 参数，组件会自动管理滚动状态
-// 2. 传递由 `use_state` 创建的 `scroll_view_state` 参数，手动管理滚动状态
+// ScrollView 的两种模式是正交的：
+// 1. 不传 `state`，组件用内部滚动状态；
+// 2. 传 `state`，页面可读偏移、程序化滚动(`scroll_to_visible` / `is_at_bottom`)，
+//    同时 `active`(默认 true)仍提供内置键鼠滚动。
 //
-// 当需要对滚动行为进行精确控制时（如程序化滚动、与其他状态联动等），建议使用手动管理模式。
+// `Scrollbars::over_border`(默认 true)控制滚动条盖在 block 边框上还是退到框内。
 
 use crate::{AnyElement, Component, layout_style::LayoutStyle};
 use crate::{
@@ -53,29 +42,52 @@ use ratatui_kit_macros::{Props, with_layout_style};
 mod state;
 pub use state::ScrollViewState;
 mod scrollbars;
-pub use scrollbars::{ScrollBars, ScrollbarVisibility};
+pub use scrollbars::{ScrollbarVisibility, Scrollbars};
 
 #[with_layout_style]
-#[derive(Default, Props)]
+#[derive(Props)]
 // ScrollView 组件属性。
 pub struct ScrollViewProps<'a> {
     // 子元素列表。
     pub children: Vec<AnyElement<'a>>,
     // 滚动条配置。
-    pub scroll_bars: ScrollBars<'static>,
-    // 滚动状态。
-    pub scroll_view_state: Option<State<ScrollViewState>>,
+    pub scrollbars: Scrollbars<'static>,
+    // 外部滚动状态(与 `active` 正交:传了也不会关掉内置滚动)。
+    pub state: Option<State<ScrollViewState>>,
 
     // 可选边框块。
     pub block: Option<Block<'static>>,
 
-    pub disabled: bool,
+    // 是否启用内置键鼠滚动(默认 true),与其它选择类组件的 `active` 约定一致。
+    pub active: bool,
+}
+
+impl Default for ScrollViewProps<'_> {
+    fn default() -> Self {
+        Self {
+            children: Vec::new(),
+            scrollbars: Scrollbars::default(),
+            state: None,
+            block: None,
+            active: true,
+            margin: Default::default(),
+            offset: Default::default(),
+            width: Default::default(),
+            height: Default::default(),
+            gap: Default::default(),
+            flex_direction: Default::default(),
+            justify_content: Default::default(),
+        }
+    }
 }
 
 // ScrollView 组件实现。
 pub struct ScrollView {
-    scroll_bars: ScrollBars<'static>,
+    scrollbars: Scrollbars<'static>,
     block: Option<Block<'static>>,
+    // draw() 在把 area 缩成 block.inner 之前暂存的外框;供 calc_children_areas 与 render_ref
+    // 共用同一个 `ring` 几何判定(单一真源)。
+    outer: Option<Rect>,
 }
 
 fn clamp_u16(value: u128) -> u16 {
@@ -169,8 +181,9 @@ impl Component for ScrollView {
 
     fn new(props: &Self::Props<'_>) -> Self {
         Self {
-            scroll_bars: props.scroll_bars.clone(),
+            scrollbars: props.scrollbars.clone(),
             block: props.block.clone(),
+            outer: None,
         }
     }
 
@@ -187,40 +200,38 @@ impl Component for ScrollView {
         let layout_style = props.layout_style();
 
         let this_scroll_view_state = hooks.use_state(ScrollViewState::default);
-
-        let disabled = props.disabled;
+        // 外部 state 与 active 正交:传外部 state 也不关掉内置滚动(与 Select/Table 一致)。
+        let state = props.state.unwrap_or(this_scroll_view_state);
+        let active = props.active;
         self.block = props.block.clone();
 
         {
             let hook = hooks.use_hook(|| UseScrollImpl {
-                scroll_view_state: props.scroll_view_state.unwrap_or(this_scroll_view_state),
-                scrollbars: props.scroll_bars.clone(),
-                area: None,
-                has_block: props.block.is_some(),
+                scroll_view_state: state,
+                scrollbars: props.scrollbars.clone(),
+                outer: None,
+                block: props.block.clone(),
             });
-            hook.scroll_view_state = props.scroll_view_state.unwrap_or(this_scroll_view_state);
-            hook.scrollbars = props.scroll_bars.clone();
-            hook.has_block = props.block.is_some();
+            hook.scroll_view_state = state;
+            hook.scrollbars = props.scrollbars.clone();
+            hook.block = props.block.clone();
         }
 
-        // 滚动事件:Current 层 + 鼠标命中过滤(复刻旧 use_local_events 的 in_component 语义)。
-        // 返回 Ignored 不阻断——handle_event 对非滚动事件无副作用,且不应吃掉同层其它 handler 的按键。
+        // 滚动事件:Current 层 + 鼠标命中过滤。命中的滚动键/滚轮返回 Consumed,不再无声漏给兄弟 handler。
         hooks.use_event_handler_with_options(
             EventScope::Current,
             EventPriority::Normal,
             EventOptions { hit_test: true },
-            {
-                let props_scroll_view_state = props.scroll_view_state;
-                move |event| {
-                    if props_scroll_view_state.is_none() && !disabled {
-                        this_scroll_view_state.write().handle_event(&event);
-                    }
+            move |event| {
+                if active && state.write().handle_event(&event) {
+                    EventResult::Consumed
+                } else {
                     EventResult::Ignored
                 }
             },
         );
 
-        self.scroll_bars = props.scroll_bars.clone();
+        self.scrollbars = props.scrollbars.clone();
 
         updater.set_layout_style(layout_style);
         updater.update_children(&mut props.children, None);
@@ -243,41 +254,39 @@ impl Component for ScrollView {
             (main_lengths, cross_lengths)
         };
 
-        let old_width_height = {
-            let area = drawer.area;
-            let (main_lengths, cross_lengths) = axis_lengths(area);
-            content_size(
-                layout_style.flex_direction,
-                &main_lengths,
-                &cross_lengths,
-                layout_style.gap,
-            )
-        };
-
-        let scrollbar_layout = self.scroll_bars.layout_for(
-            drawer.area,
-            Size::new(old_width_height.0, old_width_height.1),
+        // 此处 `drawer.area` 已是 `block.inner()`(draw() 在 calc 之前设置)。先按 inner 算一遍子长度。
+        let inner = drawer.area;
+        let (mut main_lengths, mut cross_lengths) = axis_lengths(inner);
+        let old_width_height = content_size(
+            layout_style.flex_direction,
+            &main_lengths,
+            &cross_lengths,
+            layout_style.gap,
         );
 
-        let (width, height, justify_constraints, align_constraints) = {
-            let area = scrollbar_layout.visible_area;
-            let (main_lengths, cross_lengths) = axis_lengths(area);
-            let (width, height) = content_size(
-                layout_style.flex_direction,
-                &main_lengths,
-                &cross_lengths,
-                layout_style.gap,
-            );
-            (
-                width,
-                height,
-                lengths_to_constraints(&main_lengths),
-                lengths_to_constraints(&cross_lengths),
-            )
-        };
+        // ring(盖边框)与 render_ref 共用同一几何判定(单一真源);ring 时子节点铺满整个 inner,否则扣掉滚动条。
+        let ring = self.scrollbars.ring(self.outer.unwrap_or(inner), inner);
+        let content_area = self.scrollbars.content_area(
+            inner,
+            Size::new(old_width_height.0, old_width_height.1),
+            ring,
+        );
+
+        // 仅当内容区因滚动条收窄时才重算(ring / 无滚动条时与上面完全一致,直接复用,省 4 次 Vec 分配)。
+        if content_area != inner {
+            (main_lengths, cross_lengths) = axis_lengths(content_area);
+        }
+        let (width, height) = content_size(
+            layout_style.flex_direction,
+            &main_lengths,
+            &cross_lengths,
+            layout_style.gap,
+        );
+        let justify_constraints = lengths_to_constraints(&main_lengths);
+        let align_constraints = lengths_to_constraints(&cross_lengths);
 
         let rect = Rect::new(0, 0, width, height);
-        drawer.scroll_buffer = Some(Buffer::empty(rect));
+        drawer.push_scroll_buffer(Buffer::empty(rect));
 
         drawer.area = drawer.buffer_mut().area;
 
@@ -297,6 +306,8 @@ impl Component for ScrollView {
     }
 
     fn draw(&mut self, drawer: &mut crate::ComponentDrawer<'_, '_>) {
+        // 暂存外框供 calc_children_areas 的 `ring` 判定复用(与 render_ref 同一真源)。
+        self.outer = Some(drawer.area);
         if let Some(block) = self.block.as_ref() {
             let inner_area = block.inner(drawer.area);
             drawer.render_widget(block, drawer.area);
@@ -307,29 +318,33 @@ impl Component for ScrollView {
 
 pub struct UseScrollImpl {
     scroll_view_state: State<ScrollViewState>,
-    scrollbars: ScrollBars<'static>,
-    area: Option<ratatui::layout::Rect>,
-    has_block: bool,
+    scrollbars: Scrollbars<'static>,
+    // 组件外框(pre_component_draw 在 draw() 把 area 改成 inner 之前捕获)。
+    outer: Option<ratatui::layout::Rect>,
+    block: Option<Block<'static>>,
 }
 
 impl Hook for UseScrollImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.area = Some(if self.has_block {
-            Rect {
-                x: drawer.area.x + 1,
-                y: drawer.area.y + 1,
-                width: drawer.area.width.saturating_sub(1),
-                height: drawer.area.height.saturating_sub(2),
-            }
-        } else {
-            drawer.area
-        });
+        // 此刻 drawer.area 仍是组件完整区(draw() 尚未把它缩成 block.inner)。
+        self.outer = Some(drawer.area);
     }
     fn post_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        let buffer = drawer.scroll_buffer.take().unwrap();
+        // pop 本层内容缓冲(嵌套安全:guard 避免 unwrap on None);pop 后 buffer_mut 回到外层。
+        let Some(buffer) = drawer.pop_scroll_buffer() else {
+            return;
+        };
+        let outer = self.outer.unwrap_or_default();
+        // inner 与 draw() 用同一 block.inner(),对部分边框/padding/标题一致。
+        let inner = self
+            .block
+            .as_ref()
+            .map(|block| block.inner(outer))
+            .unwrap_or(outer);
 
         self.scrollbars.render_ref(
-            self.area.unwrap_or_default(),
+            outer,
+            inner,
             drawer.buffer_mut(),
             &mut self.scroll_view_state.write_no_update(),
             &buffer,

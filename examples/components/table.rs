@@ -30,6 +30,9 @@ enum Status {
     Disabled,
 }
 
+/// Both `wide_columns()` and `compact_columns()` expose the same 7 columns.
+const COLUMN_COUNT: usize = 7;
+
 const DEPLOYMENTS: [Deployment; 10] = [
     Deployment {
         service: "gateway-入口服务",
@@ -135,13 +138,33 @@ async fn main() {
 fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut empty = hooks.use_state(|| false);
     let mut compact = hooks.use_state(|| false);
+    let table_state = hooks.use_state(TableState::default);
     let mut exit = hooks.use_exit();
 
     hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
+            // 外部驱动选择集:j/k 选行、h/l 选列。返回 Consumed 阻断下层 ScrollView 的
+            // j/k 滚动,PageUp/PageDown/滚轮不在此消费,继续交给 ScrollView。
+            let row_count = if empty.get() { 0 } else { DEPLOYMENTS.len() };
             match key.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    table_state.write().next(row_count);
+                    return EventResult::Consumed;
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    table_state.write().previous(row_count);
+                    return EventResult::Consumed;
+                }
+                KeyCode::Char('l') | KeyCode::Right => {
+                    table_state.write().next_column(COLUMN_COUNT);
+                    return EventResult::Consumed;
+                }
+                KeyCode::Char('h') | KeyCode::Left => {
+                    table_state.write().previous_column(COLUMN_COUNT);
+                    return EventResult::Consumed;
+                }
                 KeyCode::Char('c') => {
                     compact.set(!compact.get());
                     return EventResult::Consumed;
@@ -184,6 +207,22 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     } else {
         wide_columns()
     };
+    let footer = if empty.get() {
+        Vec::new()
+    } else {
+        footer_cells(&rows)
+    };
+    let selected_row = table_state.read().selected();
+    let selected_col = table_state.read().selected_column();
+    let selection = format!(
+        "row {} · col {}",
+        selected_row
+            .map(|i| (i + 1).to_string())
+            .unwrap_or_else(|| "-".into()),
+        selected_col
+            .map(|i| (i + 1).to_string())
+            .unwrap_or_else(|| "-".into()),
+    );
     let render_deployment_row: RenderTableRow<Deployment> =
         Arc::new(|deployment: &Deployment, _| {
             let status_style = deployment.status.style();
@@ -219,15 +258,15 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             Border(
                 flex_direction: Direction::Vertical,
                 border_style: Style::new().fg(Color::Blue),
-                top_title: Line::from(" table stress example ").fg(Color::Blue).bold().centered(),
-                bottom_title: Line::from(" mouse wheel/PageUp/PageDown/j/k scroll | c compact | e empty | q quit ").dark_gray().centered(),
+                top_title: Line::from(" table showcase ").fg(Color::Blue).bold().centered(),
+                bottom_title: Line::from(" j/k row · h/l column · PageUp/Down/wheel scroll | c compact | e empty | q quit ").dark_gray().centered(),
             ) {
                 View(flex_direction: Direction::Vertical, gap: 1) {
                     ScrollView(
                         width: Constraint::Length(scroll_view_width),
                         height: Constraint::Length(16),
                         flex_direction: Direction::Vertical,
-                        scroll_bars: ScrollBars {
+                        scrollbars: Scrollbars {
                             vertical_scrollbar_visibility: ScrollbarVisibility::Always,
                             horizontal_scrollbar_visibility: ScrollbarVisibility::Automatic,
                             ..Default::default()
@@ -235,17 +274,24 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     ) {
                         Table<Deployment>(
                             width: Constraint::Length(table_width),
+                            state: table_state,
+                            // 本例由父级 handler 外部驱动选择(见上),Table 自身不抢键。
                             active: false,
+                            default_index: Some(0),
                             rows: rows,
                             columns: columns,
+                            footer: footer,
                             block: Block::bordered()
                                 .border_style(Style::new().fg(Color::Cyan))
-                                .title_top(Line::from(" 中英文 mixed / very long fields / custom styles ").centered())
-                                .title_bottom(Line::from(format!(" density: {density} · ScrollView clips overflowing table ")).centered()),
+                                .title_top(Line::from(" 中英文 mixed / very long fields / row+column+cell highlight ").centered())
+                                .title_bottom(Line::from(format!(" density: {density} · footer totals · ScrollView clips overflow ")).centered()),
                             header_style: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                            footer_style: Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
                             row_style: Style::new().fg(Color::White),
-                            highlight_style: Style::new().fg(Color::White),
-                            highlight_symbol: None,
+                            highlight_style: Style::new().bg(Color::Rgb(45, 55, 95)),
+                            column_highlight_style: Style::new().bg(Color::Rgb(70, 55, 25)),
+                            cell_highlight_style: Style::new().add_modifier(Modifier::REVERSED | Modifier::BOLD),
+                            highlight_symbol: Some("▶ "),
                             column_spacing: if compact.get() { 1u16 } else { 2u16 },
                             wrap_mode: if compact.get() { TableWrapMode::Truncate } else { TableWrapMode::Wrap },
                             border_mode: if compact.get() { TableBorderMode::Outer } else { TableBorderMode::Grid },
@@ -264,17 +310,17 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     ) {
                         View(height: Constraint::Length(1)) {
                             Text(text: Line::from(format!(
-                                "mode: {mode} / {density} · width: term {terminal_width} / table {table_width}"
+                                "mode: {mode} / {density} · selection: {selection} · width: term {terminal_width} / table {table_width}"
                             )).centered())
                         }
                         View(height: Constraint::Length(1)) {
-                            Text(text: Line::from("CJK mixed · long fields · wide wraps / compact truncates · ScrollView clips overflow").centered())
+                            Text(text: Line::from("j/k move row, h/l move column: row + column highlight, cell pops at the intersection").centered())
                         }
                         View(height: Constraint::Length(1)) {
-                            Text(text: Line::from("Body row separators use the same border color").centered())
+                            Text(text: Line::from("Selection symbol reserves a gutter (highlight_spacing) so it never clips the first column").centered())
                         }
                         View(height: Constraint::Length(1)) {
-                            Text(text: Line::from("This example disables Table selection so ScrollView owns j/k and arrow keys").centered())
+                            Text(text: Line::from("Footer holds column totals; PageUp/PageDown/wheel still scroll the wrapped table").centered())
                         }
                     }
                 }
@@ -304,6 +350,34 @@ fn compact_columns() -> Vec<TableColumn> {
         TableColumn::new("Status", Constraint::Length(8)).alignment(TableCellAlignment::Center),
         TableColumn::new("Latency", Constraint::Length(7)).alignment(TableCellAlignment::Right),
         TableColumn::new("Note", Constraint::Fill(1)).min_table_width(100),
+    ]
+}
+
+/// A summary/footer row aligned to the same columns as the body.
+fn footer_cells(rows: &[Deployment]) -> Vec<TableCell> {
+    let count = rows.len();
+    let failed = rows
+        .iter()
+        .filter(|d| matches!(d.status, Status::Failed))
+        .count();
+    let avg = if count == 0 {
+        0
+    } else {
+        rows.iter().map(|d| d.latency).sum::<u64>() / count as u64
+    };
+    let muted = Style::new().fg(Color::Gray);
+
+    vec![
+        TableCell::new(format!("{count} services"))
+            .style(Style::new().fg(Color::White).add_modifier(Modifier::BOLD)),
+        TableCell::new(""),
+        TableCell::new(""),
+        TableCell::new(""),
+        TableCell::new(format!("{failed} failed")).style(Style::new().fg(Color::Red)),
+        TableCell::new(format!("{avg}ms"))
+            .style(muted)
+            .alignment(TableCellAlignment::Right),
+        TableCell::new("totals / 合计").style(muted),
     ]
 }
 

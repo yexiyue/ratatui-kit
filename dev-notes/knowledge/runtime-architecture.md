@@ -124,3 +124,17 @@ loop {
 **不要做**：恢复 `Terminal` 的 `events()`/`wait()` 广播;在 update/draw 借用期 dispatch;把 z-order 排在 priority 之后。
 
 **相关文件**：`crates/ratatui-kit/src/input/mod.rs`、`crates/ratatui-kit/src/hooks/use_input.rs`、`crates/ratatui-kit/src/render/tree.rs`、`crates/ratatui-kit/src/terminal/mod.rs`
+
+### ScrollView 事件语义 + 几何(scrollview-overhaul 后)
+
+`ScrollView` 的内置滚动 handler 现在对**真正处理了的**滚动键/滚轮返回 `EventResult::Consumed`(其余 `Ignored`),由 `ScrollViewState::handle_event(&event) -> bool` 驱动。`state`(外部状态)与 `active`(默认 true)**正交**——传 state 不再关掉内置滚动。
+
+**内嵌可选择子组件仍建议外部驱动**:把 `Table`/`Select` 塞进 ScrollView 时,让子组件 `active: false`,由父级 handler 驱动选择并对导航键返回 `Consumed`(父 handler 登记在前,截断分发,ScrollView 收不到这些键);`PageUp/PageDown/滚轮` 留给 ScrollView。见 `examples/components/table.rs`。要让选中联动滚动,用 `ScrollViewState::scroll_to_visible(y, height)`(state 层原语已具备;把「子 key/index → 缓冲区 y」映射接上是后续工作)。
+
+**几何关键点(scrollbars.rs / mod.rs)**:
+- **内区单一真源**:`UseScrollImpl` 持 `Block`,`pre_component_draw` 捕获 outer、`post` 用 `block.inner(outer)`,与 `draw()` 完全一致(对部分边框/padding/标题正确)。勿再硬编码 `+1/-1/-2` 内缩。
+- **视口感知裁剪**:偏移与 `page_size` 按「扣掉已显示滚动条后的视口」算(inset 模式),否则有滚动条时最后一行/列滚不到(上游 0.6.7 修的坑)。
+- **`over_border` 开关**(`Scrollbars::over_border`,默认 true):ring 模式滚动条画在 block 边框环上、不占视口(视口=inner);inset 模式画在 inner 内、占一行/列。ring 仅当 `over_border && inner 右/下各有边框`。
+- **嵌套安全**:`ComponentDrawer.scroll_buffers` 是**栈**(push/pop),不是单槽;ScrollView 套 ScrollView 不再 `take().unwrap()` on None。
+
+**相关文件**：`crates/ratatui-kit/src/components/scroll_view/{mod.rs,state.rs,scrollbars.rs}`、`crates/ratatui-kit/src/render/drawer.rs`、`examples/components/{scrollview,table}.rs`

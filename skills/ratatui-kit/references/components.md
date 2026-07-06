@@ -426,27 +426,27 @@ MultiSelect<&'static str>(
 - **Purpose:** a scrollable view container whose subtree is ordinary ratatui-kit layout; content may overflow the viewport, with configurable scrollbars.
 - **Feature:** core (hand-written `Component`).
 - **Layout component:** **yes** (`#[with_layout_style]`, all 7 layout fields).
-- **Props** (`ScrollViewProps<'a>`, `Default`):
+- **Props** (`ScrollViewProps<'a>`, custom `Default`):
   - `children: Vec<AnyElement<'a>>`
-  - `scroll_bars: ScrollBars<'static>`
-  - `scroll_view_state: Option<State<ScrollViewState>>` (if omitted, managed internally)
+  - `scrollbars: Scrollbars<'static>`
+  - `state: Option<State<ScrollViewState>>` (if omitted, managed internally; **orthogonal to `active`** — passing it does NOT disable built-in scrolling)
   - `block: Option<ratatui::widgets::Block<'static>>`
-  - `disabled: bool`
+  - `active: bool` (default `true`; gates built-in keyboard/mouse scrolling, like the other selection components)
   - plus all 7 layout fields.
 - **Related types:**
-  - `ScrollViewState` — create with `use_state(ScrollViewState::default)`; methods include `handle_event(&event)`, `offset()`, `scroll_*`.
-  - `ScrollBars<'a> { vertical_scrollbar_visibility: ScrollbarVisibility, horizontal_scrollbar_visibility: ScrollbarVisibility, vertical_scrollbar: Scrollbar<'a>, horizontal_scrollbar: Scrollbar<'a> }`.
+  - `ScrollViewState` — create with `use_state(ScrollViewState::default)`; methods: `handle_event(&event) -> bool`, `offset()`/`set_offset()`, `scroll_*`, `size()`/`page_size()`, `is_at_bottom()`, `scroll_to_visible(y, height)`.
+  - `Scrollbars<'a> { vertical_scrollbar_visibility, horizontal_scrollbar_visibility: ScrollbarVisibility, vertical_scrollbar, horizontal_scrollbar: Scrollbar<'a>, over_border: bool }`. `over_border` (default `true`): with a bordered block, draw the scrollbar on the border ring vs inset inside it.
   - `ScrollbarVisibility`: `Automatic` (default) / `Always` / `Never`.
 
 ```rust
 let scroll_state = hooks.use_state(ScrollViewState::default);
-// in your event handler: scroll_state.write().handle_event(&event);
 ScrollView(
     flex_direction: Direction::Vertical,
-    scroll_view_state: scroll_state,
-    scroll_bars: ScrollBars {
+    state: scroll_state,
+    scrollbars: Scrollbars {
         vertical_scrollbar_visibility: ScrollbarVisibility::Always,
         horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
+        over_border: true,
         ..Default::default()
     },
     block: Block::bordered().border_style(Style::new().cyan()),
@@ -601,6 +601,66 @@ VirtualList<Line<'static>>(
         (Line::styled(format!("row {:05}", context.index + 1), style), 1u16)
     },
     on_select: move |index: usize| { submitted.set(format!("selected row {}", index + 1)); },
+)
+```
+
+---
+
+## Table
+
+- **Purpose:** a generic, data-driven table rendered from scratch (not a wrapper around `ratatui::widgets::Table`). Owns cell-grid borders, CJK/emoji-aware cell wrapping, responsive column hiding, a footer row, and row/column/cell highlighting. Built-in keyboard interaction (j/k rows, Home/End, Enter; Left/Right columns when `column_navigation`).
+- **Feature:** `table` (`#[cfg(feature = "table")]`, generic over `T`).
+- **Layout component:** **partial** (`#[with_layout_style(margin, offset, width, height)]`).
+- **Generic bound:** `T: Clone + Send + Sync + Unpin + 'static`.
+- **Props** (`TableProps<T>`, custom `Default`):
+  - `columns: Vec<TableColumn>` — `TableColumn::new(header: impl Into<Line>, width: Constraint)`, then `.alignment(TableCellAlignment)` / `.min_table_width(u16)` (hide the column below that table width).
+  - `rows: Vec<T>` — your own row data.
+  - `render_row: Option<RenderTableRow<T>>` — `RenderTableRow<T> = Arc<dyn Fn(&T, bool) -> Vec<TableCell> + Send + Sync>`; receives `(row, is_selected)`, returns one `TableCell` per column. `TableCell::new(impl Into<Line>)`, then `.style(Style)` / `.alignment(TableCellAlignment)`.
+  - `footer: Vec<TableCell>` (default empty = no footer) — a summary row aligned to the columns.
+  - `state: Option<State<TableState>>`
+  - `active: bool` (default `true` — built-in keyboard interaction on)
+  - `default_index: Option<usize>`
+  - `on_select: Handler<'static, T>` (fires on `Enter`)
+  - `block: Option<ratatui::widgets::Block<'static>>`
+  - `header_style: Style` (default `fg(Cyan)`), `footer_style: Style` (default `fg(Cyan)`), `row_style: Style`
+  - `highlight_style: Style` (selected row; default `fg(Black).bg(Cyan)`)
+  - `column_highlight_style: Style` (selected column; default empty), `cell_highlight_style: Style` (row/column intersection; default empty)
+  - `highlight_symbol: Option<&'static str>` (default `Some("▶ ")`)
+  - `highlight_spacing: HighlightSpacing` (default `WhenSelected`; `Always` / `WhenSelected` / `Never`) — reserves a leading gutter so the symbol never clips the first column.
+  - `column_navigation: bool` (default `false`) — when `active`, Left/Right (h/l) move the selected column.
+  - `column_spacing: u16` (default `1`, only used by `TableBorderMode::None`)
+  - `wrap_mode: TableWrapMode` (default `Wrap`; `Wrap` / `Truncate`)
+  - `border_mode: TableBorderMode` (default `Outer`; `None` / `Outer` / `Grid` — `Grid` draws a full cell grid)
+  - `border_style: Style` / `horizontal_line_style: Style` (default `fg(DarkGray)`)
+  - `cell_padding: u16` (default `1`)
+  - `header_separator: bool` (default `true`), `footer_separator: bool` (default `true`), `row_separator: bool` (default `false`) — separators only take a visible line in `Grid` mode.
+  - plus `margin`/`offset`/`width`/`height`.
+- **`TableState`** tracks the selected row (`selected` / `select` / `next` / `previous` / `select_first` / `select_last`) and selected column (`selected_column` / `select_column` / `next_column` / `previous_column`); the selected column is an index into the **full** column list. Import via `use ratatui_kit::prelude::*;`.
+- **Auto height:** when `height` is left at the default, the component estimates the rendered height (wrapping + grid + footer). Wrap a tall table in a `ScrollView` and either let the built-in keys select while the page drives scrolling, or set `active: false` and drive selection externally from the page (see `examples/components/table.rs`).
+
+```rust
+let table_state = hooks.use_state(TableState::default);
+Table<Deployment>(
+    width: Constraint::Length(80),
+    state: table_state,
+    active: true,
+    default_index: Some(0),
+    columns: vec![
+        TableColumn::new("Service", Constraint::Length(20)),
+        TableColumn::new("Latency", Constraint::Length(9)).alignment(TableCellAlignment::Right),
+    ],
+    rows: deployments,
+    render_row: Some(std::sync::Arc::new(|d: &Deployment, _selected| vec![
+        TableCell::new(d.service),
+        TableCell::new(format!("{}ms", d.latency)).alignment(TableCellAlignment::Right),
+    ])),
+    footer: vec![TableCell::new("2 services"), TableCell::new("avg 30ms").alignment(TableCellAlignment::Right)],
+    border_mode: TableBorderMode::Grid,
+    highlight_symbol: "▶ ",
+    highlight_style: Style::new().bg(Color::Rgb(45, 55, 95)),
+    column_highlight_style: Style::new().bg(Color::Rgb(70, 55, 25)),
+    column_navigation: true,
+    on_select: move |d: Deployment| { submitted.set(d.service.to_string()); },
 )
 ```
 

@@ -79,8 +79,8 @@ fn WrappedTextApp(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             ) {
                 ScrollView(
                     flex_direction: Direction::Vertical,
-                    scroll_view_state: scroll_state,
-                    scroll_bars: ScrollBars {
+                    state: scroll_state,
+                    scrollbars: Scrollbars {
                         vertical_scrollbar_visibility: ScrollbarVisibility::Always,
                         horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
                         ..Default::default()

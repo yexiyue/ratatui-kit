@@ -16,7 +16,12 @@ Sleep 4s
 Type "jjjj"
 Sleep 900ms
 PageDown
-Sleep 1000ms
+Sleep 1200ms
+# b toggles Scrollbars::over_border: scrollbar on the block border ↔ inset inside it.
+Type "b"
+Sleep 1400ms
+Type "b"
+Sleep 1200ms
 Type "kk"
 Sleep 800ms
 PageUp

@@ -111,6 +111,7 @@ export default defineConfig({
 						'components/select',
 						'components/multi-select',
 						'components/tree-select',
+						'components/table',
 						'components/virtual-list',
 						'components/virtual-multi-select',
 					],

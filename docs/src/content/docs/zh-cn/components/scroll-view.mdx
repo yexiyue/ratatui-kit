@@ -36,9 +36,9 @@ ScrollView(
 }
 ```
 
-不传 `scroll_view_state` 时，`ScrollView` 内部会创建自己的 `ScrollViewState`，并在当前 input layer 注册滚动事件。它支持 `j/k`、方向键、`PageUp/PageDown`、`Home/End` 和鼠标滚轮。
+不传 `state` 时，`ScrollView` 内部会创建自己的 `ScrollViewState`，并在当前 input layer 注册滚动事件。它支持 `j/k`、方向键、`PageUp/PageDown`、`Home/End` 和鼠标滚轮。
 
-内部滚动 handler 返回 `EventResult::Ignored`。这意味着滚动行为不会阻止同一层其它快捷键继续处理，比如页面里的 `q` 退出或 `?` 打开帮助。
+内置滚动只由 `active`(默认 `true`)门控,**与 `state` 正交**:传外部 state 不会关掉内置滚动——你可以既拿到句柄、又保留内置按键(与其它选择类组件一致)。内部 handler 现在对**真正处理了的**滚动键返回 `EventResult::Consumed`(其余返回 `Ignored`),所以同层无关快捷键(页面 `q` 退出、`?` 帮助)照常运行。
 
 ## 受控状态
 
@@ -71,8 +71,8 @@ hooks.use_event_handler_with_options(
 );
 
 ScrollView(
-    scroll_view_state: scroll_state,
-    scroll_bars: ScrollBars {
+    state: scroll_state,
+    scrollbars: Scrollbars {
         vertical_scrollbar_visibility: ScrollbarVisibility::Always,
         horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
         ..Default::default()
@@ -82,9 +82,9 @@ ScrollView(
 }
 ```
 
-示例用的就是受控状态：右侧状态面板读取 `scroll_state.get().offset()`，所以录屏里每次滚动都会看到 offset 改变。
+示例用的就是外部状态：右侧状态面板读取 `scroll_state.get().offset()`，所以录屏里每次滚动都会看到 offset 改变。
 
-受控模式下，滚动事件由业务 handler 调用 `scroll_state.write().handle_event(&event)`。这让你可以决定哪些键消费事件、哪些键继续交给页面其它 handler。
+`ScrollViewState` 还暴露 `size()` / `page_size()`、`is_at_bottom()`(日志/聊天的“贴底”逻辑)、`scroll_to_visible(y, height)`(把目标行滚进视口)。`handle_event` 返回 `bool`(是否处理),业务 handler 可据此映射为 `Consumed` / `Ignored`。
 
 ## 内容尺寸
 
@@ -108,7 +108,20 @@ ScrollView(
 )
 ```
 
-滚动条通过 `ScrollBars` 控制。`Automatic` 只在内容超出时显示；`Always` 会预留稳定空间；`Never` 适合明确不需要某个方向滚动的场景。
+滚动条通过 `Scrollbars` 控制。`Automatic` 只在内容超出时显示；`Always` 会预留稳定空间；`Never` 适合明确不需要某个方向滚动的场景。
+
+### 滚动条盖在边框上
+
+有 block 边框时,`Scrollbars::over_border`(默认 `true`)把滚动条画在**边框环**上——轨道落在右/下边框线上,内容占满整个 inner。设为 `false` 则把滚动条退到边框内侧,视口相应少一行/一列:
+
+```rust
+ScrollView(
+    block: Block::bordered(),
+    scrollbars: Scrollbars { over_border: false, ..Default::default() },
+)
+```
+
+`scrollview` 示例支持运行时切换(按 `b`),可对比两种观感。无论哪种模式,偏移量都按**真实可见视口**裁剪,所以最后一行/列始终可达。
 
 ## 与输入层组合
 

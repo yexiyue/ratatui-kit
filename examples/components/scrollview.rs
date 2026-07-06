@@ -60,29 +60,20 @@ const DOC_ROWS: [DocRow; 32] = [
     ),
     DocRow::new(RowKind::Bullet, "- Home and End jump to the edges"),
     DocRow::new(RowKind::Heading, "Automatic state"),
-    DocRow::new(
-        RowKind::Text,
-        "Omit scroll_view_state for the built-in handler.",
-    ),
+    DocRow::new(RowKind::Text, "Omit state for the built-in handler."),
     DocRow::new(RowKind::Code, "ScrollView { /* rows */ }"),
     DocRow::new(
         RowKind::Text,
         "The handler lives on the current input layer.",
     ),
-    DocRow::new(
-        RowKind::Text,
-        "It returns Ignored so peer shortcuts can run.",
-    ),
+    DocRow::new(RowKind::Text, "It consumes only the keys it scrolls on."),
     DocRow::new(RowKind::Heading, "Controlled state"),
     DocRow::new(
         RowKind::Text,
         "Pass a State<ScrollViewState> to own the offset.",
     ),
     DocRow::new(RowKind::Code, "let scroll = hooks.use_state(...);"),
-    DocRow::new(
-        RowKind::Code,
-        "ScrollView(scroll_view_state: scroll) { ... }",
-    ),
+    DocRow::new(RowKind::Code, "ScrollView(state: scroll) { ... }"),
     DocRow::new(RowKind::Text, "The page can inspect offset and jump."),
     DocRow::new(RowKind::Heading, "Layout contract"),
     DocRow::new(RowKind::Text, "Each child contributes width and height."),
@@ -122,6 +113,7 @@ async fn main() {
 fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let scroll_state = hooks.use_state(ScrollViewState::default);
     let mut status = hooks.use_state(|| "ready at top".to_string());
+    let mut over_border = hooks.use_state(|| true);
     let mut exit = hooks.use_exit();
 
     hooks.use_event_handler_with_options(
@@ -140,6 +132,16 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
             match key.code {
                 KeyCode::Char('q') | KeyCode::Char('Q') => {
                     exit();
+                    EventResult::Consumed
+                }
+                KeyCode::Char('b') | KeyCode::Char('B') => {
+                    let next = !over_border.get();
+                    over_border.set(next);
+                    status.set(if next {
+                        "scrollbar on the border".to_string()
+                    } else {
+                        "scrollbar inset in the border".to_string()
+                    });
                     EventResult::Consumed
                 }
                 KeyCode::Char('j') | KeyCode::Down => {
@@ -190,7 +192,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 gap: 1,
                 border_style: Style::new().blue(),
                 top_title: Line::from(" scroll view ").blue().bold().centered(),
-                bottom_title: Line::from(" j/k scroll | PageDown/PageUp page | Home/End jump | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" j/k scroll | PageDown/PageUp page | Home/End jump | b border | q quit ").dark_gray().centered(),
             ) {
                 View(
                     flex_direction: Direction::Horizontal,
@@ -199,10 +201,11 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     ScrollView(
                         width: Constraint::Length(66),
                         flex_direction: Direction::Vertical,
-                        scroll_view_state: scroll_state,
-                        scroll_bars: ScrollBars {
+                        state: scroll_state,
+                        scrollbars: Scrollbars {
                             vertical_scrollbar_visibility: ScrollbarVisibility::Always,
                             horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
+                            over_border: over_border.get(),
                             ..Default::default()
                         },
                         block: Block::bordered()

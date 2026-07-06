@@ -36,9 +36,9 @@ ScrollView(
 }
 ```
 
-When `scroll_view_state` is not passed, `ScrollView` creates its own `ScrollViewState` internally and registers scroll events on the current input layer. It supports `j/k`, arrow keys, `PageUp/PageDown`, `Home/End`, and the mouse wheel.
+When `state` is not passed, `ScrollView` creates its own `ScrollViewState` internally and registers scroll events on the current input layer. It supports `j/k`, arrow keys, `PageUp/PageDown`, `Home/End`, and the mouse wheel.
 
-The internal scroll handler returns `EventResult::Ignored`. This means scrolling does not prevent other shortcuts on the same layer from continuing to handle the event, such as page-level `q` to quit or `?` to open help.
+Built-in scrolling is gated only by `active` (default `true`); it is **orthogonal to `state`**, so passing external state does not turn it off — you can hold a handle *and* keep the built-in keys, matching the other selection components. The internal handler now returns `EventResult::Consumed` for the keys it actually scrolled on (and `Ignored` for everything else), so unrelated shortcuts on the same layer — page-level `q` to quit, `?` to open help — still run.
 
 ## Controlled state
 
@@ -71,8 +71,8 @@ hooks.use_event_handler_with_options(
 );
 
 ScrollView(
-    scroll_view_state: scroll_state,
-    scroll_bars: ScrollBars {
+    state: scroll_state,
+    scrollbars: Scrollbars {
         vertical_scrollbar_visibility: ScrollbarVisibility::Always,
         horizontal_scrollbar_visibility: ScrollbarVisibility::Never,
         ..Default::default()
@@ -82,9 +82,9 @@ ScrollView(
 }
 ```
 
-The example uses controlled state: the right-hand state panel reads `scroll_state.get().offset()`, so every scroll in the recording shows the offset changing.
+The example uses external state: the right-hand state panel reads `scroll_state.get().offset()`, so every scroll in the recording shows the offset changing.
 
-In controlled mode, scroll events are handled by business code calling `scroll_state.write().handle_event(&event)`. That lets you decide which keys consume the event and which keys continue to other page handlers.
+`ScrollViewState` also exposes `size()` / `page_size()`, `is_at_bottom()` (for stick-to-bottom logs/chat), and `scroll_to_visible(y, height)` (scroll a target row into view). `handle_event` returns `bool` (whether it acted), so business handlers can map it to `Consumed` / `Ignored`.
 
 ## Content size
 
@@ -108,7 +108,20 @@ ScrollView(
 )
 ```
 
-Scrollbars are controlled through `ScrollBars`. `Automatic` shows only when content overflows; `Always` reserves stable space; `Never` fits cases where you explicitly do not need scrolling in that direction.
+Scrollbars are controlled through `Scrollbars`. `Automatic` shows only when content overflows; `Always` reserves stable space; `Never` fits cases where you explicitly do not need scrolling in that direction.
+
+### Scrollbars on the border
+
+With a bordered `block`, `Scrollbars::over_border` (default `true`) draws the scrollbar **on the block's border ring** — the track sits on the right/bottom border line, and the content keeps the full inner area. Set it to `false` to inset the scrollbar inside the border instead, reducing the content viewport by one row/column:
+
+```rust
+ScrollView(
+    block: Block::bordered(),
+    scrollbars: Scrollbars { over_border: false, ..Default::default() },
+)
+```
+
+The `scrollview` example toggles this at runtime (press `b`) so you can compare the two looks. Either way the offset is clamped against the true visible viewport, so the last row/column is always reachable.
 
 ## Combining with input layers
 
