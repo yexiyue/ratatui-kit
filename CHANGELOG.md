@@ -1,3 +1,13 @@
+## [0.9.0] - 2026-07-06
+
+### 🚀 Features
+
+- *(table)* Footer row, highlight_spacing gutter, and column/cell highlight
+- *(scroll-view)* [**breaking**] Over_border switch, upstream sync, and API consistency
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.8.0 [skip ci]
 ## [0.8.0] - 2026-07-06
 
 ### 🚀 Features
