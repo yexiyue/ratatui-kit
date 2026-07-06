@@ -1,10 +1,10 @@
 ## 1. P0 — 扩展 API 地基(阻塞项,立即可做)
 
-- [ ] 1.1 修复 `crates/ratatui-kit-macros/src/with_layout_style.rs` 第 54-72 行 6 处裸 `ratatui::layout::...`,改为 `::ratatui_kit::ratatui::layout::...`(margin/offset/width/height/flex_direction/justify_content)
-- [ ] 1.2 回归验证:四件套 `--all-features`(test/clippy `-D warnings`/fmt --check/doc `RUSTDOCFLAGS=-D warnings`)+ `crates/ratatui-kit/tests/ui/{pass,fail}` trybuild 全绿
-- [ ] 1.3 新增「外部 crate 可编译」验证:把 probe 转正为 `tests/ui/pass` 用例或 contrib 内最小 crate,锁死宏 hygiene 回归
-- [ ] 1.4 起草「扩展 API 稳定面」文档:枚举承诺 semver 的公共项(Component/ComponentUpdater/ComponentDrawer/Element/AnyElement/ElementKey/NoProps、过程宏、Hooks/Hook/use_hook+内置 hooks、State/LayoutStyle、re-export ratatui/crossterm)
-- [ ] 1.5 给内部实现项(`ComponentHelperExt`、`AnyProps` 等)加 `#[doc(hidden)]` 或文档 internal 标注,不删除现有 `pub` 项
+- [x] 1.1 修复 `crates/ratatui-kit-macros/src/with_layout_style.rs` 第 54-72 行 6 处裸 `ratatui::layout::...`,改为 `::ratatui_kit::ratatui::layout::...`(margin/offset/width/height/flex_direction/justify_content)
+- [x] 1.2 回归验证:四件套 `--all-features`(test/clippy `-D warnings`/fmt --check/doc `RUSTDOCFLAGS=-D warnings`)+ `crates/ratatui-kit/tests/ui/{pass,fail}` trybuild 全绿
+- [x] 1.3 新增「外部 crate 可编译」验证:把 probe 转正为 `tests/ui/pass` 用例或 contrib 内最小 crate,锁死宏 hygiene 回归
+- [x] 1.4 起草「扩展 API 稳定面」文档:枚举承诺 semver 的公共项(Component/ComponentUpdater/ComponentDrawer/Element/AnyElement/ElementKey/NoProps、过程宏、Hooks/Hook/use_hook+内置 hooks、State/LayoutStyle、re-export ratatui/crossterm)
+- [x] 1.5 给内部实现项(`ComponentHelperExt`、`AnyProps` 等)加 `#[doc(hidden)]` 或文档 internal 标注,不删除现有 `pub` 项
 - [ ] 1.6 (可选)为 `#[component]`/`element!`/`#[derive(Props)]`/`#[with_layout_style]` 增加 `crate = "..."` 逃生舱,防依赖 rename
 
 ## 2. P1 — 作者规范 + 模板 + 发现机制
