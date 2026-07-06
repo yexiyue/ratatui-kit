@@ -152,9 +152,13 @@ ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦
 
 **踩过的坑**：`with_layout_style` 曾对注入字段用裸 `ratatui::layout::Margin` 等（6 处），而同宏 `layout_style()` 方法体却是对的 `::ratatui_kit::layout_style::`；调研第三方生态就绪度时用「只依赖 ratatui-kit 的外部 probe crate」一编译即暴露，已统一改为 `::ratatui_kit::ratatui::layout::*`。
 
-**正确做法**：改任何 `quote! { ... }` 里的类型/函数路径，一律写绝对 `::ratatui_kit::`；宏 hygiene 的回归护栏应是「一个只依赖 ratatui-kit 的外部 crate 跑 `cargo check`」或 `tests/ui/pass` 用例，别只靠库内编译判绿。
+**正确做法**：改任何 `quote! { ... }` 里的类型/函数路径，一律写绝对 `::ratatui_kit::`。
 
-**相关文件**：`crates/ratatui-kit-macros/src/with_layout_style.rs`、`crates/ratatui-kit/src/lib.rs`（`pub use ratatui` + `extern crate self`）
+**回归护栏必须用「只依赖 ratatui-kit 的独立 crate」，trybuild 抓不到**：`tests/ui/pass` 用例**不能**当 hygiene 护栏——trybuild 生成的临时 crate 会 mirror 被测 crate 的 dependencies/dev-dependencies（实测 `target/tests/trybuild/ratatui-kit-tests` 的 `Cargo.toml` 直接依赖 `ratatui`/`crossterm`），故其作用域里有裸 `ratatui`，宏即便回退成裸 `ratatui::layout::…` 也能解析、编译通过（**假绿**）。当初 `with_layout_style` 的 hygiene bug 就是因此长期没被 CI 发现。真正的外部视角护栏要用一个**只**声明 `ratatui-kit` 依赖（无 `ratatui`/`crossterm`）的 crate 跑 `cargo check`——本仓库以 workspace 成员 `crates/external-api-probe`（`publish = false`）承担这个角色，随 `--workspace` 自动编译，宏 hygiene 一回退就红。
+
+**同类:宏生成代码的 lint 也要自洽**：`with_layout_style` 生成的 `layout_style()` 里有 `..Default::default()`（只选部分布局字段时必要，全选时多余），会触发 `clippy::needless_update`。库内靠 `lib.rs` 顶部的 `#![allow(clippy::needless_update)]` 压住，但外部 crate 没有这个 crate 级 allow，`-D warnings` 就报错。已改为让宏在生成的 `layout_style()` 上自带 `#[allow(clippy::needless_update)]`。**原则:宏 `quote!` 出的代码不得依赖使用方 crate 级的 `#![allow(...)]` 或 lint 配置——需要的 allow 由宏自己带上。** 这类「外部才暴露」的问题正是 `external-api-probe` 护栏的价值。
+
+**相关文件**：`crates/ratatui-kit-macros/src/with_layout_style.rs`、`crates/ratatui-kit/src/lib.rs`（`pub use ratatui` + `extern crate self`）、`crates/external-api-probe/`（hygiene 护栏）
 
 ## 手写 Component 与 context-aware hooks
 

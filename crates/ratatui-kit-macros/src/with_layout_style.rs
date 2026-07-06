@@ -109,6 +109,9 @@ pub fn impl_layout_style(
 
                 impl #impl_generics #struct_name #ty_generics #where_clause {
                     /// Returns the layout style based on the layout-related fields of this struct.
+                    // 字段全部被 with_layout_style 选中时 `..Default::default()` 是多余的;
+                    // 宏自带 allow,以免外部 crate(无 crate 级 allow)在 -D warnings 下报错。
+                    #[allow(clippy::needless_update)]
                     pub fn layout_style(&self) -> ::ratatui_kit::layout_style::LayoutStyle {
                         ::ratatui_kit::layout_style::LayoutStyle {
                             #(#layout_style_assignments,)*

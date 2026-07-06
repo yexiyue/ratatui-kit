@@ -504,6 +504,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "external-api-probe"
+version = "0.0.0"
+dependencies = [
+ "ratatui-kit",
+]
+
+[[package]]
 name = "fancy-regex"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
