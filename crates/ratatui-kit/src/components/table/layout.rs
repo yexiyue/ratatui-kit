@@ -27,8 +27,9 @@ pub(super) fn resolve_column_widths(
     }
 
     let reserved = match border_mode {
-        TableBorderMode::Grid => column_count.saturating_add(1),
-        TableBorderMode::Outer => 2,
+        // Outer 与 Grid 一样要为 (n-1) 个列间分隔 + 外边框预留 column_count+1 格。
+        // (采纳自 #12:Outer 原先只留 2,窄表时 render_border_line 会越界。)
+        TableBorderMode::Outer | TableBorderMode::Grid => column_count.saturating_add(1),
         TableBorderMode::None => column_spacing.saturating_mul(column_count.saturating_sub(1)),
     }
     .saturating_add(cell_padding.saturating_mul(2).saturating_mul(column_count));
