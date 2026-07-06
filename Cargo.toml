@@ -1,12 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-    "crates/ratatui-kit",
-    "crates/ratatui-kit-macros",
-    # 宏 hygiene 护栏:只依赖 ratatui-kit(不依赖 ratatui/crossterm)的外部作者视角 crate,
-    # 随 --workspace 自动编译;宏展开一旦回退成裸 ratatui::/crossterm:: 即编译失败。
-    "crates/external-api-probe",
-]
+members = ["crates/ratatui-kit", "crates/ratatui-kit-macros"]
 
 [package]
 name = "ratatui-kit-examples"
@@ -22,6 +16,12 @@ serde_json = "1.0"
 
 # Examples are grouped by learning path and registered explicitly so the public
 # command stays stable: `cargo run --example <name>`.
+
+# 宏 hygiene 护栏:examples crate 不直连 ratatui/crossterm,宏若回退成裸路径即编译失败。
+[[example]]
+name = "hygiene_probe"
+path = "examples/hygiene_probe.rs"
+
 [[example]]
 name = "hello_world"
 path = "examples/start/hello_world.rs"
