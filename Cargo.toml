@@ -85,6 +85,11 @@ name = "multi_select"
 path = "examples/components/multi_select.rs"
 
 [[example]]
+name = "table"
+path = "examples/components/table.rs"
+required-features = ["ratatui-kit/table"]
+
+[[example]]
 name = "tree_select"
 path = "examples/components/tree_select.rs"
 
