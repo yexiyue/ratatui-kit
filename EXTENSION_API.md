@@ -78,7 +78,7 @@ These are `pub` but `#[doc(hidden)]` — do not depend on them.
 - Macros expand to absolute `::ratatui_kit::…` paths. This works out of the box when the
   dependency is named `ratatui-kit`. If you rename it via `cargo`
   (`foo = { package = "ratatui-kit" }`), add `extern crate foo as ratatui_kit;` at your
-  crate root so the macro paths resolve again (verified by `crates/rename-escape-probe`).
+  crate root so the macro paths resolve again (a standard Rust mechanism).
 - `#[component]` functions are **transparent-layout wrappers**: put layout props on the
   **returned root element**, not on the wrapper.
 - Feature-gate any heavy dependency (`optional = true` + a feature); keep default
@@ -88,9 +88,9 @@ These are `pub` but `#[doc(hidden)]` — do not depend on them.
 
 ## Guardrail
 
-The workspace crate `crates/external-api-probe` depends **only** on `ratatui-kit`
-(deliberately not on `ratatui` / `crossterm`) and exercises the macros + a manual
-`Component` + a custom `Hook`. It compiles under `--workspace`, so if a macro ever
-expands to a bare `ratatui::` / `crossterm::` path (or otherwise leaks a non-exported
+The example `examples/hygiene_probe.rs` lives in the `ratatui-kit-examples` crate, which
+**does not depend on `ratatui` / `crossterm` directly**. It exercises the macros + a manual
+`Component` + a custom `Hook`, and is compiled by `cargo test --examples`, so if a macro
+ever expands to a bare `ratatui::` / `crossterm::` path (or otherwise leaks a non-exported
 item), it fails to compile and CI goes red. `trybuild` cannot catch this — its temporary
 crate mirrors the tested crate's `ratatui` / `crossterm` dependencies.
