@@ -11,6 +11,7 @@ use generational_box::{AnyStorage, GenerationalBox, Owner, SyncStorage};
 
 use crate::ElementKey;
 
+#[doc(hidden)]
 pub trait Notifier: Default + Send + Sync + 'static {
     fn wake(&mut self);
     fn register(&mut self, key: Option<&ElementKey>, waker: Waker);
@@ -68,6 +69,7 @@ impl Notifier for WakerMap {
     }
 }
 
+#[doc(hidden)]
 pub struct ReactiveValue<T, N> {
     value: T,
     notifier: N,

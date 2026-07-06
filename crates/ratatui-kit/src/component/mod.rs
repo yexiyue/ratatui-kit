@@ -110,6 +110,7 @@ pub trait Component: Any + Unpin {
     }
 }
 
+#[doc(hidden)]
 pub trait AnyComponent: Any + Unpin {
     fn update(&mut self, props: AnyProps, hooks: Hooks, updater: &mut ComponentUpdater);
 

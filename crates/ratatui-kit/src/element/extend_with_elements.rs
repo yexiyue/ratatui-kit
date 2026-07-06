@@ -1,5 +1,6 @@
 use super::{AnyElement, Element, ElementType};
 
+#[doc(hidden)]
 pub trait ExtendWithElements<T> {
     fn extend_with_elements<E: Extend<T>>(self, dest: &mut E);
 }
@@ -36,6 +37,7 @@ where
     }
 }
 
+#[doc(hidden)]
 pub fn extend_with_elements<T, U, E>(dest: &mut T, elements: U)
 where
     U: ExtendWithElements<E>,

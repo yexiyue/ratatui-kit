@@ -61,6 +61,7 @@ impl Components {
     }
 }
 
+#[doc(hidden)]
 pub struct InstantiatedComponent {
     key: ElementKey,
     hooks: Vec<Box<dyn AnyHook>>,

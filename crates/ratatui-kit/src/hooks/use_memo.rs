@@ -14,6 +14,7 @@ pub trait UseMemo: private::Sealed {
         T: Clone + Unpin + 'static;
 }
 
+#[doc(hidden)]
 pub struct UseMemoImpl<T, D> {
     memoized_value: Option<T>,
     deps: Option<D>,

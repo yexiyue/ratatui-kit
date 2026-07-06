@@ -39,6 +39,7 @@ pub enum EventPriority {
 // [`InputLayer`] 句柄仅在**同一帧**内由父组件传给子组件用于 [`EventScope::Layer`] 显式归属；
 // **禁止**存入 `use_state` 跨帧使用（下一帧该 id 已不在层栈，对应 handler 会静默失聪）。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[doc(hidden)]
 pub struct LayerId(u64);
 
 // 用户持有的输入层句柄（`Copy`）。由 `use_input_layer` 返回。

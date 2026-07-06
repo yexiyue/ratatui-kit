@@ -17,6 +17,7 @@ pub trait UseFuture: private::Sealed {
         F: Future<Output = ()> + 'static;
 }
 
+#[doc(hidden)]
 pub struct UseFutureImpl {
     f: Option<LocalBoxFuture<'static, ()>>,
 }

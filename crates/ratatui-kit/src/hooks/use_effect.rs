@@ -22,6 +22,7 @@ pub trait UseEffect: private::Sealed {
         D: PartialEq + Unpin + 'static;
 }
 
+#[doc(hidden)]
 pub struct UseEffectImpl<D> {
     deps: Option<D>,
 }
@@ -32,6 +33,7 @@ impl<D> Default for UseEffectImpl<D> {
     }
 }
 
+#[doc(hidden)]
 pub struct UseAsyncEffectImpl<D> {
     f: Option<LocalBoxFuture<'static, ()>>,
     deps: Option<D>,

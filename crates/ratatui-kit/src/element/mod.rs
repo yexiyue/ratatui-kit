@@ -8,6 +8,7 @@ pub use element_ext::{ElementExt, ElementRepr};
 mod extend_with_elements;
 pub use extend_with_elements::{ExtendWithElements, extend_with_elements};
 
+#[doc(hidden)]
 pub trait ElementType {
     type Props<'a>
     where

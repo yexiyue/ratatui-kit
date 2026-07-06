@@ -23,6 +23,7 @@ impl Drop for RestoreGuard {
     }
 }
 
+#[doc(hidden)]
 pub struct Tree<'a> {
     root_component: InstantiatedComponent,
     props: AnyProps<'a>,
