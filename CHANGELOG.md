@@ -1,3 +1,25 @@
+## [0.8.0] - 2026-07-06
+
+### 🚀 Features
+
+- *(table)* Add feature-gated table component (#11)
+- 第三方组件生态地基 — 扩展 API hygiene 修复 + 立项 (#13)
+- 生态 P1(主仓库) — 1.6 rename 逃生舱 + hygiene 护栏收敛为 example + COMPONENT_GUIDE (#14)
+
+### 🐛 Bug Fixes
+
+- *(table)* Outer 边框模式预留 column_count+1(采纳 #12,修窄表边框越界)
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.7.2 [skip ci]
+- *(blog)* Add ratatui-kit 0.7 "three rewrites" post and assets
+- *(api)* 补内置组件进扩展 API 稳定面(markdown 试点暴露的 gap)+ 勾选 P2 markdown 迁移
+- 主库 README 增加 Ecosystem 段(P1 2.4)+ 勾选 P1 tasks
+
+### ⚙️ Miscellaneous Tasks
+
+- *(openspec)* Archive third-party-component-ecosystem(P0/P1/P2 完成)
 ## [0.7.2] - 2026-06-30
 
 ### 🐛 Bug Fixes
