@@ -272,6 +272,23 @@ Some examples require optional features such as `input`, `tree`, `virtual-list`,
 
 ---
 
+## Ecosystem
+
+Beyond the built-in components, ratatui-kit has a growing ecosystem of third-party
+component crates, published independently as `ratatui-kit-<name>`. They depend only on the
+stable [Extension API](./EXTENSION_API.md) and do **not** need to be merged into this repo,
+so the core stays small.
+
+- **Find components** — search the [`ratatui-kit` keyword](https://crates.io/keywords/ratatui-kit)
+  on crates.io, or browse [awesome-ratatui-kit](https://github.com/yexiyue/awesome-ratatui-kit).
+- **Write your own** — scaffold from the
+  [component template](https://github.com/yexiyue/ratatui-kit-component-template)
+  (`cargo generate yexiyue/ratatui-kit-component-template`) and follow the
+  [Component Guide](./COMPONENT_GUIDE.md).
+- **Official extensions** live in
+  [ratatui-kit-contrib](https://github.com/yexiyue/ratatui-kit-contrib) (e.g.
+  `ratatui-kit-markdown` — Markdown / code-block / diff / blockquote / divider).
+
 ## Design goals
 
 Ratatui Kit is inspired by React, [iocraft](https://github.com/ccbrown/iocraft), and [ink](https://github.com/vadimdemedes/ink), but stays close to Rust and Ratatui:

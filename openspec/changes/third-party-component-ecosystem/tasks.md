@@ -9,12 +9,12 @@
 
 ## 2. P1 — 作者规范 + 模板 + 发现机制
 
-- [ ] 2.1 编写 `COMPONENT_GUIDE.md`:组件契约(只依赖公共 API、透明布局陷阱、feature 门控、panic 文案英文、doctest+example 编译基线、版本区间声明)
-- [ ] 2.2 编写命名 + 发布规范:`ratatui-kit-<name>` 前缀、keyword `ratatui-kit`、category、official 标注、打 tag 发布流程
-- [ ] 2.3 创建 `ratatui-kit-component-template`(cargo-generate):示例组件 + 自定义 hook + 可运行 example + fmt/clippy/test/doc CI + 打 tag 发布配置(内建透明布局正确示范)
-- [ ] 2.4 主库 README 增加「Ecosystem」段,指向 awesome-list 与 keyword 检索
-- [ ] 2.5 创建 `awesome-ratatui-kit` 列表仓库骨架
-- [ ] 2.6 创建 `ratatui-kit-contrib` monorepo 骨架(workspace + CI + 按 tag 前缀发布)
+- [x] 2.1 编写 `COMPONENT_GUIDE.md`:组件契约(只依赖公共 API、透明布局陷阱、feature 门控、panic 文案英文、doctest+example 编译基线、版本区间声明)
+- [x] 2.2 编写命名 + 发布规范:`ratatui-kit-<name>` 前缀、keyword `ratatui-kit`、category、official 标注、打 tag 发布流程
+- [x] 2.3 创建 `ratatui-kit-component-template`(cargo-generate):示例组件 + 自定义 hook + 可运行 example + fmt/clippy/test/doc CI + 打 tag 发布配置(内建透明布局正确示范)
+- [x] 2.4 主库 README 增加「Ecosystem」段,指向 awesome-list 与 keyword 检索
+- [x] 2.5 创建 `awesome-ratatui-kit` 列表仓库骨架
+- [x] 2.6 创建 `ratatui-kit-contrib` monorepo 骨架(workspace + CI + 按 tag 前缀发布)
 
 ## 3. P2 — 试点:table 入核心
 
