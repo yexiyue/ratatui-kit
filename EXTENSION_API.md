@@ -25,6 +25,17 @@ crate, depend only on the items listed under *Stable surface*.
 `Component`, `ComponentUpdater`, `ComponentDrawer`, `Components` (+ `get_constraints`),
 `LayoutStyle`, `NoProps`, `Props`.
 
+### Built-in components
+
+Every `pub` component re-exported from the crate root (and its `*Props`) is part of the
+stable surface — a component crate may compose them. Core: `View`, `Text`, `Border`,
+`Center`, `Fragment`, `ScrollView`, `ScrollBars`, `ScrollbarVisibility`, and the `Modal`
+family. Feature-gated: `Input` / `SearchInput` (`input`), `TreeSelect` (`tree`),
+`VirtualList` (`virtual-list`).
+
+Table (feature `table`): `Table`, `TableColumn`, `TableCell`, `TableCellAlignment`,
+`TableBorderMode`, `TableWrapMode`, `TableState`, `RenderTableRow`.
+
 ### Elements
 `Element`, `AnyElement`, `ElementExt` (`fullscreen` / `render_loop`).
 

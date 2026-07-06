@@ -18,20 +18,20 @@
 
 ## 3. P2 — 试点:table 入核心
 
-- [ ] 3.1 合入 PR #11(CI 绿、零验证存活 findings、单独满足 issue #10)
-- [ ] 3.2 采纳 #12 对 `table/layout.rs` 的 Outer 模式修复(`column_count+1`,防 Outer 边框越界;markdown 用 Grid 不受影响),折入 #11 或接受 #12 rebase 带入
+- [x] 3.1 合入 PR #11(CI 绿、零验证存活 findings、单独满足 issue #10)
+- [x] 3.2 采纳 #12 对 `table/layout.rs` 的 Outer 模式修复(`column_count+1`,防 Outer 边框越界;markdown 用 Grid 不受影响),折入 #11 或接受 #12 rebase 带入
 
 ## 4. P2 — 试点:markdown 迁出为独立 crate(迁移即修 review 实证 bug)
 
-- [ ] 4.1 在 contrib 建 `ratatui-kit-markdown` crate,搬入 markdown/code_block/diff/blockquote/divider 源码,依赖改为 crates.io `ratatui-kit` 版本区间
-- [ ] 4.2 修 **blocker**:连续段落合并成一行(`parser.rs` flush_spans 把每次 flush 并入前一 Paragraph)——按行分行渲染 + 段间空行 + 硬换行成真换行,加回归测试
-- [ ] 4.3 修 **major**:嵌套列表父项丢 bullet + 多余空 bullet(子列表 Start 时把父项已收集 spans 作为 ListItem 发出,跳过空 ListItem),加回归测试
-- [ ] 4.4 修 **CI blocker**:删 `examples/components/markdown_streaming.rs` 6 处对 Copy 类型(State/ReactiveHandle)的 `.clone()`,并 `cargo fmt --all`(markdown/mod.rs、parser.rs、markdown_streaming.rs)
-- [ ] 4.5 修 minor:标题内 bold/italic 样式泄漏(改用 save/restore 样式栈,同 link 路径);代码块与换行表格行的预留高度按 wrap 感知计算(避免 ScrollView 裁剪);Divider 透明布局属性转发到根元素;补齐 4 处 `///` doctest 缺失的 prelude import
-- [ ] 4.6 对齐 openspec 文档(#12 自带 md-diff-highlight-components change:MarkdownComponents trait / 三层 LRU 缓存等描述与实现不符,勾选状态与实现对齐或改写)
-- [ ] 4.7 端到端验证:markdown crate 全部 example 跑通 + 编译基线 + 全量四件套,然后发布首个版本
+- [x] 4.1 在 contrib 建 `ratatui-kit-markdown` crate,搬入 markdown/code_block/diff/blockquote/divider 源码,依赖改为 crates.io `ratatui-kit` 版本区间
+- [x] 4.2 修 **blocker**:连续段落合并成一行(`parser.rs` flush_spans 把每次 flush 并入前一 Paragraph)——按行分行渲染 + 段间空行 + 硬换行成真换行,加回归测试
+- [x] 4.3 修 **major**:嵌套列表父项丢 bullet + 多余空 bullet(子列表 Start 时把父项已收集 spans 作为 ListItem 发出,跳过空 ListItem),加回归测试
+- [x] 4.4 修 **CI blocker**:删 `examples/components/markdown_streaming.rs` 6 处对 Copy 类型(State/ReactiveHandle)的 `.clone()`,并 `cargo fmt --all`(markdown/mod.rs、parser.rs、markdown_streaming.rs)
+- [x] 4.5 修 minor:标题内 bold/italic 样式泄漏(改用 save/restore 样式栈,同 link 路径);代码块与换行表格行的预留高度按 wrap 感知计算(避免 ScrollView 裁剪);Divider 透明布局属性转发到根元素;补齐 4 处 `///` doctest 缺失的 prelude import
+- [x] 4.6 对齐 openspec 文档(#12 自带 md-diff-highlight-components change:MarkdownComponents trait / 三层 LRU 缓存等描述与实现不符,勾选状态与实现对齐或改写)
+- [x] 4.7 端到端验证:markdown crate 全部 example 跑通 + 编译基线 + 全量四件套,然后发布首个版本
 
 ## 5. 收尾
 
-- [ ] 5.1 回填 markdown 迁移中暴露的缺失扩展 API 到稳定面文档
+- [x] 5.1 回填 markdown 迁移中暴露的缺失扩展 API 到稳定面文档
 - [ ] 5.2 `openspec archive third-party-component-ecosystem`
