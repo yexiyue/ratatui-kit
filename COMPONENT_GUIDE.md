@@ -10,10 +10,10 @@ you are allowed to depend on.
 
 ```bash
 # 推荐:从官方模板生成
-cargo generate ratatui-kit-org/ratatui-kit-component-template
+cargo generate yexiyue/ratatui-kit-component-template
 
 # 或手动:在 Cargo.toml 里
-# ratatui-kit = ">=0.7, <0.8"
+# ratatui-kit = ">=0.8, <0.9"
 ```
 
 ## The component contract
@@ -94,7 +94,7 @@ Macros expand to absolute `::ratatui_kit::…` paths, which resolve as long as t
 is named `ratatui-kit`. If you rename it via `cargo`:
 
 ```toml
-rk = { package = "ratatui-kit", version = ">=0.7, <0.8" }
+rk = { package = "ratatui-kit", version = ">=0.8, <0.9" }
 ```
 
 add this at your crate root so the macro paths resolve again:
@@ -107,9 +107,9 @@ extern crate rk as ratatui_kit;
 
 - **Name**: `ratatui-kit-<name>` (e.g. `ratatui-kit-markdown`).
 - **`Cargo.toml`**: `keywords = ["ratatui-kit", "tui"]`, a relevant `categories`, and a
-  version range `ratatui-kit = ">=0.7, <0.8"` matching the API surface you build against.
+  version range `ratatui-kit = ">=0.8, <0.9"` matching the API surface you build against.
 - **Release**: bump version → tag → CI `cargo publish` (mirror the main repo's flow).
-- List your crate in [`awesome-ratatui-kit`](https://github.com/ratatui-kit-org/awesome-ratatui-kit)
+- List your crate in [`awesome-ratatui-kit`](https://github.com/yexiyue/awesome-ratatui-kit)
   so people can find it.
 
 ## Pre-publish checklist

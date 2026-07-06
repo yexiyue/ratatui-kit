@@ -11,7 +11,7 @@ crate, depend only on the items listed under *Stable surface*.
 
 - **`0.x` semver**: a breaking change to any *Stable surface* item bumps the **minor**
   version; purely additive changes go in a **patch**.
-- **Depend with a range**, e.g. `ratatui-kit = ">=0.7, <0.8"`, matching the surface
+- **Depend with a range**, e.g. `ratatui-kit = ">=0.8, <0.9"`, matching the surface
   version you build against.
 - **Get `ratatui` / `crossterm` types through the re-exports** — `ratatui_kit::ratatui`
   and `ratatui_kit::crossterm` — instead of adding a direct dependency. This avoids a
