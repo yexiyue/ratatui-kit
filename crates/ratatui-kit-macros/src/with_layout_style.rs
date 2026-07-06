@@ -52,23 +52,23 @@ pub fn impl_layout_style(
         .iter()
         .map(|field| match field.to_string().as_str() {
             "margin" => Field::parse_named
-                .parse2(quote! { pub margin: ratatui::layout::Margin })
+                .parse2(quote! { pub margin: ::ratatui_kit::ratatui::layout::Margin })
                 .unwrap(),
             "offset" => Field::parse_named
-                .parse2(quote! { pub offset: ratatui::layout::Offset })
+                .parse2(quote! { pub offset: ::ratatui_kit::ratatui::layout::Offset })
                 .unwrap(),
             "width" => Field::parse_named
-                .parse2(quote! { pub width: ratatui::layout::Constraint })
+                .parse2(quote! { pub width: ::ratatui_kit::ratatui::layout::Constraint })
                 .unwrap(),
             "height" => Field::parse_named
-                .parse2(quote! { pub height: ratatui::layout::Constraint})
+                .parse2(quote! { pub height: ::ratatui_kit::ratatui::layout::Constraint})
                 .unwrap(),
             "gap" => Field::parse_named.parse2(quote! { pub gap: i32 }).unwrap(),
             "flex_direction" => Field::parse_named
-                .parse2(quote! { pub flex_direction: ratatui::layout::Direction })
+                .parse2(quote! { pub flex_direction: ::ratatui_kit::ratatui::layout::Direction })
                 .unwrap(),
             "justify_content" => Field::parse_named
-                .parse2(quote! { pub justify_content: ratatui::layout::Flex })
+                .parse2(quote! { pub justify_content: ::ratatui_kit::ratatui::layout::Flex })
                 .unwrap(),
             _ => panic!("Unknown layout style field: {field}"),
         })
@@ -109,6 +109,9 @@ pub fn impl_layout_style(
 
                 impl #impl_generics #struct_name #ty_generics #where_clause {
                     /// Returns the layout style based on the layout-related fields of this struct.
+                    // 字段全部被 with_layout_style 选中时 `..Default::default()` 是多余的;
+                    // 宏自带 allow,以免外部 crate(无 crate 级 allow)在 -D warnings 下报错。
+                    #[allow(clippy::needless_update)]
                     pub fn layout_style(&self) -> ::ratatui_kit::layout_style::LayoutStyle {
                         ::ratatui_kit::layout_style::LayoutStyle {
                             #(#layout_style_assignments,)*

@@ -73,6 +73,7 @@ where
 //
 // 事件订阅已移除（改由 `InputRuntime` 中央分发),故此 trait 仅暴露 update 真正用到的 `insert_before`
 // （闭包 box 化,因 `TerminalImpl::insert_before` 泛型闭包不对象安全)。
+#[doc(hidden)]
 pub trait UpdaterTerminal {
     fn insert_before(
         &mut self,

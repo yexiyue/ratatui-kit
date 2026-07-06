@@ -1,6 +1,12 @@
 [workspace]
 resolver = "3"
-members = ["crates/ratatui-kit", "crates/ratatui-kit-macros"]
+members = [
+    "crates/ratatui-kit",
+    "crates/ratatui-kit-macros",
+    # 宏 hygiene 护栏:只依赖 ratatui-kit(不依赖 ratatui/crossterm)的外部作者视角 crate,
+    # 随 --workspace 自动编译;宏展开一旦回退成裸 ratatui::/crossterm:: 即编译失败。
+    "crates/external-api-probe",
+]
 
 [package]
 name = "ratatui-kit-examples"

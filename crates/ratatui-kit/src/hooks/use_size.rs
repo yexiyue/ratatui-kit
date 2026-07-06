@@ -74,6 +74,7 @@ pub trait UsePreviousSize: private::Sealed {
     fn use_previous_size(&mut self) -> Rect;
 }
 
+#[doc(hidden)]
 pub struct UsePreviousSizeImpl {
     size: Rect,
 }

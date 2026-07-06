@@ -1,0 +1,12 @@
+# 宏 hygiene 护栏 crate:只依赖 ratatui-kit(刻意不依赖 ratatui/crossterm),
+# 模拟第三方组件作者的视角。随 --workspace 自动编译;不发布。
+[package]
+name = "external-api-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+
+[dependencies]
+ratatui-kit = { path = "../ratatui-kit" }

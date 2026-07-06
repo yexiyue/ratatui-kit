@@ -11,6 +11,7 @@ use std::sync::Arc;
 //
 // 两个变体天然不互相碰撞;`Decl(同一 u128)` 与此前「无用户 key 用同一 decl_key」语义一致。
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[doc(hidden)]
 pub enum ElementKey {
     // 仅声明点稳定的 key,零堆分配。
     Decl(u128),

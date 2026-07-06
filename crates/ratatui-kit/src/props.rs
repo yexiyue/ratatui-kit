@@ -34,6 +34,7 @@ impl<T> DropRaw for DropRawImpl<T> {
 // raw: 指向实际数据的原始指针
 // drop: 可选的drop处理函数（对于owned类型）
 // _marker: 生命周期标记
+#[doc(hidden)]
 pub struct AnyProps<'a> {
     raw: *mut (),
     type_id: TypeId,
