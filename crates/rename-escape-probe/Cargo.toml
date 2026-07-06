@@ -1,0 +1,13 @@
+# 1.6 rename 逃生舱护栏:把 ratatui-kit 依赖 rename 成 `rk`(package = ratatui-kit),
+# 靠 src/lib.rs 的 `extern crate rk as ratatui_kit;` 让宏路径重新可达。随 --workspace
+# 自动编译;若某天 extern crate 逃生舱失效,这里会编译失败。不发布。
+[package]
+name = "rename-escape-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+
+[dependencies]
+rk = { package = "ratatui-kit", path = "../ratatui-kit" }

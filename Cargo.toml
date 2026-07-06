@@ -6,6 +6,8 @@ members = [
     # 宏 hygiene 护栏:只依赖 ratatui-kit(不依赖 ratatui/crossterm)的外部作者视角 crate,
     # 随 --workspace 自动编译;宏展开一旦回退成裸 ratatui::/crossterm:: 即编译失败。
     "crates/external-api-probe",
+    # rename 逃生舱护栏:依赖被 rename,靠 extern crate 别名让宏路径可达(1.6)。
+    "crates/rename-escape-probe",
 ]
 
 [package]

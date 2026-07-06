@@ -75,8 +75,10 @@ These are `pub` but `#[doc(hidden)]` — do not depend on them.
 
 - Depend only on *Stable surface* items; reach `ratatui` / `crossterm` via
   `ratatui_kit::ratatui` / `ratatui_kit::crossterm`.
-- Macros expand to absolute `::ratatui_kit::…` paths — this works as long as the
-  dependency keeps the crate name `ratatui-kit` (not renamed via `cargo`).
+- Macros expand to absolute `::ratatui_kit::…` paths. This works out of the box when the
+  dependency is named `ratatui-kit`. If you rename it via `cargo`
+  (`foo = { package = "ratatui-kit" }`), add `extern crate foo as ratatui_kit;` at your
+  crate root so the macro paths resolve again (verified by `crates/rename-escape-probe`).
 - `#[component]` functions are **transparent-layout wrappers**: put layout props on the
   **returned root element**, not on the wrapper.
 - Feature-gate any heavy dependency (`optional = true` + a feature); keep default
