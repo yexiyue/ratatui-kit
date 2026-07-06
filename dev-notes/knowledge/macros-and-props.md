@@ -146,6 +146,16 @@ ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦
 
 **相关文件**：`crates/ratatui-kit/src/lib.rs`
 
+### 宏 hygiene：所有宏展开须用绝对 `::ratatui_kit::` 路径，外部 crate 才能用
+
+过程宏面向**第三方组件 crate**（只依赖 `ratatui-kit`、作用域里没有 `ratatui`/`crossterm` 裸名）也要能用，故 `quote!` 生成的每一处路径都必须是绝对的：`::ratatui_kit::...`，需要 ratatui 类型时写 `::ratatui_kit::ratatui::...`（经 `lib.rs` 的 `pub use ratatui`）。**不得生成裸 `ratatui::` / `crossterm::` 路径**——库内因作用域有 `ratatui` 照常编译，外部 crate 会 `cannot find crate/module ratatui` 直接炸，而库内四件套永远发现不了。
+
+**踩过的坑**：`with_layout_style` 曾对注入字段用裸 `ratatui::layout::Margin` 等（6 处），而同宏 `layout_style()` 方法体却是对的 `::ratatui_kit::layout_style::`；调研第三方生态就绪度时用「只依赖 ratatui-kit 的外部 probe crate」一编译即暴露，已统一改为 `::ratatui_kit::ratatui::layout::*`。
+
+**正确做法**：改任何 `quote! { ... }` 里的类型/函数路径，一律写绝对 `::ratatui_kit::`；宏 hygiene 的回归护栏应是「一个只依赖 ratatui-kit 的外部 crate 跑 `cargo check`」或 `tests/ui/pass` 用例，别只靠库内编译判绿。
+
+**相关文件**：`crates/ratatui-kit-macros/src/with_layout_style.rs`、`crates/ratatui-kit/src/lib.rs`（`pub use ratatui` + `extern crate self`）
+
 ## 手写 Component 与 context-aware hooks
 
 ### Modal 等手写组件经 updater 拿 SystemContext 登记输入层

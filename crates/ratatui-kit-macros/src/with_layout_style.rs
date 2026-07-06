@@ -52,23 +52,23 @@ pub fn impl_layout_style(
         .iter()
         .map(|field| match field.to_string().as_str() {
             "margin" => Field::parse_named
-                .parse2(quote! { pub margin: ratatui::layout::Margin })
+                .parse2(quote! { pub margin: ::ratatui_kit::ratatui::layout::Margin })
                 .unwrap(),
             "offset" => Field::parse_named
-                .parse2(quote! { pub offset: ratatui::layout::Offset })
+                .parse2(quote! { pub offset: ::ratatui_kit::ratatui::layout::Offset })
                 .unwrap(),
             "width" => Field::parse_named
-                .parse2(quote! { pub width: ratatui::layout::Constraint })
+                .parse2(quote! { pub width: ::ratatui_kit::ratatui::layout::Constraint })
                 .unwrap(),
             "height" => Field::parse_named
-                .parse2(quote! { pub height: ratatui::layout::Constraint})
+                .parse2(quote! { pub height: ::ratatui_kit::ratatui::layout::Constraint})
                 .unwrap(),
             "gap" => Field::parse_named.parse2(quote! { pub gap: i32 }).unwrap(),
             "flex_direction" => Field::parse_named
-                .parse2(quote! { pub flex_direction: ratatui::layout::Direction })
+                .parse2(quote! { pub flex_direction: ::ratatui_kit::ratatui::layout::Direction })
                 .unwrap(),
             "justify_content" => Field::parse_named
-                .parse2(quote! { pub justify_content: ratatui::layout::Flex })
+                .parse2(quote! { pub justify_content: ::ratatui_kit::ratatui::layout::Flex })
                 .unwrap(),
             _ => panic!("Unknown layout style field: {field}"),
         })
