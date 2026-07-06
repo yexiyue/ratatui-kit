@@ -1,0 +1,155 @@
+---
+title: Table
+description: 通用的数据驱动表格:单元格网格边框、视宽感知换行、响应式列、页脚合计行,以及行/列/单元格三级高亮。
+sidebar:
+  order: 5
+---
+
+`Table` 是一个由 `table` 特性提供的通用、数据驱动表格组件。你描述列、给出行数据以及一个 `render_row` 闭包,组件负责列宽解析、CJK/emoji 视宽感知的单元格换行、单元格网格边框、选中态、页脚行与布局高度。它保持业务中立:行类型 `T` 是你自己的,组件从不假设一行代表什么。
+
+![table demo](/ratatui-kit/recordings/table.gif)
+
+该录制由 `docs/tapes/table.tape` 生成:默认选中一行(`▶` gutter 与行高亮),用 `l`/`h` 移动列高亮,用 `c` 切换密度,用 `PageDown` 滚出页脚合计,用 `e` 切换空态。
+
+## 运行
+
+```bash
+cargo run --example table
+```
+
+按 `j/k` 移动选中行,`h/l` 移动选中列,`PageUp/PageDown` 或鼠标滚轮滚动,`c` 切换紧凑密度,`e` 切换空态,`q` 退出。
+
+## 特性
+
+`Table` 在 `table` 特性之后:
+
+```toml
+ratatui-kit = { version = "...", features = ["table"] }
+```
+
+示例使用 `full` 特性,可以直接运行。主库默认特性集刻意为空;裸 `cargo check` 不会编译 table 组件。
+
+## 为什么不用原生 ratatui `Table`?
+
+`Table` 是从零手写的渲染器,并**没有**包裹 `ratatui::widgets::Table`。它存在的意义正是原生 widget 做不到的三件事:
+
+- **单元格网格线** —— `TableBorderMode::Grid` 在每个单元格与每行之间绘制盒线边框(原生表格只有外层 `Block`)。这正是它能渲染 markdown 风格表格的原因。
+- **自动换行** —— 过长的单元格文本按列宽换行,并正确处理 CJK/emoji 的视觉宽度(原生表格只截断,或需要你预换行并设置行高)。
+- **响应式列** —— 通过 `min_table_width`,列可以在表格窄于阈值时自动隐藏。
+
+如果你想要的是原生的窗口化滚动表格(只渲染可见行、二维单元格选择、`footer`),它已经能通过 `stateful(...)` adapter 直接使用——因为 `ratatui::widgets::Table` 就是 `StatefulWidget`。当你要边框、换行与框架集成的选中态时,才用 `Table`。
+
+## 列
+
+一列由表头、宽度 `Constraint`、对齐方式,以及可选的响应式阈值组成:
+
+```rust title="examples/components/table.rs"
+TableColumn::new("Service / 服务", Constraint::Length(22))
+TableColumn::new("Latency", Constraint::Length(9)).alignment(TableCellAlignment::Right)
+TableColumn::new("Note / 备注", Constraint::Fill(1)).min_table_width(100)
+```
+
+宽度接受 `Length` / `Min` / `Max` / `Percentage` / `Ratio` / `Fill`;组件在可用宽度(扣除边框、内边距与选中 gutter 之后)内解析它们,并在溢出时按比例缩小。`min_table_width(n)` 在表格窄于 `n` 时整列隐藏,让宽表在终端收窄时仍然可读。
+
+## 行与 `render_row`
+
+行是你自己的数据。`render_row` 把一行(以及它是否被选中)转成 `Vec<TableCell>`,每列一个单元格:
+
+```rust title="examples/components/table.rs"
+let render_row: RenderTableRow<Deployment> = Arc::new(|deployment, _selected| {
+    vec![
+        TableCell::new(deployment.service).style(Style::new().fg(Color::White).bold()),
+        TableCell::new(deployment.owner),
+        TableCell::new(format!("{}ms", deployment.latency))
+            .alignment(TableCellAlignment::Right),
+    ]
+});
+
+Table<Deployment>(
+    columns: wide_columns(),
+    rows: deployments,
+    render_row: Some(render_row),
+)
+```
+
+`TableCell` 是一个 `Line` 加上可选的单元格级 `style` 与 `alignment`(对齐方式缺省回退到列的对齐)。超过列数的单元格被忽略;缺失的单元格渲染为空。
+
+## 边框、换行与分隔线
+
+```rust
+Table<Row>(
+    border_mode: TableBorderMode::Grid,     // None | Outer | Grid
+    wrap_mode: TableWrapMode::Wrap,         // Wrap | Truncate
+    cell_padding: 1u16,
+    column_spacing: 1u16,                    // 仅 border_mode = None 时使用
+    header_separator: true,
+    row_separator: true,
+    border_style: Style::new().fg(Color::DarkGray),
+    horizontal_line_style: Style::new().fg(Color::DarkGray),
+)
+```
+
+- `Grid` 绘制完整单元格网格;`Outer` 只绘制外框;`None` 不绘制边框,列间用 `column_spacing`。
+- `Wrap` 在空白处断行(退化时硬断),并把 CJK/emoji 记为宽度 2;`Truncate` 截断为单行。
+- 行分隔线与表头分隔线只在 `Grid` 模式下占一条可见的线。
+
+## 页脚
+
+传入一行 `footer` 单元格(每列一个)用于合计或摘要。它对齐到相同的列,绘制在表体之后,并可选带分隔线:
+
+```rust title="examples/components/table.rs"
+Table<Deployment>(
+    footer: footer_cells(&rows),           // Vec<TableCell>,空 = 无页脚
+    footer_style: Style::new().fg(Color::Cyan).bold(),
+    footer_separator: true,
+)
+```
+
+## 选中、高亮与 gutter
+
+`Table` 在 `TableState` 中跟踪选中行(以及可选的选中列)。
+
+```rust
+Table<Row>(
+    active: true,                           // 处理 j/k/Home/End/Enter
+    default_index: Some(0),
+    highlight_style: Style::new().bg(Color::Rgb(45, 55, 95)),   // 选中行
+    highlight_symbol: Some("▶ "),
+    highlight_spacing: HighlightSpacing::WhenSelected,          // Always | WhenSelected | Never
+    column_highlight_style: Style::new().bg(Color::Rgb(70, 55, 25)),  // 选中列
+    cell_highlight_style: Style::new().add_modifier(Modifier::REVERSED),  // 交叉单元格
+    column_navigation: true,                // Left/Right 移动选中列
+    on_select: move |row| { /* Enter */ },
+)
+```
+
+- **`highlight_spacing`** 决定选中符号是否预留前置 gutter。默认 `WhenSelected` 时,选中一行就出现 gutter,`▶` 符号永远不会覆盖首列内容(与原生 `HighlightSpacing` 一致)。`Always` 无条件预留;`Never` 从不绘制符号。
+- **`column_highlight_style`** 为整个选中列(表头、表体、页脚)着色;**`cell_highlight_style`** 在行/列交叉处再叠加一层。两者默认为空,只有选中某列后才显现。
+- **内置按键**(`active` 时):`j/k` / `Down/Up` 移动行,`Home/End` 跳转,`Enter` 触发 `on_select`。设 `column_navigation: true` 会加上 `h/l` / `Left/Right` 来移动选中列。
+
+## 外部状态
+
+`Table` 默认自己拥有 `TableState`。当页面需要读取当前选中、用自己的按键驱动选择,或在重新挂载后保持稳定时,传入外部状态。示例用页面驱动选择,好让外层 `ScrollView` 仍然独占 `PageUp/PageDown` 与滚轮:
+
+```rust title="examples/components/table.rs"
+let table_state = hooks.use_state(TableState::default);
+
+// 在页面自己的 handler 里:
+match key.code {
+    KeyCode::Char('j') => { table_state.write().next(row_count); }
+    KeyCode::Char('l') => { table_state.write().next_column(COLUMN_COUNT); }
+    _ => {}
+}
+
+Table<Deployment>(
+    state: table_state,
+    active: false,          // 改由页面驱动选择
+    // ...
+)
+```
+
+`TableState` 对行暴露 `selected()` / `select()` / `next()` / `previous()` / `select_first()` / `select_last()`,对列暴露 `selected_column()` / `select_column()` / `next_column()` / `previous_column()`。选中列是**完整列表**里的索引,因此即便响应式隐藏改变了可见列,它也保持稳定。
+
+## 布局与高度
+
+`Table` 接受 `width`、`height`、`margin`、`offset`。当 `height` 保持默认时,它会估算渲染高度(含换行、网格线与页脚),让表格恰好占据所需空间。表格高于视口时,把它放进 [ScrollView](/ratatui-kit/zh-cn/components/scroll-view/)——示例正是这么做的,让 `ScrollView` 裁剪溢出、`PageUp/PageDown` 滚动。普通长列表优先用 [VirtualList](/ratatui-kit/zh-cn/components/virtual-list/);普通单选/多选见 [Select](/ratatui-kit/zh-cn/components/select/) 与 [MultiSelect](/ratatui-kit/zh-cn/components/multi-select/)。

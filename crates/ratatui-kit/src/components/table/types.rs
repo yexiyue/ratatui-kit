@@ -22,6 +22,33 @@ pub enum TableCellAlignment {
     Right,
 }
 
+/// Controls whether the row that holds the `highlight_symbol` reserves a
+/// leading gutter, so the symbol never overwrites the first column's content.
+///
+/// Mirrors `ratatui::widgets::HighlightSpacing`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HighlightSpacing {
+    /// Always reserve the gutter, even when no row is selected.
+    Always,
+    /// Reserve the gutter only while a row is selected (default).
+    #[default]
+    WhenSelected,
+    /// Never reserve the gutter; the highlight symbol is not drawn.
+    Never,
+}
+
+impl HighlightSpacing {
+    /// Whether the selection gutter should be reserved given the current
+    /// selection state.
+    pub(super) fn should_reserve(self, has_selection: bool) -> bool {
+        match self {
+            HighlightSpacing::Always => true,
+            HighlightSpacing::WhenSelected => has_selection,
+            HighlightSpacing::Never => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TableColumn {
     pub header: Line<'static>,

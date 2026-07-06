@@ -109,6 +109,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 | `atom` | `Atom` / `AtomState` / `use_atom` (process-global state) |
 | `input` | `Input` / `SearchInput` (single-line text entry) |
 | `tree` | `TreeSelect` |
+| `table` | `Table` (data grid: cell-grid borders, wrapping, row/column highlight, footer) |
 | `virtual-list` | `VirtualList` (windowed list for huge data) |
 | `full` | all of the above |
 
@@ -401,8 +402,9 @@ in `references/building-polished-uis.md`.
   first frame and `Enter` is a no-op until the user presses `j`/`k`. Set
   `default_index: Some(0)` whenever the first interaction is Enter-to-confirm.
 - **Using a gated component without its feature** → "cannot find" errors. `Input`/
-  `SearchInput` need `input`; `TreeSelect` → `tree`; `VirtualList` → `virtual-list`;
-  router items → `router`; `Atom` → `atom`. Develop with `--all-features` or `full`.
+  `SearchInput` need `input`; `TreeSelect` → `tree`; `Table` → `table`; `VirtualList`
+  → `virtual-list`; router items → `router`; `Atom` → `atom`. Develop with
+  `--all-features` or `full`.
 - **Layout props on a function component's call site** instead of its returned root
   → no effect (transparent layout). Put them on the root element the component returns.
 - **`for` element without `key:`** → reconciliation reuses the wrong node; state

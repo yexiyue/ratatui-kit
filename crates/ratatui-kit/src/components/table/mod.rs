@@ -8,5 +8,6 @@ mod wrap;
 pub use component::{Table, TableProps};
 pub use state::TableState;
 pub use types::{
-    RenderTableRow, TableBorderMode, TableCell, TableCellAlignment, TableColumn, TableWrapMode,
+    HighlightSpacing, RenderTableRow, TableBorderMode, TableCell, TableCellAlignment, TableColumn,
+    TableWrapMode,
 };

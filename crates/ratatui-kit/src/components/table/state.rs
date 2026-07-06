@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, Default)]
 pub struct TableState {
     selected: Option<usize>,
+    selected_column: Option<usize>,
 }
 
 impl TableState {
@@ -10,6 +11,50 @@ impl TableState {
 
     pub fn select(&mut self, index: Option<usize>) {
         self.selected = index;
+    }
+
+    /// The currently highlighted column index (into the full column list), if any.
+    pub fn selected_column(&self) -> Option<usize> {
+        self.selected_column
+    }
+
+    /// Highlight a column by index, or clear the column highlight with `None`.
+    pub fn select_column(&mut self, index: Option<usize>) {
+        self.selected_column = index;
+    }
+
+    pub fn next_column(&mut self, len: usize) {
+        if len == 0 {
+            self.selected_column = None;
+            return;
+        }
+
+        self.selected_column = Some(match self.selected_column {
+            Some(index) => index.saturating_add(1).min(len - 1),
+            None => 0,
+        });
+    }
+
+    pub fn previous_column(&mut self, len: usize) {
+        if len == 0 {
+            self.selected_column = None;
+            return;
+        }
+
+        self.selected_column = Some(match self.selected_column {
+            Some(index) => index.saturating_sub(1),
+            None => 0,
+        });
+    }
+
+    pub fn clamp_column(&mut self, len: usize) {
+        self.selected_column = self.selected_column.and_then(|index| {
+            if len == 0 {
+                None
+            } else {
+                Some(index.min(len - 1))
+            }
+        });
     }
 
     pub fn select_first(&mut self, len: usize) {
@@ -93,6 +138,24 @@ mod tests {
         state.previous(3);
         state.previous(3);
         assert_eq!(state.selected(), Some(0));
+    }
+
+    #[test]
+    fn table_state_column_navigation_is_clamped() {
+        let mut state = TableState::default();
+        assert_eq!(state.selected_column(), None);
+        state.next_column(3);
+        assert_eq!(state.selected_column(), Some(0));
+        state.next_column(3);
+        state.next_column(3);
+        state.next_column(3);
+        assert_eq!(state.selected_column(), Some(2));
+        state.previous_column(3);
+        assert_eq!(state.selected_column(), Some(1));
+        state.clamp_column(1);
+        assert_eq!(state.selected_column(), Some(0));
+        state.clamp_column(0);
+        assert_eq!(state.selected_column(), None);
     }
 
     #[test]

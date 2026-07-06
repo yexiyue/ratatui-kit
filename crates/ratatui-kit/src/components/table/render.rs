@@ -6,6 +6,9 @@ use super::types::TableBorderMode;
 #[derive(Debug)]
 pub(super) struct RenderedCell {
     pub(super) lines: Vec<Line<'static>>,
+    /// Extra style patched on top of the row style for this cell only
+    /// (column / cell highlight). Empty for cells that are not highlighted.
+    pub(super) extra_style: Style,
 }
 
 #[derive(Debug)]
@@ -63,6 +66,8 @@ pub(super) struct RenderTable<'a> {
     pub(super) cell_padding: u16,
     pub(super) column_spacing: u16,
     pub(super) highlight_symbol: Option<&'static str>,
+    /// Reserved leading width for the selection symbol. `0` means no gutter.
+    pub(super) gutter: u16,
 }
 
 pub(super) fn render_table(mut table: RenderTable<'_>) {
@@ -123,6 +128,11 @@ fn render_border_line(
     let mut x = table.area.x;
     put(table.buf, x, y, left, style);
     x += 1;
+    // 选中符号的 gutter 是首列之前的一段横线,没有列间分隔符。
+    for _ in 0..table.gutter {
+        put(table.buf, x, y, '─', style);
+        x += 1;
+    }
     for (index, width) in table.widths.iter().copied().enumerate() {
         for _ in 0..width.saturating_add(table.cell_padding.saturating_mul(2)) {
             put(table.buf, x, y, '─', style);
@@ -153,15 +163,31 @@ fn render_row_line(table: &mut RenderTable<'_>, row: &RenderedRow, line_index: u
         }
     }
 
-    if row.selected
-        && let Some(symbol) = table.highlight_symbol
-    {
-        write_text(table.buf, x, y, symbol, row_style);
+    // 前置 gutter:选中行首行画符号(左对齐、按视宽裁剪),其余填空格,列宽已为它预留。
+    if table.gutter > 0 {
+        for offset in 0..table.gutter {
+            put(table.buf, x + offset, y, ' ', row_style);
+        }
+        if row.selected
+            && line_index == 0
+            && let Some(symbol) = table.highlight_symbol
+        {
+            write_text_clamped(table.buf, x, y, symbol, row_style, table.gutter);
+        }
+        x += table.gutter;
     }
 
     for (index, width) in table.widths.iter().copied().enumerate() {
+        // 列/单元格高亮:在行样式之上叠加该格的 extra_style。
+        let cell_style = row_style.patch(
+            row.cells
+                .get(index)
+                .map(|cell| cell.extra_style)
+                .unwrap_or_default(),
+        );
+
         for _ in 0..table.cell_padding {
-            put(table.buf, x, y, ' ', row_style);
+            put(table.buf, x, y, ' ', cell_style);
             x += 1;
         }
 
@@ -171,11 +197,11 @@ fn render_row_line(table: &mut RenderTable<'_>, row: &RenderedRow, line_index: u
             .and_then(|cell| cell.lines.get(line_index))
             .cloned()
             .unwrap_or_default();
-        render_line(table.buf, x, y, width, line, row_style);
+        render_line(table.buf, x, y, width, line, cell_style);
         x += width;
 
         for _ in 0..table.cell_padding {
-            put(table.buf, x, y, ' ', row_style);
+            put(table.buf, x, y, ' ', cell_style);
             x += 1;
         }
 
@@ -234,11 +260,18 @@ fn render_line(
     }
 }
 
-fn write_text(buf: &mut Buffer, x: u16, y: u16, text: &str, style: Style) {
+fn write_text_clamped(buf: &mut Buffer, x: u16, y: u16, text: &str, style: Style, max_width: u16) {
     let mut offset = 0u16;
     for c in text.chars() {
+        let char_width = c.width().unwrap_or(0) as u16;
+        if offset + char_width > max_width {
+            break;
+        }
         put(buf, x + offset, y, c, style);
-        offset += c.width().unwrap_or(0) as u16;
+        if char_width == 2 && offset + 1 < max_width {
+            put(buf, x + offset + 1, y, ' ', style);
+        }
+        offset += char_width;
     }
 }
 

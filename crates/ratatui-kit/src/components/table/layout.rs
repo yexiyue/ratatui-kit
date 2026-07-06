@@ -2,15 +2,29 @@ use ratatui::layout::Constraint;
 
 use super::types::{TableBorderMode, TableColumn};
 
+fn is_column_visible(column: &TableColumn, table_width: u16) -> bool {
+    column
+        .min_table_width
+        .is_none_or(|min_width| table_width >= min_width)
+}
+
 pub(super) fn visible_columns(columns: &[TableColumn], table_width: u16) -> Vec<TableColumn> {
     columns
         .iter()
-        .filter(|column| {
-            column
-                .min_table_width
-                .is_none_or(|min_width| table_width >= min_width)
-        })
+        .filter(|column| is_column_visible(column, table_width))
         .cloned()
+        .collect()
+}
+
+/// The original indices (into the full column list) of the columns that survive
+/// responsive `min_table_width` filtering at the given width. Used to map a
+/// `TableState::selected_column` (a full-list index) onto a visible position.
+pub(super) fn visible_column_indices(columns: &[TableColumn], table_width: u16) -> Vec<usize> {
+    columns
+        .iter()
+        .enumerate()
+        .filter(|(_, column)| is_column_visible(column, table_width))
+        .map(|(index, _)| index)
         .collect()
 }
 
@@ -20,6 +34,7 @@ pub(super) fn resolve_column_widths(
     border_mode: TableBorderMode,
     cell_padding: u16,
     column_spacing: u16,
+    gutter: u16,
 ) -> Vec<u16> {
     let column_count = columns.len() as u16;
     if column_count == 0 {
@@ -32,7 +47,9 @@ pub(super) fn resolve_column_widths(
         TableBorderMode::Outer | TableBorderMode::Grid => column_count.saturating_add(1),
         TableBorderMode::None => column_spacing.saturating_mul(column_count.saturating_sub(1)),
     }
-    .saturating_add(cell_padding.saturating_mul(2).saturating_mul(column_count));
+    .saturating_add(cell_padding.saturating_mul(2).saturating_mul(column_count))
+    // 选中符号的前置 gutter 也要从可用宽度里扣除,否则符号会挤占首列内容。
+    .saturating_add(gutter);
     let available = area_width.saturating_sub(reserved).max(column_count) as u32;
 
     let mut fixed = 0u32;
@@ -110,6 +127,8 @@ mod tests {
 
         assert_eq!(visible_columns(&columns, 79).len(), 1);
         assert_eq!(visible_columns(&columns, 80).len(), 2);
+        assert_eq!(visible_column_indices(&columns, 79), vec![0]);
+        assert_eq!(visible_column_indices(&columns, 80), vec![0, 1]);
     }
 
     #[test]
@@ -120,8 +139,19 @@ mod tests {
             TableColumn::new("C", Constraint::Fill(1)),
         ];
 
-        let widths = resolve_column_widths(&columns, 30, TableBorderMode::None, 0, 0);
+        let widths = resolve_column_widths(&columns, 30, TableBorderMode::None, 0, 0, 0);
 
         assert_eq!(widths, vec![15, 7, 7]);
+    }
+
+    #[test]
+    fn gutter_reserves_leading_width() {
+        let columns = vec![TableColumn::new("A", Constraint::Fill(1))];
+
+        let without = resolve_column_widths(&columns, 20, TableBorderMode::None, 0, 0, 0);
+        let with = resolve_column_widths(&columns, 20, TableBorderMode::None, 0, 0, 2);
+
+        assert_eq!(without, vec![20]);
+        assert_eq!(with, vec![18]);
     }
 }
