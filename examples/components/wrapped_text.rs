@@ -63,7 +63,7 @@ fn WrappedTextApp(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         }
     });
 
-    let offset = scroll_state.get().offset();
+    let offset = scroll_state.read().offset();
 
     element!(
         Center(

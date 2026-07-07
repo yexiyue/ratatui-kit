@@ -1,13 +1,14 @@
 //! ScrollView 内置组件示例。
 //!
-//! 按 `j/k` 或方向键逐行滚动，按 `PageUp/PageDown` 翻页，按 `Home/End` 跳转。
+//! 按 `j/k` 移动选中行(视口经 `scroll_to_index` 自动跟随),`PageUp/PageDown` 手动浏览,
+//! `Home/End` 选首/末行,`b` 切换滚动条盖不盖边框。
 
 use ratatui_kit::{
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
         layout::{Constraint, Direction, Flex},
-        style::{Style, Stylize},
+        style::{Color, Modifier, Style, Stylize},
         text::Line,
         widgets::Block,
     },
@@ -32,12 +33,22 @@ impl DocRow {
         Self { kind, text }
     }
 
-    fn line(self) -> Line<'static> {
-        match self.kind {
+    fn line(self, selected: bool) -> Line<'static> {
+        let base = match self.kind {
             RowKind::Heading => Line::styled(self.text, Style::new().cyan().bold()),
             RowKind::Text => Line::from(self.text),
             RowKind::Bullet => Line::styled(self.text, Style::new().yellow()),
             RowKind::Code => Line::styled(self.text, Style::new().green()),
+        };
+        if selected {
+            // 选中行加底色高亮 + 前置 ▶,让"选中项联动滚动"一眼可见。
+            Line::from(format!("▶ {}", self.text)).style(
+                Style::new()
+                    .bg(Color::Rgb(45, 55, 95))
+                    .add_modifier(Modifier::BOLD),
+            )
+        } else {
+            base
         }
     }
 }
@@ -52,13 +63,10 @@ const DOC_ROWS: [DocRow; 32] = [
         RowKind::Text,
         "The child tree is normal ratatui-kit layout.",
     ),
-    DocRow::new(RowKind::Bullet, "- j / Down scroll one row down"),
-    DocRow::new(RowKind::Bullet, "- k / Up scroll one row up"),
-    DocRow::new(
-        RowKind::Bullet,
-        "- PageDown and PageUp move by the viewport",
-    ),
-    DocRow::new(RowKind::Bullet, "- Home and End jump to the edges"),
+    DocRow::new(RowKind::Bullet, "- j / Down select the next row"),
+    DocRow::new(RowKind::Bullet, "- k / Up select the previous row"),
+    DocRow::new(RowKind::Bullet, "- the viewport follows the selected row"),
+    DocRow::new(RowKind::Bullet, "- PageDown / PageUp browse (cursor stays)"),
     DocRow::new(RowKind::Heading, "Automatic state"),
     DocRow::new(RowKind::Text, "Omit state for the built-in handler."),
     DocRow::new(RowKind::Code, "ScrollView { /* rows */ }"),
@@ -114,7 +122,10 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let scroll_state = hooks.use_state(ScrollViewState::default);
     let mut status = hooks.use_state(|| "ready at top".to_string());
     let mut over_border = hooks.use_state(|| true);
+    let mut selected = hooks.use_state(|| 0usize);
     let mut exit = hooks.use_exit();
+
+    let last = DOC_ROWS.len() - 1;
 
     hooks.use_event_handler_with_options(
         EventScope::Current,
@@ -144,16 +155,34 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     });
                     EventResult::Consumed
                 }
+                // j/k 移动选中光标,并用 scroll_to_index 让视口自动跟随选中行。
                 KeyCode::Char('j') | KeyCode::Down => {
-                    scroll_state.write().handle_event(&event);
-                    status.set("scroll down one row".to_string());
+                    let next = (selected.get() + 1).min(last);
+                    selected.set(next);
+                    scroll_state.write().scroll_to_index(next);
+                    status.set(format!("selected row {next}"));
                     EventResult::Consumed
                 }
                 KeyCode::Char('k') | KeyCode::Up => {
-                    scroll_state.write().handle_event(&event);
-                    status.set("scroll up one row".to_string());
+                    let next = selected.get().saturating_sub(1);
+                    selected.set(next);
+                    scroll_state.write().scroll_to_index(next);
+                    status.set(format!("selected row {next}"));
                     EventResult::Consumed
                 }
+                KeyCode::Home => {
+                    selected.set(0);
+                    scroll_state.write().scroll_to_index(0);
+                    status.set("selected first row".to_string());
+                    EventResult::Consumed
+                }
+                KeyCode::End => {
+                    selected.set(last);
+                    scroll_state.write().scroll_to_index(last);
+                    status.set("selected last row".to_string());
+                    EventResult::Consumed
+                }
+                // PageDown/PageUp 手动滚动浏览(不移动光标)。
                 KeyCode::PageDown => {
                     scroll_state.write().handle_event(&event);
                     status.set("page down".to_string());
@@ -164,22 +193,12 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     status.set("page up".to_string());
                     EventResult::Consumed
                 }
-                KeyCode::Home => {
-                    scroll_state.write().handle_event(&event);
-                    status.set("jumped to top".to_string());
-                    EventResult::Consumed
-                }
-                KeyCode::End => {
-                    scroll_state.write().handle_event(&event);
-                    status.set("jumped to bottom".to_string());
-                    EventResult::Consumed
-                }
                 _ => EventResult::Ignored,
             }
         },
     );
 
-    let offset = scroll_state.get().offset();
+    let offset = scroll_state.read().offset();
     let status_view = status.read().to_string();
 
     element!(
@@ -192,7 +211,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 gap: 1,
                 border_style: Style::new().blue(),
                 top_title: Line::from(" scroll view ").blue().bold().centered(),
-                bottom_title: Line::from(" j/k scroll | PageDown/PageUp page | Home/End jump | b border | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" j/k select (view follows) | PageUp/Down browse | Home/End | b border | q quit ").dark_gray().centered(),
             ) {
                 View(
                     flex_direction: Direction::Horizontal,
@@ -217,7 +236,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                                 key: index,
                                 height: Constraint::Length(1),
                             ) {
-                                Text(text: row.line())
+                                Text(text: row.line(index == selected.get()))
                             }
                         }
                     }
@@ -229,6 +248,9 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                         top_title: Line::from(" state ").cyan().centered(),
                     ) {
                         View(height: Constraint::Length(1)) {
+                            Text(text: Line::from(format!("selected: {}", selected.get())).centered())
+                        }
+                        View(height: Constraint::Length(1)) {
                             Text(text: Line::from(format!("offset: {}", offset.y)).centered())
                         }
                         View(height: Constraint::Length(1)) {
@@ -236,9 +258,6 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                         }
                         View(height: Constraint::Length(1)) {
                             Text(text: Line::from(status_view).centered())
-                        }
-                        View(height: Constraint::Length(1)) {
-                            Text(text: Line::from("controlled").centered())
                         }
                     }
                 }

@@ -11,9 +11,9 @@
 // 支持上下左右/翻页/鼠标滚轮等多种滚动方式。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind, MouseEventKind};
-use ratatui::layout::{Position, Size};
+use ratatui::layout::{Position, Rect, Size};
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 // 滚动视图状态。
 pub struct ScrollViewState {
     // 偏移量是滚动视图需要移动的行数和列数。
@@ -22,6 +22,9 @@ pub struct ScrollViewState {
     pub(crate) size: Option<Size>,
     // 滚动视图一页的尺寸。在第一次渲染调用前不会被设置。
     pub(crate) page_size: Option<Size>,
+    // 每个直接子节点在内容缓冲中的区域(内容坐标),由 ScrollView 每帧记录。
+    // 供 `scroll_to_index` 把某个子节点滚进视口——用于"选中项联动滚动"。
+    pub(crate) child_areas: Vec<Rect>,
 }
 
 impl ScrollViewState {
@@ -137,6 +140,26 @@ impl ScrollViewState {
         }
     }
 
+    /// The content-buffer area of the direct child at `index` (in child order),
+    /// as recorded by `ScrollView` on the last render. `None` before the first
+    /// render or when `index` is out of range.
+    pub fn child_area(&self, index: usize) -> Option<Rect> {
+        self.child_areas.get(index).copied()
+    }
+
+    /// Scroll so the direct child at `index` (in child order) is visible.
+    ///
+    /// This is the "follow the selection" primitive: after a page moves its
+    /// selection over a list of `ScrollView` children, call this with the
+    /// selected index so the viewport tracks it. No-op if `index` is unknown
+    /// (e.g. before the first render). Child geometry is selection-independent,
+    /// so the last recorded layout is correct for the new selection.
+    pub fn scroll_to_index(&mut self, index: usize) {
+        if let Some(area) = self.child_area(index) {
+            self.scroll_to_visible(area.y, area.height);
+        }
+    }
+
     /// Returns `true` if the event was a scroll input this state acted on.
     pub fn handle_event(&mut self, event: &Event) -> bool {
         match event {
@@ -174,6 +197,7 @@ mod tests {
             offset: Position::new(0, 4),
             size: Some(Size::new(1, 10)),
             page_size: Some(Size::new(1, 5)),
+            ..Default::default()
         };
         assert!(!state.is_at_bottom());
         state.offset.y = 5;
@@ -187,11 +211,31 @@ mod tests {
     }
 
     #[test]
+    fn scroll_to_index_brings_child_into_view() {
+        let mut state = ScrollViewState {
+            size: Some(Size::new(10, 20)),
+            page_size: Some(Size::new(10, 3)),
+            child_areas: (0..10).map(|y| Rect::new(0, y, 10, 1)).collect(),
+            ..Default::default()
+        };
+        // child 8 sits at y=8 (below the 3-row viewport) → offset = 8 + 1 - 3
+        state.scroll_to_index(8);
+        assert_eq!(state.offset.y, 6);
+        // out-of-range index is a no-op
+        state.scroll_to_index(100);
+        assert_eq!(state.offset.y, 6);
+        // child already visible → no change
+        state.scroll_to_index(7);
+        assert_eq!(state.offset.y, 6);
+    }
+
+    #[test]
     fn scroll_to_visible_only_moves_when_outside_the_page() {
         let mut state = ScrollViewState {
             offset: Position::new(0, 2),
             size: Some(Size::new(1, 20)),
             page_size: Some(Size::new(1, 5)),
+            ..Default::default()
         };
         // already visible (rows 2..7 shown, target row 3) → no change
         state.scroll_to_visible(3, 1);

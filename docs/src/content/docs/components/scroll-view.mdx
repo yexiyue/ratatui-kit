@@ -82,9 +82,9 @@ ScrollView(
 }
 ```
 
-The example uses external state: the right-hand state panel reads `scroll_state.get().offset()`, so every scroll in the recording shows the offset changing.
+The example uses external state: `j/k` move a **selected cursor** and the viewport follows it via `scroll_state.write().scroll_to_index(selected)`; the state panel reads `scroll_state.read().offset()`.
 
-`ScrollViewState` also exposes `size()` / `page_size()`, `is_at_bottom()` (for stick-to-bottom logs/chat), and `scroll_to_visible(y, height)` (scroll a target row into view). `handle_event` returns `bool` (whether it acted), so business handlers can map it to `Consumed` / `Ignored`.
+`ScrollViewState` also exposes `size()` / `page_size()`, `is_at_bottom()` (for stick-to-bottom logs/chat), `scroll_to_visible(y, height)`, and — the follow-the-selection primitive — `scroll_to_index(i)` / `child_area(i)`, which scroll the *i*-th direct child into view. `ScrollView` records each direct child's content-buffer area every frame, so after a page moves its selection over a list of children it just calls `scroll_to_index(selected)`. Child geometry is selection-independent, so no extra measure pass is needed. `handle_event` returns `bool` (whether it acted), so business handlers can map it to `Consumed` / `Ignored`.
 
 ## Content size
 

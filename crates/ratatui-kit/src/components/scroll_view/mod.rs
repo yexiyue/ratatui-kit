@@ -88,6 +88,8 @@ pub struct ScrollView {
     // draw() 在把 area 缩成 block.inner 之前暂存的外框;供 calc_children_areas 与 render_ref
     // 共用同一个 `ring` 几何判定(单一真源)。
     outer: Option<Rect>,
+    // 解析后的滚动状态(内部或外部),供 calc_children_areas 记录子节点区域以支持 scroll_to_index。
+    scroll_view_state: Option<State<ScrollViewState>>,
 }
 
 fn clamp_u16(value: u128) -> u16 {
@@ -184,6 +186,7 @@ impl Component for ScrollView {
             scrollbars: props.scrollbars.clone(),
             block: props.block.clone(),
             outer: None,
+            scroll_view_state: None,
         }
     }
 
@@ -232,6 +235,7 @@ impl Component for ScrollView {
         );
 
         self.scrollbars = props.scrollbars.clone();
+        self.scroll_view_state = Some(state);
 
         updater.set_layout_style(layout_style);
         updater.update_children(&mut props.children, None);
@@ -300,6 +304,12 @@ impl Component for ScrollView {
         for (area, constraint) in areas.iter().zip(align_constraints.iter()) {
             let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
             new_areas.push(area);
+        }
+
+        // 记录子节点在内容缓冲中的区域,供 `ScrollViewState::scroll_to_index` 联动滚动。
+        // 用 write_no_update:布局阶段写入不应触发重渲染(与 hook 写 offset 同理)。
+        if let Some(state) = self.scroll_view_state {
+            state.write_no_update().child_areas = new_areas.clone();
         }
 
         new_areas

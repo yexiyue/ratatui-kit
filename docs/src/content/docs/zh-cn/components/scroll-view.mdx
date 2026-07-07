@@ -82,9 +82,9 @@ ScrollView(
 }
 ```
 
-示例用的就是外部状态：右侧状态面板读取 `scroll_state.get().offset()`，所以录屏里每次滚动都会看到 offset 改变。
+示例用的就是外部状态：`j/k` 移动一个**选中光标**,视口通过 `scroll_state.write().scroll_to_index(selected)` 自动跟随;状态面板读取 `scroll_state.read().offset()`。
 
-`ScrollViewState` 还暴露 `size()` / `page_size()`、`is_at_bottom()`(日志/聊天的“贴底”逻辑)、`scroll_to_visible(y, height)`(把目标行滚进视口)。`handle_event` 返回 `bool`(是否处理),业务 handler 可据此映射为 `Consumed` / `Ignored`。
+`ScrollViewState` 还暴露 `size()` / `page_size()`、`is_at_bottom()`(日志/聊天的“贴底”逻辑)、`scroll_to_visible(y, height)`,以及**选中项联动滚动**的原语 `scroll_to_index(i)` / `child_area(i)`——把第 *i* 个直接子节点滚进视口。`ScrollView` 每帧记录各直接子节点在内容缓冲中的区域,故页面在一组子节点上移动选中后,只需 `scroll_to_index(selected)`;子布局与"选中谁"无关,无需额外测量。`handle_event` 返回 `bool`(是否处理),业务 handler 可据此映射为 `Consumed` / `Ignored`。
 
 ## 内容尺寸
 
