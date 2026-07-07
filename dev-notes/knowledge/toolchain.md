@@ -233,6 +233,8 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 
 文档里展示的 `ratatui-kit = "x.y.z"` 安装版本号**不写死**：`docs/astro.config.mjs` 在构建时从 `crates/ratatui-kit/Cargo.toml` 用正则 `^version\s*=\s*"([^"]+)"` 读出 version，经 `vite.define` 注入全局常量 `__RK_VERSION__`，再由 `docs/src/consts.ts` 导出 `RK_VERSION` 供 `.astro` / `.mdx` 引用。`release.sh` 升 crate version 后，下次 docs 构建自动用上新版本，无需手改任何文档。
 
+根 README 是静态 Markdown，不能像 Astro 文档页一样在 GitHub/crates.io 渲染时读取 `Cargo.toml`。README 的安装示例应使用 `cargo add ratatui-kit --features full`，或在展示生成后的 `Cargo.toml` 形态时用 `version = "..."` 占位，避免发布时手动同步版本号。
+
 **为什么在 astro.config 读、而不是 consts.ts 直接 `readFileSync`**：consts.ts 被 bundle 后，prerender 阶段 `import.meta.url` 指向 `dist/` 输出位置而非源码，相对路径会解析到 `dist/crates/...`（实测 ENOENT）。config 在构建启动时以 Node 执行，`new URL('../crates/...', import.meta.url)` 路径稳定。
 
 **MDX 代码块怎么插值**：markdown 代码围栏（` ```toml `）是静态文本，不能插变量。改用 `astro:components` 的 `<Code lang="toml" themes={codeThemes} code={`...${RK_VERSION}...`} />`。

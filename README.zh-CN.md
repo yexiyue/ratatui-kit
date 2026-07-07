@@ -73,11 +73,17 @@
 cargo add ratatui-kit
 ```
 
-或在 `Cargo.toml` 中按需启用特性：
+或让 Cargo 直接写入 `full` 特性：
+
+```bash
+cargo add ratatui-kit --features full
+```
+
+它会生成类似这样的依赖项：
 
 ```toml
 [dependencies]
-ratatui-kit = { version = "0.6.0", features = ["full"] }
+ratatui-kit = { version = "...", features = ["full"] }
 
 # 需要一个 async runtime（文档与示例使用 tokio）
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }

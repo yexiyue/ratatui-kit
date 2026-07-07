@@ -77,11 +77,17 @@ Install the crate:
 cargo add ratatui-kit
 ```
 
-Or enable feature flags explicitly in `Cargo.toml`:
+Or let Cargo add the `full` feature set:
+
+```bash
+cargo add ratatui-kit --features full
+```
+
+This writes a dependency entry like:
 
 ```toml
 [dependencies]
-ratatui-kit = { version = "0.6.0", features = ["full"] }
+ratatui-kit = { version = "...", features = ["full"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 
