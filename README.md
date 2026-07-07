@@ -17,6 +17,7 @@
 **[Quick Start](https://yexiyue.github.io/ratatui-kit/start/quick-start/)** ·
 **[Components](https://yexiyue.github.io/ratatui-kit/components/)** ·
 **[Examples](https://yexiyue.github.io/ratatui-kit/examples/)** ·
+**[Ecosystem](https://github.com/yexiyue/awesome-ratatui-kit)** ·
 **[简体中文](https://github.com/yexiyue/ratatui-kit/blob/main/README.zh-CN.md)**
 
 </div>
@@ -45,6 +46,7 @@ Ratatui gives you the terminal canvas and widgets. Ratatui Kit adds component id
 - [Built-in components and hooks](#built-in-components-and-hooks)
 - [Feature flags](#feature-flags)
 - [Documentation and examples](#documentation-and-examples)
+- [Ecosystem](#ecosystem)
 - [Design goals](#design-goals)
 - [Contributing](#contributing)
 - [License](#license)
@@ -65,7 +67,7 @@ Ratatui gives you the terminal canvas and widgets. Ratatui Kit adds component id
 - **Local and global state**: use component-local `State<T>` for local lifetimes and `Atom<T>` for process-wide shared state.
 - **Built-in router**: `RouterProvider`, `Outlet`, `routes!`, `use_navigate`, `use_route`, and `use_params` are available behind the `router` feature.
 - **Native widget escape hatch**: use `widget(expr)` and `stateful(widget, state)` to embed existing Ratatui widgets directly.
-- **Small default dependency surface**: the default feature set is empty; opt into `router`, `atom`, `input`, `tree`, `virtual-list`, or `full` as needed.
+- **Small default dependency surface**: the default feature set is empty; opt into `router`, `atom`, `input`, `tree`, `table`, `virtual-list`, or `full` as needed.
 
 ---
 
@@ -195,6 +197,7 @@ README keeps the API overview intentionally compact. See the [documentation site
 | `ContextProvider` | Scoped context injection | core |
 | `Input`, `SearchInput` | Single-line input and search input | `input` |
 | `TreeSelect` | Tree selection | `tree` |
+| `Table` | Data-driven table with cell-grid borders, wrapping, responsive columns, footer rows, and row/column highlighting | `table` |
 | `VirtualList` | Virtualized list rendering | `virtual-list` |
 | `RouterProvider`, `Outlet` | Routing container and nested route outlet | `router` |
 
@@ -230,6 +233,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `atom` | `Atom`, `AtomState`, `use_atom` | - |
 | `input` | `Input`, `SearchInput`, and the `tui_input` re-export | `tui-input` |
 | `tree` | `TreeSelect` and the `tui_tree_widget` re-export | `tui-tree-widget` |
+| `table` | `Table`, width-aware wrapping, responsive columns, and grid borders | `unicode-width` |
 | `virtual-list` | `VirtualList` and the `tui_widget_list` re-export | `tui-widget-list` |
 | `full` | All optional features above | - |
 
@@ -257,6 +261,7 @@ cargo run --example counter        # local state + async updates
 cargo run --example atom_state     # global atom state
 cargo run --example router         # RouterProvider and nested Outlet
 cargo run --example modal          # modal input isolation
+cargo run --example table          # data table with wrapping + highlights
 cargo run --example todo_app       # full workflow: state, input, routing, modals
 ```
 
@@ -268,11 +273,12 @@ hello_world          counter              async_state          atom_state
 router               control_flow         input_mutex          input
 search_input         scrollview           wrapped_text         modal
 confirm_modal        alert_modal          shortcut_info_modal  select
-multi_select         tree_select          virtual_list         virtual_multi_select
-custom_widget        custom_hook          custom_provider      todo_app
+multi_select         tree_select          table                 virtual_list
+virtual_multi_select custom_widget        custom_hook           custom_provider
+todo_app
 ```
 
-Some examples require optional features such as `input`, `tree`, `virtual-list`, or `router`. Running examples from this repository uses the workspace configuration and enables `full`.
+Some examples require optional features such as `input`, `tree`, `table`, `virtual-list`, or `router`. Running examples from this repository uses the workspace configuration and enables `full`.
 
 </details>
 
