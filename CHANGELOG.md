@@ -1,3 +1,23 @@
+## [0.10.0] - 2026-07-08
+
+### 🚀 Features
+
+- *(scroll-view)* [**breaking**] Scroll_to_index to follow the selected child
+- *(theme)* [**breaking**] Unified theme system (Palette + per-component ComponentTheme)
+
+### 🐛 Bug Fixes
+
+- *(theme)* Keep theme demo preset state reactive
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.9.0 [skip ci]
+- *(readme)* Avoid hard-coded crate version
+- *(readme)* Document table and ecosystem
+- *(theme)* Document the theme system (guide, homepage, examples, AI skill)
+- *(skill)* Validate recordings with VHS Screenshot
+- *(readme)* Give the crate its own README, fix crates.io logo, document theming
+- *(recordings)* Re-record examples for theme system
 ## [0.9.0] - 2026-07-06
 
 ### 🚀 Features
