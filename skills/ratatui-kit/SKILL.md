@@ -370,6 +370,15 @@ the app's identity and the user's request. The repo's own examples gravitate
 toward blue/cyan frames with `dark_gray` hint lines — treat that as *one coherent
 option*, not a rule.
 
+**Colors come from a theme, not scattered literals.** Every component derives its
+styles from a shared `Palette`, and the default palette already gives a coherent
+scheme — you get sensible colors without setting any style prop. Recolor the whole
+app by tuning a `Palette` inside `PaletteProvider`; override one spot with a bare
+`Style` prop (every style prop is `Option<Style>`, patched over the theme);
+re-style one component type with `ThemeOverride::<FooTheme>(theme: ...)` (turbofish
+required); or drive the `Palette` from an `Atom<Palette>` to switch themes at
+runtime. Full mechanics in `references/building-polished-uis.md` §3.
+
 Principles, and the tools that achieve them:
 
 - **Hierarchy** — separate primary from secondary with color + weight + alignment.

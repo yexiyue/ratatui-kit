@@ -1,0 +1,192 @@
+---
+title: 主题
+description: 共享 Palette 作为唯一颜色真源、每组件主题、覆盖 context 与运行时换肤。
+sidebar:
+  order: 8
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+
+每个内置组件的颜色都来自**主题**,而非硬编码字面量。一个共享的 `Palette` 是颜色的唯一真源,每个组件都据它派生自己的样式。改这一处,整棵树就一致地重新配色。该协议 always-on(无 feature 门控、零额外依赖)。
+
+## 模型
+
+主题分两层:
+
+- **`Palette`** —— 一组扁平的*语义*色(`accent`、`border`、`selection`、`error`……)。这通常是你唯一需要调的东西。
+- **`FooTheme`** —— 每个组件一个(`BorderTheme`、`SelectTheme`、`TableTheme`……)。各自经 `ComponentTheme::from_palette` 从 palette 派生本组件的样式 *slot*。除非你想重塑某一类组件,否则很少直接碰它。
+
+每个组件按一条固定的三级链解析主题,取第一个命中的:
+
+<Mermaid
+	chart={`
+flowchart LR
+    override["ThemeOverride&lt;FooTheme&gt;<br/>显式 context"] --> derive["FooTheme::from_palette<br/>(当前 Palette)"]
+    derive --> def["FooTheme::default()<br/>(默认 Palette)"]
+	`}
+	caption="首个命中胜出:显式的组件级覆盖 → 否则据当前 palette 派生 → 否则用默认。"
+/>
+
+因为约定 `FooTheme::default() == FooTheme::from_palette(&Palette::default())`,后两级在实现上收敛为一次 `from_palette`:没有 `PaletteProvider` 时,组件回退到 `Palette::default()`。
+
+## Palette:语义色
+
+`Palette` 是 `#[non_exhaustive]` 的 —— 从 `Palette::default()` 起手,只改你关心的字段(以后新增语义 slot 不会破坏你的代码):
+
+```rust
+use ratatui_kit::prelude::*;
+use ratatui_kit::ratatui::style::Color;
+
+let mut palette = Palette::default();
+palette.accent = Color::Rgb(94, 175, 255);
+palette.selection = Color::Rgb(30, 70, 120);
+palette.on_accent = Color::White;
+palette.border = Color::Rgb(70, 100, 140);
+```
+
+按角色分组的 slot:
+
+| 分组 | slot | 用途 |
+| --- | --- | --- |
+| 文本 | `fg`、`fg_dim`、`placeholder` | 正文、次要/禁用文字、占位符 |
+| 表面 | `bg`、`surface`、`overlay` | 背景、抬升的面板、模态遮罩 |
+| 强调 | `accent`、`on_accent`、`selection` | 高亮/激活边框、强调底上的文字、选中背景 |
+| 边框 | `border`、`border_active` | 常态边框、聚焦/激活边框 |
+| 语义 | `success`、`warning`、`error`、`info` | 状态色 |
+
+默认 palette 让 `fg`/`bg` 跟随终端默认(`Color::Reset`),强调用青色,边框用暗灰,语义 slot 用 `green`/`yellow`/`red`/`blue`。高亮把 `on_accent` 前景与 `selection` 底色配对。
+
+## 应用主题:PaletteProvider
+
+用 `PaletteProvider` 包住子树即可给它一套 palette。它是透明布局节点 —— 不占独立布局盒。
+
+```rust
+element!(PaletteProvider(palette: palette) {
+    Border(top_title: Line::from(" Ocean ").centered()) {
+        Select<String>(items: items, default_index: 0)
+    }
+})
+```
+
+内部每个组件现在都据 `palette` 派生颜色:边框、select 高亮,全部如此。没有组件需要显式接入。
+
+## 运行时换肤
+
+context 读取是**被动**的 —— 读 palette 不会让组件订阅其变化。要给运行中的应用换肤,得用响应式[状态](/ratatui-kit/zh-cn/core/state/)驱动 palette:把它放进 `Atom<Palette>`(或 `use_state`),再喂给 `PaletteProvider`。写 Atom 唤醒整树,下一帧重新配色。
+
+```rust
+static PALETTE: Atom<Palette> = Atom::new(Palette::default);
+
+#[component]
+fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let palette = hooks.use_atom(&PALETTE);
+
+    // 别处(按键 handler、后台任务)里:
+    //   PALETTE.set(ocean_palette());
+
+    element!(PaletteProvider(palette: palette.get()) {
+        // ...PALETTE 变化时子树重新配色
+    })
+}
+```
+
+这正是 [`theme` 示例](/ratatui-kit/zh-cn/examples/)用的模式 —— 按一个键循环切换预置。
+
+## 单次覆盖:`Option<Style>`
+
+每个组件的样式 prop 都是 `Option<Style>`:
+
+- `None`(默认)—— 用主题。
+- `Some(style)` —— 在主题之上 patch:`theme.patch(style)`,你设的字段胜出,其余保持主题。
+- `Some(Style::reset())` —— 把该 slot 清回终端默认。
+
+```rust
+element!(Border(
+    // 主题化边框,但强制这一个为品红:
+    border_style: Some(Style::new().magenta()),
+) {
+    Text(text: "只覆盖这一个边框")
+})
+```
+
+也可以直接传裸 `Style` —— `element!` 宏会自动把它转成 `Some`,所以 `border_style: Style::new().magenta()` 一样能用。
+
+## 重塑单一组件类型:ThemeOverride
+
+想在某子树内改**某一类组件**的主题 —— 又不动 palette —— 就用 `ThemeOverride` 注入一个 `FooTheme` 覆盖。它是解析链的第一级。
+
+```rust
+// 只在此子树内给 Border 一套绿色主题:
+let mut green_border = BorderTheme::default();
+green_border.border_style = Style::new().green();
+
+element!(ThemeOverride::<BorderTheme>(theme: green_border) {
+    Border(top_title: Line::from(" Section ")) {
+        Text(text: "这个 Border 是绿的;别处不受影响")
+    }
+})
+```
+
+:::caution[必须用 turbofish]
+`element!` 不会为手写泛型组件推断类型参数,所以要显式写出:`ThemeOverride::<BorderTheme>(...)`。(这与 `Select<String>(...)`、`Table<Row>(...)` 需要写出类型是同一原因。)
+:::
+
+覆盖可嵌套:树里更深处的 `ThemeOverride` 会遮蔽上层的,与 [context](/ratatui-kit/zh-cn/core/state/#context-不是-atom) 完全一致。
+
+## 各组件的主题
+
+每个内置组件都暴露自己的 `FooTheme`(feature 门控与组件一致)。Always-on:`TextTheme`、`BorderTheme`、`ModalTheme`、`ConfirmModalTheme`、`AlertModalTheme`、`ShortcutInfoModalTheme`、`SelectTheme`、`MultiSelectTheme`。门控:`InputTheme` / `SearchInputTheme`(`input`)、`TreeSelectTheme`(`tree`)、`VirtualListTheme`(`virtual-list`)、`TableTheme`(`table`)。
+
+组合组件(如 `ConfirmModal`)先解析自己的主题,再把**已解析**的样式透传给它包裹的原语,内层 `Border`/`Text` 如实渲染、不产生双重上色。模态遮罩(`DIM`)归 `ModalTheme` 所有并委托处理。
+
+## 给你自己的组件加主题
+
+第三方组件通过实现 `ComponentTheme`(`Clone + Default + 'static`)并在 `update` 中读取来接入本系统:
+
+```rust
+use ratatui_kit::{ComponentTheme, Palette};
+use ratatui_kit::ratatui::style::Style;
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GaugeTheme {
+    pub bar_style: Style,
+    pub label_style: Style,
+}
+
+impl ComponentTheme for GaugeTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            bar_style: Style::new().fg(palette.accent),
+            label_style: Style::new().fg(palette.fg),
+        }
+    }
+}
+
+impl Default for GaugeTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
+```
+
+然后在组件内读取解析后的主题。函数组件用 Hook;手写 `Component` 用 updater 方法(它返回 owned 值,守卫不会残留到 `update_children`):
+
+```rust
+// 函数组件:
+let theme = hooks.use_component_theme::<GaugeTheme>();
+
+// 手写 Component,在 update() 内:
+let theme = updater.use_component_theme::<GaugeTheme>();
+```
+
+主题上的 `#[non_exhaustive]` 与 `Default == from_palette(&Palette::default())` 约定,让你的主题向前兼容、且与解析链一致。用户随后用 `ThemeOverride::<GaugeTheme>(...)` 重塑你的组件,而它会免费继承用户的全局 `Palette`。
+
+:::tip[持久化 palette]
+启用 `serde` feature 即可给 `Palette` 得到 `Serialize` / `Deserialize`,从而保存与加载用户主题。
+:::
+
+## 另见
+
+- [状态](/ratatui-kit/zh-cn/core/state/) —— 全局主题该放进 `Atom`;子树主题该放进 Provider。
+- [自定义 Provider](/ratatui-kit/zh-cn/advanced/custom-provider/) —— context 注入与就近查找如何工作。

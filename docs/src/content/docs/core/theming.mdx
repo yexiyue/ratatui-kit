@@ -1,0 +1,192 @@
+---
+title: Theming
+description: A shared Palette as the single color source, per-component themes, override contexts, and runtime theme switching.
+sidebar:
+  order: 8
+---
+
+import Mermaid from '../../../components/Mermaid.astro';
+
+Every built-in component reads its colors from a **theme**, not from hardcoded literals. A single shared `Palette` is the source of truth for color; each component derives its own styles from it. Change the palette in one place and the whole tree re-colors consistently. The protocol is always-on (no feature flag, no extra dependency).
+
+## The model
+
+Theming has two layers:
+
+- **`Palette`** — a flat set of *semantic* colors (`accent`, `border`, `selection`, `error`, …). This is the one thing you usually tune.
+- **`FooTheme`** — one per component (`BorderTheme`, `SelectTheme`, `TableTheme`, …). Each derives its style *slots* from the palette via `ComponentTheme::from_palette`. You rarely touch these unless you want to re-style one component type.
+
+Each component resolves its theme through a fixed three-level chain, taking the first that applies:
+
+<Mermaid
+	chart={`
+flowchart LR
+    override["ThemeOverride&lt;FooTheme&gt;<br/>explicit context"] --> derive["FooTheme::from_palette<br/>(current Palette)"]
+    derive --> def["FooTheme::default()<br/>(default Palette)"]
+	`}
+	caption="First match wins: an explicit component-level override, else derive from the current palette, else the default."
+/>
+
+Because `FooTheme::default() == FooTheme::from_palette(&Palette::default())` by convention, the last two levels collapse into a single `from_palette` call: with no `PaletteProvider`, components fall back to `Palette::default()`.
+
+## Palette: the semantic colors
+
+`Palette` is `#[non_exhaustive]` — construct it from `Palette::default()` and change the fields you care about (new semantic slots can be added later without breaking you):
+
+```rust
+use ratatui_kit::prelude::*;
+use ratatui_kit::ratatui::style::Color;
+
+let mut palette = Palette::default();
+palette.accent = Color::Rgb(94, 175, 255);
+palette.selection = Color::Rgb(30, 70, 120);
+palette.on_accent = Color::White;
+palette.border = Color::Rgb(70, 100, 140);
+```
+
+The slots, grouped by role:
+
+| Group | Slots | Used for |
+| --- | --- | --- |
+| Text | `fg`, `fg_dim`, `placeholder` | Body text, secondary/disabled text, placeholders |
+| Surfaces | `bg`, `surface`, `overlay` | Background, raised panels, modal backdrops |
+| Accent | `accent`, `on_accent`, `selection` | Highlights / active borders, text on an accent fill, selection background |
+| Borders | `border`, `border_active` | Default borders, focused/active borders |
+| Semantic | `success`, `warning`, `error`, `info` | Status colors |
+
+The default palette keeps `fg`/`bg` on the terminal default (`Color::Reset`), uses a cyan accent, dim-gray borders, and `green`/`yellow`/`red`/`blue` for the semantic slots. Highlights pair `on_accent` foreground with a `selection` background.
+
+## Apply a theme: PaletteProvider
+
+Wrap a subtree in `PaletteProvider` to give it a palette. It is a transparent-layout node — it does not occupy a layout box.
+
+```rust
+element!(PaletteProvider(palette: palette) {
+    Border(top_title: Line::from(" Ocean ").centered()) {
+        Select<String>(items: items, default_index: 0)
+    }
+})
+```
+
+Every component inside now derives its colors from `palette`: the border, the select highlight, everything. No component needs to opt in.
+
+## Switch themes at runtime
+
+Context reads are **passive** — reading the palette does not subscribe a component to changes. To re-theme a live app, drive the palette from reactive [state](/ratatui-kit/core/state/): put it in an `Atom<Palette>` (or `use_state`) and feed that into `PaletteProvider`. Writing the atom wakes the tree and the next frame re-colors.
+
+```rust
+static PALETTE: Atom<Palette> = Atom::new(Palette::default);
+
+#[component]
+fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let palette = hooks.use_atom(&PALETTE);
+
+    // Elsewhere (a key handler, a background task):
+    //   PALETTE.set(ocean_palette());
+
+    element!(PaletteProvider(palette: palette.get()) {
+        // ...subtree re-colors when PALETTE changes
+    })
+}
+```
+
+This is the same pattern the [`theme` example](/ratatui-kit/examples/) uses — press a key to cycle presets.
+
+## Per-call overrides: `Option<Style>`
+
+Every component's style prop is an `Option<Style>`:
+
+- `None` (the default) — use the theme.
+- `Some(style)` — patch on top of the theme: `theme.patch(style)`, so the fields you set win and the rest stay themed.
+- `Some(Style::reset())` — clear the slot back to the terminal default.
+
+```rust
+element!(Border(
+    // themed border, but force this one magenta:
+    border_style: Some(Style::new().magenta()),
+) {
+    Text(text: "override just this border")
+})
+```
+
+You can pass a bare `Style` too — the `element!` macro coerces it to `Some` automatically, so `border_style: Style::new().magenta()` also works.
+
+## Re-style one component type: ThemeOverride
+
+To change the theme of *one component type* within a subtree — without touching the palette — inject a `FooTheme` override with `ThemeOverride`. It is the first level of the resolve chain.
+
+```rust
+// Give Border a green theme, only inside this subtree:
+let mut green_border = BorderTheme::default();
+green_border.border_style = Style::new().green();
+
+element!(ThemeOverride::<BorderTheme>(theme: green_border) {
+    Border(top_title: Line::from(" Section ")) {
+        Text(text: "this Border is green; others are not")
+    }
+})
+```
+
+:::caution[Turbofish required]
+`element!` does not infer the type parameter of a hand-written generic component, so write it explicitly: `ThemeOverride::<BorderTheme>(...)`. (This is the same reason `Select<String>(...)` and `Table<Row>(...)` need their type spelled out.)
+:::
+
+Overrides nest: a `ThemeOverride` deeper in the tree shadows one above it, exactly like [context](/ratatui-kit/core/state/#context-is-not-atom).
+
+## Each component's theme
+
+Every built-in component exposes its `FooTheme` (same feature gate as the component). Always-on: `TextTheme`, `BorderTheme`, `ModalTheme`, `ConfirmModalTheme`, `AlertModalTheme`, `ShortcutInfoModalTheme`, `SelectTheme`, `MultiSelectTheme`. Feature-gated: `InputTheme` / `SearchInputTheme` (`input`), `TreeSelectTheme` (`tree`), `VirtualListTheme` (`virtual-list`), `TableTheme` (`table`).
+
+A composed component (like `ConfirmModal`) resolves its own theme and passes fully-resolved styles down to the primitives it wraps, so the inner `Border`/`Text` render faithfully without double-theming. Modal backdrops (`DIM`) are owned by `ModalTheme` and delegated.
+
+## Theme your own component
+
+Third-party components join the system by implementing `ComponentTheme` (`Clone + Default + 'static`) and reading it in `update`:
+
+```rust
+use ratatui_kit::{ComponentTheme, Palette};
+use ratatui_kit::ratatui::style::Style;
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GaugeTheme {
+    pub bar_style: Style,
+    pub label_style: Style,
+}
+
+impl ComponentTheme for GaugeTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            bar_style: Style::new().fg(palette.accent),
+            label_style: Style::new().fg(palette.fg),
+        }
+    }
+}
+
+impl Default for GaugeTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
+```
+
+Then read the resolved theme inside your component. A function component uses the hook; a hand-written `Component` uses the updater method (it returns an owned value, so no borrow guard lingers into `update_children`):
+
+```rust
+// function component:
+let theme = hooks.use_component_theme::<GaugeTheme>();
+
+// hand-written Component, inside update():
+let theme = updater.use_component_theme::<GaugeTheme>();
+```
+
+Both `#[non_exhaustive]` on the theme and the `Default == from_palette(&Palette::default())` convention keep your theme forward-compatible and consistent with the resolve chain. Users then re-style your component with `ThemeOverride::<GaugeTheme>(...)`, and it picks up their global `Palette` for free.
+
+:::tip[Persisting a palette]
+Enable the `serde` feature to get `Serialize` / `Deserialize` on `Palette`, so you can save and load a user's theme.
+:::
+
+## See also
+
+- [State](/ratatui-kit/core/state/) — a global theme belongs in an `Atom`; a subtree theme belongs in a Provider.
+- [Custom provider](/ratatui-kit/advanced/custom-provider/) — how context injection and nearest-layer lookup work.

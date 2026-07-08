@@ -177,6 +177,33 @@ Consequence: **layout properties (`width`/`height`/`flex_direction`/`gap`, …) 
 
 Polish is the sum of transferable principles, each backed by a concrete framework tool. None of these mandate a specific color.
 
+### Theming — colors come from a shared palette, not scattered literals
+
+Every built-in component reads its colors from a **theme**. A single `Palette` (semantic slots: `accent`, `border`, `selection`, `on_accent`, `success`/`warning`/`error`/`info`, `fg`/`fg_dim`, `placeholder`, …) is the one color source; each component derives its styles from it. The default palette already gives a coherent scheme (cyan accent, dim-gray borders, green/yellow/red/blue semantics, `on_accent`+`selection` highlights) — so you get the color vocabulary below for free, without setting any style prop.
+
+Prefer tuning the palette once over hardcoding colors everywhere:
+
+- **Recolor the whole app** — wrap a subtree in `PaletteProvider`. `Palette` is `#[non_exhaustive]`, so build it from `Palette::default()` and set fields:
+  ```rust
+  let mut palette = Palette::default();
+  palette.accent = Color::Rgb(94, 175, 255);
+  palette.border = Color::Rgb(70, 100, 140);
+  element!(PaletteProvider(palette: palette) { /* whole app */ })
+  ```
+- **Override one spot** — every style prop is `Option<Style>`. Pass `Some(style)` (or a bare `Style` — `element!` auto-wraps it in `Some`) to patch over the theme; `Some(Style::reset())` clears the slot to terminal default:
+  ```rust
+  Border(border_style: Style::new().magenta()) { /* just this border */ }
+  ```
+- **Re-style one component type** — inject a `FooTheme` override with `ThemeOverride`. Turbofish is required (`element!` can't infer a hand-written generic's type param):
+  ```rust
+  let mut t = BorderTheme::default();
+  t.border_style = Style::new().green();
+  element!(ThemeOverride::<BorderTheme>(theme: t) { /* Borders here are green */ })
+  ```
+- **Switch at runtime** — context reads are passive, so drive the `Palette` from reactive state: `static PALETTE: Atom<Palette> = Atom::new(Palette::default);`, subscribe with `hooks.use_atom(&PALETTE)`, feed `PaletteProvider(palette: palette.get())`, and `PALETTE.set(...)` re-themes on the next frame. See the `theme` example.
+
+The subsections below are the per-element polish tools; reach for a bare `Style` prop or `ThemeOverride` when one spot needs to deviate, but let the palette carry the base scheme.
+
 ### Visual hierarchy — color + weight + alignment
 
 Use color, font weight, and alignment together so the eye lands on the right thing first. The tools: ratatui's `Stylize` chained methods (or `Style::new().xxx()`), `.bold()` for weight, and `.centered()` for alignment.
@@ -192,7 +219,7 @@ Line::from(vec![
 ])
 ```
 
-The color vocabulary below is **what the repository's own examples gravitate toward** — treat it as illustrative idioms for one coherent palette, not as required rules. Substitute colors that match your app's identity.
+The color vocabulary below is **what the default `Palette` already encodes** (and what the repository's examples gravitate toward) — treat it as the themed baseline, not as rules you must set by hand. To shift the whole scheme, tune the `Palette` (see *Theming* above) rather than restyling each element.
 
 | Purpose | Idiomatic color/style (examples) | Where it appears |
 | --- | --- | --- |
@@ -232,7 +259,7 @@ A strong convention: every panel's `bottom_title` is a single `dark_gray`, cente
 For dynamic status, give success/warn/error states distinct colors so feedback reads at a glance:
 
 - **Async status trio:** loading → `.yellow()`, error → `.red()`, ready → `.green()`.
-- **Validation border states** (built into `SearchInput` props): `border_style` / `active_border_style` (yellow) / `success_border_style` (green) / `error_border_style` (red), corresponding to idle / focused / valid / invalid.
+- **Validation border states** (built into `SearchInput`, themed from the palette by default): `border_style` / `active_border_style` (accent) / `success_border_style` (success) / `error_border_style` (error), corresponding to idle / focused / valid / invalid. Each is an `Option<Style>` override on top of `SearchInputTheme`.
 
 ### Clear focus / selected states — `>` marker + reverse video
 

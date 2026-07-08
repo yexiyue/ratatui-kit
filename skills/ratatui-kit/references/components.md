@@ -25,6 +25,22 @@ Two `element!` macro conveniences used throughout this reference:
 - **`Option<T>` props accept a bare `T`** — the macro auto-wraps it in `Some(...)`. So a prop typed `Option<Line<'static>>` can be passed `top_title: Line::from(" title ")`.
 - **`From`-converting props** — several props (e.g. `TextParagraph<'static>`) accept any type with a `From` impl, so you can pass `&str`, `String`, `Line`, etc. directly. These are noted per-field below.
 
+### Style props are theme-backed `Option<Style>` (read this)
+
+Every `*_style` / style prop listed below (Border's `border_style` / `style`, Select's `highlight_style`, Table's `header_style`, …) is actually **`Option<Style>`, defaulting to the component's theme** — the per-component types below still write `Style` for brevity, so **read every style prop as `Option<Style>`**. Behavior:
+
+- Omit it or pass `None` → use the theme.
+- Pass a bare `Style` (auto-wrapped to `Some`) → patch over the theme (your fields win, the rest stay themed).
+- Pass `Some(Style::reset())` → clear that slot to the terminal default.
+
+Colors come from a **shared `Palette`** (semantic slots: `accent`, `border`, `selection`, `on_accent`, `success`/`warning`/`error`/`info`, `fg`/`fg_dim`, `placeholder`), and each component derives its styles from it via a `FooTheme` (`BorderTheme`, `SelectTheme`, `TableTheme`, …). So instead of setting style props everywhere:
+
+- **Recolor everything** — `PaletteProvider(palette: p) { … }` (`Palette` is `#[non_exhaustive]`; build from `Palette::default()` and set fields).
+- **Re-style one component type** — `ThemeOverride::<BorderTheme>(theme: t) { … }` (turbofish required; `element!` can't infer a hand-written generic's type param).
+- **Runtime switching** — put the `Palette` in an `Atom<Palette>` driving `PaletteProvider` (context reads are passive; a state write re-themes on the next frame).
+
+`Palette`, `ComponentTheme`, `PaletteProvider`, `ThemeOverride`, `use_palette` / `use_component_theme`, and every `FooTheme` are in `prelude::*`.
+
 ---
 
 ## View

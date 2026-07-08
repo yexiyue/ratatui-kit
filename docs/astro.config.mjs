@@ -91,6 +91,7 @@ export default defineConfig({
 						'core/hooks',
 						'core/input-layers',
 						'core/state',
+						'core/theming',
 						'core/routing',
 					],
 				},
