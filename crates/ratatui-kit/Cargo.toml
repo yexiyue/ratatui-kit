@@ -6,8 +6,9 @@ license = "MIT"
 repository = "https://github.com/yexiyue/ratatui-kit"
 description = "A framework for building interactive terminal user interfaces with ratatui"
 authors = ["yexiyue <yexiyue666@qq.com>"]
-# README 是指向仓库根 README.md 的符号链接，crate 与仓库共用同一份文档；
-# cargo 打包时会把根 README 的内容嵌入 crate 包，crates.io / docs.rs 正常渲染。
+# crate 专属 README（独立于仓库根 README.md），面向 crates.io / docs.rs：
+# logo 用绝对 raw PNG URL（crates.io 屏蔽 SVG、且不解析相对路径），链接一律绝对。
+# 也是 lib.rs `#![doc = include_str!("../README.md")]` 的文档来源，故其 rust 代码块会跑 doctest。
 readme = "README.md"
 
 [dependencies]

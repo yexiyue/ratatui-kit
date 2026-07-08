@@ -4,7 +4,7 @@
 
 # Ratatui Kit
 
-**Build component-driven terminal UIs in Rust with React-style components, hooks, props, routing, input layers, and global state. Powered by Ratatui and Tokio.**
+**Build component-driven terminal UIs in Rust with React-style components, hooks, props, routing, input layers, theming, and global state. Powered by Ratatui and Tokio.**
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)
 [![crates.io](https://img.shields.io/crates/v/ratatui-kit?logo=rust&color=E43717)](https://crates.io/crates/ratatui-kit)
@@ -63,11 +63,12 @@ Ratatui gives you the terminal canvas and widgets. Ratatui Kit adds component id
 - **Waker-driven rendering**: state writes wake the render loop instead of requiring manual redraw calls.
 - **Async-native runtime**: the terminal loop runs on Tokio, so components can spawn futures and react to async work naturally.
 - **Flex-style layout**: `LayoutStyle` maps common layout concepts (`flex_direction`, `justify_content`, `gap`, `margin`, `offset`, `width`, `height`) to Ratatui layout primitives.
+- **Unified theming**: a shared `Palette` is the single color source, and every component derives its styles from it via a per-component `FooTheme`. Recolor globally with `PaletteProvider`, override one component type with `ThemeOverride`, or drive the palette from an `Atom` to re-theme at runtime.
 - **Central input routing**: `InputRuntime`, `InputLayer`, `EventScope`, `EventPriority`, and `EventResult` make modals and edit modes block background shortcuts cleanly.
 - **Local and global state**: use component-local `State<T>` for local lifetimes and `Atom<T>` for process-wide shared state.
 - **Built-in router**: `RouterProvider`, `Outlet`, `routes!`, `use_navigate`, `use_route`, and `use_params` are available behind the `router` feature.
 - **Native widget escape hatch**: use `widget(expr)` and `stateful(widget, state)` to embed existing Ratatui widgets directly.
-- **Small default dependency surface**: the default feature set is empty; opt into `router`, `atom`, `input`, `tree`, `table`, `virtual-list`, or `full` as needed.
+- **Small default dependency surface**: the default feature set is empty; opt into `router`, `atom`, `input`, `tree`, `table`, `virtual-list`, `serde`, or `full` as needed. The theming protocol is always-on with no extra dependency.
 
 ---
 
@@ -195,6 +196,7 @@ README keeps the API overview intentionally compact. See the [documentation site
 | `Select`, `MultiSelect` | Single and multiple selection lists | core |
 | `ScrollView` | Scrollable viewport | core |
 | `ContextProvider` | Scoped context injection | core |
+| `PaletteProvider`, `ThemeOverride` | Theme injection — global palette and per-component overrides | core |
 | `Input`, `SearchInput` | Single-line input and search input | `input` |
 | `TreeSelect` | Tree selection | `tree` |
 | `Table` | Data-driven table with cell-grid borders, wrapping, responsive columns, footer rows, and row/column highlighting | `table` |
@@ -211,6 +213,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `use_future`, `use_async_state` | Async tasks and async state | core |
 | `use_memo`, `use_effect` | Memoized derived values and side effects | core |
 | `use_context` | Read values from the nearest context provider | core |
+| `use_palette`, `use_component_theme` | Read the current palette or a resolved component theme | core |
 | `use_event_handler` | Register scoped input handlers | core |
 | `use_input_layer` | Create a same-frame input layer handle | core |
 | `use_insert_before`, `use_terminal_size` | Insert content before render and read terminal size | core |
@@ -235,6 +238,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `tree` | `TreeSelect` and the `tui_tree_widget` re-export | `tui-tree-widget` |
 | `table` | `Table`, width-aware wrapping, responsive columns, and grid borders | `unicode-width` |
 | `virtual-list` | `VirtualList` and the `tui_widget_list` re-export | `tui-widget-list` |
+| `serde` | `Serialize` / `Deserialize` for `Palette` | `serde`, `ratatui/serde` |
 | `full` | All optional features above | - |
 
 The `textarea` feature is currently disabled during the Ratatui 0.30 migration because `tui-textarea` does not yet provide a compatible release.
@@ -248,6 +252,7 @@ The `textarea` feature is currently disabled during the Ratatui 0.30 migration b
 - [Installation and feature flags](https://yexiyue.github.io/ratatui-kit/start/installation/)
 - [Hooks](https://yexiyue.github.io/ratatui-kit/core/hooks/)
 - [State model](https://yexiyue.github.io/ratatui-kit/core/state/)
+- [Theming](https://yexiyue.github.io/ratatui-kit/core/theming/)
 - [Routing](https://yexiyue.github.io/ratatui-kit/core/routing/)
 - [Built-in components](https://yexiyue.github.io/ratatui-kit/components/)
 - [Examples](https://yexiyue.github.io/ratatui-kit/examples/)
