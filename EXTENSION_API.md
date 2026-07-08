@@ -93,6 +93,15 @@ Feature `serde` adds `Serialize` / `Deserialize` on `Palette` (pulls `ratatui/se
 `element!`, `#[component]`, `#[derive(Props)]`, `#[with_layout_style]`,
 and `routes!` (feature: `router`).
 
+### Test utilities (feature: `test-util`)
+`test_util::render_frame` / `test_util::render_frames` — offscreen-render a component
+tree into a `ratatui::buffer::Buffer` (no real terminal) for integration tests, e.g.
+mounting a component under `PaletteProvider` and asserting the rendered cell style
+tracks the injected `Palette`. This is the same helper the core crate's own
+`render/harness.rs` uses internally; extension crates should prefer it over
+hand-rolling an offscreen renderer. Test-only surface — enable `test-util` as a
+`dev-dependencies` feature, not in your crate's own runtime feature set.
+
 ## Not part of the surface
 
 These are `pub` but `#[doc(hidden)]` — do not depend on them.

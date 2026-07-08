@@ -14,6 +14,8 @@ mod props;
 mod reactive_handle;
 mod render;
 mod terminal;
+#[cfg(feature = "test-util")]
+pub mod test_util;
 
 mod flatten_export {
     #[cfg(feature = "atom")]

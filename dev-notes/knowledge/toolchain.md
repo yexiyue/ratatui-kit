@@ -167,7 +167,8 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 | `input` | `Input`、`SearchInput` 和 `tui_input` re-export | `tui-input` |
 | `tree` | `TreeSelect` 组件 | `tui-tree-widget` |
 | `virtual-list` | `VirtualList` 虚拟列表组件 | `tui-widget-list` |
-| `full` | 上述全部 | — |
+| `test-util` | `test_util::render_frame`/`render_frames` 离屏渲染测试 helper（不在 `full` 里，测试专用面） | — |
+| `full` | 上述除 `test-util` 外全部 | — |
 
 宏库 `ratatui-kit-macros` 有**独立**的 `router` feature，由主库同名 feature 透传（见主库 `Cargo.toml` 的 `ratatui-kit-macros/router` 写法）。全局状态已改为纯主库 `atom` feature，不再有 store 宏或宏库透传。
 
@@ -199,6 +200,27 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 **正确做法**：改公开 API/宏后既跑 examples 冒烟,也跑 `--lib`/`--tests`;新增的纯逻辑（key/状态/路由匹配等）优先补 `#[cfg(test)]` 单测，宏的报错质量用 trybuild fail 用例锁住。
 
 **相关文件**：`examples/`、`crates/ratatui-kit/tests/ui.rs`、各模块 `#[cfg(test)] mod tests`、`CLAUDE.md`
+
+### `test-util` feature：把离屏渲染 harness 暴露给 contrib 扩展 crate
+
+`src/render/harness.rs` 的 `render_to_buffer`/`render_to_buffer_frames` 一直是 `#[cfg(test)]`
+私有实现，`ratatui-kit-contrib` 之类的下游扩展 crate 因此无法写"挂一棵真实 `PaletteProvider`
+树、断言渲染出的 `Buffer` 颜色随 `Palette` 切换"这类集成测试——只能测 `ComponentTheme::
+from_palette`/`from_props` 的纯逻辑，测不到 `use_component_theme` 真正走 context 解析链这条
+路径（`add-contrib-themes` 审查中发现的覆盖缺口）。
+
+**正确做法**：新增 `test-util` feature + `src/test_util.rs`（`pub mod`，非 flatten），重新实现
+一份精简版 `render_frame`/`render_frames`（内部仍用 crate-private 的 `render::tree::Tree` /
+`terminal::UpdaterTerminal`，但导出的函数签名只暴露已公开的 `AnyElement`/`Buffer`/
+`ComponentDrawer`），不复用/改造 `harness.rs` 本体——`harness.rs` 保持 `#[cfg(test)]` 无条件跑
+（脱离 `--all-features` 也能跑核心库自身测试），若改成依赖 `test-util` feature 会让裸
+`cargo test --lib` 少测一截，得不偿失。两份实现有少量重复（~20 行），但职责边界清楚：一个是
+私有测试基础设施，一个是公开的 Extension API 面。
+
+**不要做**：不要把 `test-util`塞进 `full`——它是测试专用能力，不是运行时能力；下游应作为
+`dev-dependencies` 的 feature 引入。
+
+**相关文件**：`crates/ratatui-kit/src/test_util.rs`、`crates/ratatui-kit/src/render/harness.rs`、`EXTENSION_API.md`
 
 ### 发布：打 tag → CI 用 git-cliff 生成 CHANGELOG + Release
 

@@ -49,6 +49,10 @@ table = ["unicode-width"]
 # 主题协议本体（Palette/ComponentTheme/各 *Theme）永远 always-on、零新依赖；此 feature 仅
 # 追加 `Palette` 的 serde 序列化能力（用于持久化用户主题），透传启用 ratatui 的 serde。
 serde = ["dep:serde", "ratatui/serde"]
+# 离屏渲染测试工具（`render_frame`/`render_frames`），供 `ratatui-kit-<name>` 扩展 crate 编写
+# 与本库 `render/harness.rs` 同构的集成测试（挂 `PaletteProvider`、断言渲染出的 `Buffer`）。
+# 零新增依赖；不进 `full`——它是测试专用面，不是运行时能力。
+test-util = []
 
 full = [
     "router",

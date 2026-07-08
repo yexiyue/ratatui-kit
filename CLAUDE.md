@@ -53,7 +53,8 @@ cargo run --example counter      # 其它：custom_list hello_world input list m
 - `atom` → 全局状态 `Atom`、`AtomState`、`use_atom`
 - `input` → `Input` 组件（`tui-input`）
 - `tree` → `TreeSelect` 组件（`tui-tree-widget`）
-- `full` → 上述全部
+- `test-util` → `test_util::render_frame`/`render_frames` 离屏渲染测试 helper，供 `ratatui-kit-<name>` 扩展 crate 写集成测试；不在 `full` 里（测试专用面，非运行时能力）
+- `full` → 上述全部（`test-util` 除外）
 
 宏库有独立的 `router` 特性，由主库的同名特性透传；`atom` 是纯主库 feature，无宏库透传。
 
