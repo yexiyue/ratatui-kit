@@ -19,6 +19,7 @@ use ratatui_kit::{
 
 // 全局响应式调色板:写入即唤醒订阅它的 `PaletteProvider` 重渲。
 static PALETTE: Atom<Palette> = Atom::new(Palette::default);
+static PRESET_INDEX: Atom<usize> = Atom::new(|| 0);
 
 // 三套预置调色板,按 `t` 循环切换。均以 `Palette::default()` 起手再改字段
 // (`Palette` 是 `#[non_exhaustive]`,禁结构体字面量,只能这样构造)。
@@ -56,7 +57,7 @@ async fn main() {
 #[component]
 fn ThemeDemo(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let palette = hooks.use_atom(&PALETTE);
-    let mut preset_index = hooks.use_state(|| 0usize);
+    let mut preset_index = hooks.use_atom(&PRESET_INDEX);
     let mut exit = hooks.use_exit();
 
     hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
