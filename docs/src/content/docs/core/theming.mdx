@@ -9,6 +9,8 @@ import Mermaid from '../../../components/Mermaid.astro';
 
 Every built-in component reads its colors from a **theme**, not from hardcoded literals. A single shared `Palette` is the source of truth for color; each component derives its own styles from it. Change the palette in one place and the whole tree re-colors consistently. The protocol is always-on (no feature flag, no extra dependency).
 
+![theme demo](/ratatui-kit/recordings/theme.gif)
+
 ## The model
 
 Theming has two layers:

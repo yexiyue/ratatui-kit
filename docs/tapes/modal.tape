@@ -16,7 +16,7 @@ Sleep 4s
 Type "j"
 Sleep 700ms
 Type "m"
-Sleep 900ms
+Sleep 1500ms
 Type "j"
 Sleep 900ms
 Escape
@@ -24,6 +24,6 @@ Sleep 900ms
 Type "k"
 Sleep 700ms
 Type "m"
-Sleep 900ms
+Sleep 1500ms
 Enter
 Sleep 900ms
