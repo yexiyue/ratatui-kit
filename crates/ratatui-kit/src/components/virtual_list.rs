@@ -1,18 +1,45 @@
 // VirtualList 组件：基于 `tui-widget-list` 的虚拟列表。
 
+use crate::components::theme::resolve_style;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
     style::Style,
     widgets::{Block, Widget},
 };
 use ratatui_kit::{
-    Component, Handler, Props, State, UseEffect, UseEventHandler, UseState,
+    Component, ComponentTheme, Handler, Palette, Props, State, UseEffect, UseEventHandler,
+    UseState,
     input::{EventPriority, EventResult, EventScope},
     with_layout_style,
 };
 use tui_widget_list::{
     ListBuildContext, ListBuilder, ListState, ListView as TuiListView, ScrollAxis, ScrollDirection,
 };
+
+/// VirtualList 组件的主题 slot。
+///
+/// 注:虚拟列表的**选中态由 `render_item` 闭包按 `ListBuildContext::is_selected` 自绘**,
+/// 不由 widget 统一着色,故本 slot 只提供列表基础样式。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VirtualListTheme {
+    /// 列表基础样式。
+    pub style: Style,
+}
+
+impl ComponentTheme for VirtualListTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            style: Style::new().fg(palette.fg),
+        }
+    }
+}
+
+impl Default for VirtualListTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 type VirtualItemRenderer<'a, W> = dyn Fn(&ListBuildContext) -> (W, u16) + Send + Sync + 'a;
 
@@ -64,7 +91,8 @@ where
     pub on_select: Handler<'static, usize>,
     pub scroll_axis: ScrollAxis,
     pub scroll_direction: ScrollDirection,
-    pub style: Style,
+    // 基础样式覆盖。`None` 用 `VirtualListTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub style: Option<Style>,
     pub block: Option<Block<'static>>,
     pub scroll_padding: u16,
     pub infinite_scrolling: bool,
@@ -84,7 +112,7 @@ where
             on_select: Handler::default(),
             scroll_axis: ScrollAxis::Vertical,
             scroll_direction: ScrollDirection::Forward,
-            style: Style::default(),
+            style: None,
             block: None,
             scroll_padding: 0,
             infinite_scrolling: true,
@@ -142,7 +170,8 @@ where
             render_item: props.render_item.take(),
             scroll_axis: props.scroll_axis,
             scroll_direction: props.scroll_direction,
-            style: props.style,
+            // 样式待 update 经主题解析后写入。
+            style: Style::default(),
             block: props.block.clone(),
             scroll_padding: props.scroll_padding,
             infinite_scrolling: props.infinite_scrolling,
@@ -166,7 +195,8 @@ where
             render_item: RenderVirtualItem::default(),
             scroll_axis: props.scroll_axis,
             scroll_direction: props.scroll_direction,
-            style: props.style,
+            // 样式待 update 经主题解析后写入。
+            style: Style::default(),
             block: props.block.clone(),
             scroll_padding: props.scroll_padding,
             infinite_scrolling: props.infinite_scrolling,
@@ -255,8 +285,14 @@ where
 
         updater.set_layout_style(layout_style);
 
+        // 主题解析:theme slot 铺底,props 的 Option<Style> 在上 patch(None → 用主题)。
+        // use_component_theme 返回 owned 值、读后即弃守卫,不与 &mut updater 冲突。
+        let theme = updater.use_component_theme::<VirtualListTheme>();
+        let style = resolve_style(theme.style, props.style);
+
         *self = Self {
             state: Some(state),
+            style,
             ..Self::from_props(props)
         };
     }

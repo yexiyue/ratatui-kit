@@ -19,6 +19,7 @@ mod flatten_export {
     #[cfg(feature = "atom")]
     pub use crate::atom::*;
     pub use crate::component::*;
+    pub use crate::components::theme::*;
     pub use crate::context::*;
     pub use crate::element::*;
     pub use crate::handler::*;

@@ -4,19 +4,64 @@
 // `Enter` 提交、`Esc` 取消，避免背景列表/页面同时响应键盘事件。
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{
-    layout::Constraint,
-    style::{Color, Style},
-    text::Line,
-};
+use ratatui::{layout::Constraint, style::Style, text::Line};
 use ratatui_kit_macros::{Props, component, element, with_layout_style};
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    AnyElement, Handler, Hooks, UseEffect, UseEventHandler, UseInputLayer, UseState,
+    AnyElement, ComponentTheme, Handler, Hooks, Palette, UseEffect, UseEventHandler, UseInputLayer,
+    UseState, UseTheme,
+    components::theme::resolve_style,
     components::{Border, Input},
     input::{EventPriority, EventResult, EventScope},
 };
+
+/// SearchInput 组件的主题 slot。状态色(active/success/error)、占位符、光标、状态文案样式
+/// 全部从 [`Palette`] 派生。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SearchInputTheme {
+    /// 非编辑态边框样式。
+    pub border_style: Style,
+    /// 编辑态(无校验结论)边框样式。
+    pub active_border_style: Style,
+    /// 校验通过边框样式。
+    pub success_border_style: Style,
+    /// 校验失败边框样式。
+    pub error_border_style: Style,
+    /// 输入文本样式。
+    pub input_style: Style,
+    /// 占位符样式。
+    pub placeholder_style: Style,
+    /// 光标块样式。
+    pub cursor_style: Style,
+    /// 校验通过状态文案样式。
+    pub success_status_style: Style,
+    /// 校验失败状态文案样式。
+    pub error_status_style: Style,
+}
+
+impl ComponentTheme for SearchInputTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            border_style: Style::new().fg(palette.border),
+            active_border_style: Style::new().fg(palette.border_active),
+            success_border_style: Style::new().fg(palette.success),
+            error_border_style: Style::new().fg(palette.error),
+            input_style: Style::new().fg(palette.fg),
+            placeholder_style: Style::new().fg(palette.placeholder),
+            cursor_style: Style::new().bg(palette.accent).fg(palette.on_accent),
+            success_status_style: Style::new().fg(palette.success),
+            error_status_style: Style::new().fg(palette.error),
+        }
+    }
+}
+
+impl Default for SearchInputTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[with_layout_style(margin, offset, width)]
 #[derive(Props)]
@@ -41,15 +86,16 @@ pub struct SearchInputProps {
     pub clear_on_submit: bool,
     // `Esc` 取消时是否清空输入。
     pub clear_on_escape: bool,
-    pub border_style: Style,
-    pub active_border_style: Style,
-    pub success_border_style: Style,
-    pub error_border_style: Style,
-    pub input_style: Style,
-    pub placeholder_style: Style,
-    pub cursor_style: Style,
-    pub success_status_style: Style,
-    pub error_status_style: Style,
+    // 以下样式覆盖:`None` 用 `SearchInputTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub border_style: Option<Style>,
+    pub active_border_style: Option<Style>,
+    pub success_border_style: Option<Style>,
+    pub error_border_style: Option<Style>,
+    pub input_style: Option<Style>,
+    pub placeholder_style: Option<Style>,
+    pub cursor_style: Option<Style>,
+    pub success_status_style: Option<Style>,
+    pub error_status_style: Option<Style>,
 }
 
 impl Default for SearchInputProps {
@@ -65,15 +111,15 @@ impl Default for SearchInputProps {
             validate: Handler::default(),
             clear_on_submit: false,
             clear_on_escape: false,
-            border_style: Style::default(),
-            active_border_style: Style::default().fg(Color::Yellow),
-            success_border_style: Style::default().fg(Color::Green),
-            error_border_style: Style::default().fg(Color::Red),
-            input_style: Style::default(),
-            placeholder_style: Style::default().fg(Color::DarkGray),
-            cursor_style: Style::default().bg(Color::Yellow),
-            success_status_style: Style::default().fg(Color::Green),
-            error_status_style: Style::default().fg(Color::Red),
+            border_style: None,
+            active_border_style: None,
+            success_border_style: None,
+            error_border_style: None,
+            input_style: None,
+            placeholder_style: None,
+            cursor_style: None,
+            success_status_style: None,
+            error_status_style: None,
             margin: Default::default(),
             offset: Default::default(),
             width: Default::default(),
@@ -90,6 +136,20 @@ pub fn SearchInput(
     let mut editing = hooks.use_state(|| false);
     let mut status = hooks.use_state(String::new);
     let mut valid = hooks.use_state(|| None::<bool>);
+
+    // 主题解析:每个 slot 铺底,对应 props 的 Option<Style> 在上 patch(None → 用主题)。
+    let theme = hooks.use_component_theme::<SearchInputTheme>();
+    let base_border_style = resolve_style(theme.border_style, props.border_style);
+    let active_border_style = resolve_style(theme.active_border_style, props.active_border_style);
+    let success_border_style =
+        resolve_style(theme.success_border_style, props.success_border_style);
+    let error_border_style = resolve_style(theme.error_border_style, props.error_border_style);
+    let input_style = resolve_style(theme.input_style, props.input_style);
+    let placeholder_style = resolve_style(theme.placeholder_style, props.placeholder_style);
+    let cursor_style = resolve_style(theme.cursor_style, props.cursor_style);
+    let success_status_style =
+        resolve_style(theme.success_status_style, props.success_status_style);
+    let error_status_style = resolve_style(theme.error_status_style, props.error_status_style);
 
     let is_enabled = props.is_editing;
     hooks.use_effect(
@@ -208,9 +268,9 @@ pub fn SearchInput(
     let is_active = props.is_editing && editing.get();
     let status_title = if is_active && !status.read().is_empty() {
         let style = if valid.get() == Some(false) {
-            props.error_status_style
+            error_status_style
         } else {
-            props.success_status_style
+            success_status_style
         };
         Some(Line::styled(status.read().to_string(), style))
     } else {
@@ -219,12 +279,12 @@ pub fn SearchInput(
 
     let border_style = if is_active {
         match valid.get() {
-            Some(true) => props.success_border_style,
-            Some(false) => props.error_border_style,
-            None => props.active_border_style,
+            Some(true) => success_border_style,
+            Some(false) => error_border_style,
+            None => active_border_style,
         }
     } else {
-        props.border_style
+        base_border_style
     };
 
     element!(Border(
@@ -237,10 +297,10 @@ pub fn SearchInput(
     ) {
         Input(
             input: input.read().clone(),
-            cursor_style: props.cursor_style,
+            cursor_style: cursor_style,
             placeholder: props.placeholder.clone(),
-            placeholder_style: props.placeholder_style,
-            style: props.input_style,
+            placeholder_style: placeholder_style,
+            style: input_style,
             hide_cursor: !is_active,
         )
     })

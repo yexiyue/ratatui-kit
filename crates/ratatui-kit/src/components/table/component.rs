@@ -1,16 +1,12 @@
+use crate::components::theme::resolve_style;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{
-    layout::Constraint,
-    style::{Color, Style},
-    widgets::Block,
-};
+use ratatui::{layout::Constraint, style::Style, widgets::Block};
 use ratatui_kit::{
-    Component, ComponentDrawer, ComponentUpdater, Handler, Hooks, Props, State, UseEffect,
-    UseEventHandler, UseState,
+    Component, ComponentDrawer, ComponentTheme, ComponentUpdater, Handler, Hooks, Palette, Props,
+    State, UseEffect, UseEventHandler, UseState,
     input::{EventPriority, EventResult, EventScope},
     with_layout_style,
 };
-
 use unicode_width::UnicodeWidthStr;
 
 use super::{
@@ -22,6 +18,50 @@ use super::{
     },
     wrap::wrap_line,
 };
+
+/// Table 组件的主题 slot。表头/表尾/选中行取 `accent`,边框/分隔线取 `border`,
+/// 选中前景取 `on_accent`;列/单元格高亮默认留空(仅列导航时由用户或 override 启用)。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableTheme {
+    /// 表头样式。
+    pub header_style: Style,
+    /// 表尾样式。
+    pub footer_style: Style,
+    /// 数据行常规样式。
+    pub row_style: Style,
+    /// 选中行高亮样式。
+    pub highlight_style: Style,
+    /// 选中列样式(默认留空)。
+    pub column_highlight_style: Style,
+    /// 选中行列交叉单元格样式(默认留空)。
+    pub cell_highlight_style: Style,
+    /// 外框样式。
+    pub border_style: Style,
+    /// 分隔线样式。
+    pub horizontal_line_style: Style,
+}
+
+impl ComponentTheme for TableTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            header_style: Style::new().fg(palette.accent),
+            footer_style: Style::new().fg(palette.accent),
+            row_style: Style::new().fg(palette.fg),
+            highlight_style: Style::new().fg(palette.on_accent).bg(palette.selection),
+            column_highlight_style: Style::new(),
+            cell_highlight_style: Style::new(),
+            border_style: Style::new().fg(palette.border),
+            horizontal_line_style: Style::new().fg(palette.border),
+        }
+    }
+}
+
+impl Default for TableTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[with_layout_style(margin, offset, width, height)]
 #[derive(Props)]
@@ -39,14 +79,15 @@ where
     pub default_index: Option<usize>,
     pub on_select: Handler<'static, T>,
     pub block: Option<Block<'static>>,
-    pub header_style: Style,
-    pub footer_style: Style,
-    pub row_style: Style,
-    pub highlight_style: Style,
+    // 以下样式覆盖:`None` 用 `TableTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub header_style: Option<Style>,
+    pub footer_style: Option<Style>,
+    pub row_style: Option<Style>,
+    pub highlight_style: Option<Style>,
     /// Applied to every cell of the column referenced by `TableState::selected_column`.
-    pub column_highlight_style: Style,
+    pub column_highlight_style: Option<Style>,
     /// Applied to the intersection of the selected row and the selected column.
-    pub cell_highlight_style: Style,
+    pub cell_highlight_style: Option<Style>,
     pub highlight_symbol: Option<&'static str>,
     pub highlight_spacing: HighlightSpacing,
     /// When `true`, an active table moves the selected column with Left/Right.
@@ -54,8 +95,8 @@ where
     pub column_spacing: u16,
     pub wrap_mode: TableWrapMode,
     pub border_mode: TableBorderMode,
-    pub border_style: Style,
-    pub horizontal_line_style: Style,
+    pub border_style: Option<Style>,
+    pub horizontal_line_style: Option<Style>,
     pub cell_padding: u16,
     pub header_separator: bool,
     pub footer_separator: bool,
@@ -77,20 +118,20 @@ where
             default_index: None,
             on_select: Handler::default(),
             block: None,
-            header_style: Style::new().fg(Color::Cyan),
-            footer_style: Style::new().fg(Color::Cyan),
-            row_style: Style::default(),
-            highlight_style: Style::new().fg(Color::Black).bg(Color::Cyan),
-            column_highlight_style: Style::default(),
-            cell_highlight_style: Style::default(),
+            header_style: None,
+            footer_style: None,
+            row_style: None,
+            highlight_style: None,
+            column_highlight_style: None,
+            cell_highlight_style: None,
             highlight_symbol: Some("▶ "),
             highlight_spacing: HighlightSpacing::default(),
             column_navigation: false,
             column_spacing: 1,
             wrap_mode: TableWrapMode::Wrap,
             border_mode: TableBorderMode::Outer,
-            border_style: Style::new().fg(Color::DarkGray),
-            horizontal_line_style: Style::new().fg(Color::DarkGray),
+            border_style: None,
+            horizontal_line_style: None,
             cell_padding: 1,
             header_separator: true,
             footer_separator: true,
@@ -147,19 +188,20 @@ where
             footer: props.footer.clone(),
             state,
             block: props.block.clone(),
-            header_style: props.header_style,
-            footer_style: props.footer_style,
-            row_style: props.row_style,
-            highlight_style: props.highlight_style,
-            column_highlight_style: props.column_highlight_style,
-            cell_highlight_style: props.cell_highlight_style,
+            // 样式待 update 经主题解析后写入(布局/估高与样式无关,此处置占位)。
+            header_style: Style::default(),
+            footer_style: Style::default(),
+            row_style: Style::default(),
+            highlight_style: Style::default(),
+            column_highlight_style: Style::default(),
+            cell_highlight_style: Style::default(),
             highlight_symbol: props.highlight_symbol,
             highlight_spacing: props.highlight_spacing,
             column_spacing: props.column_spacing,
             wrap_mode: props.wrap_mode,
             border_mode: props.border_mode,
-            border_style: props.border_style,
-            horizontal_line_style: props.horizontal_line_style,
+            border_style: Style::default(),
+            horizontal_line_style: Style::default(),
             cell_padding: props.cell_padding,
             header_separator: props.header_separator,
             footer_separator: props.footer_separator,
@@ -390,6 +432,21 @@ where
 
         updater.set_layout_style(layout_style);
         *self = Self::from_props(props, state);
+
+        // 主题解析:每个 slot 铺底,对应 props 的 Option<Style> 在上 patch(None → 用主题)。
+        // use_component_theme 返回 owned 值、读后即弃守卫,不与 &mut updater 冲突。
+        let theme = updater.use_component_theme::<TableTheme>();
+        self.header_style = resolve_style(theme.header_style, props.header_style);
+        self.footer_style = resolve_style(theme.footer_style, props.footer_style);
+        self.row_style = resolve_style(theme.row_style, props.row_style);
+        self.highlight_style = resolve_style(theme.highlight_style, props.highlight_style);
+        self.column_highlight_style =
+            resolve_style(theme.column_highlight_style, props.column_highlight_style);
+        self.cell_highlight_style =
+            resolve_style(theme.cell_highlight_style, props.cell_highlight_style);
+        self.border_style = resolve_style(theme.border_style, props.border_style);
+        self.horizontal_line_style =
+            resolve_style(theme.horizontal_line_style, props.horizontal_line_style);
     }
 
     fn draw(&mut self, drawer: &mut ComponentDrawer<'_, '_>) {

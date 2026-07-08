@@ -1,4 +1,7 @@
-use crate::{AnyElement, element, prelude::Fragment};
+use crate::{
+    AnyElement, ComponentTheme, Hooks, Palette, UseTheme, components::theme::resolve_style,
+    element, prelude::Fragment,
+};
 use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
@@ -8,6 +11,28 @@ use ratatui::{
 };
 use ratatui_kit_macros::{Props, component};
 use std::ops::{Deref, DerefMut};
+
+/// Text 组件的主题 slot。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextTheme {
+    /// 正文文本样式。
+    pub style: Style,
+}
+
+impl ComponentTheme for TextTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            style: Style::new().fg(palette.fg),
+        }
+    }
+}
+
+impl Default for TextTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct TextParagraph<'a> {
@@ -79,7 +104,8 @@ impl<'a> From<RataText<'a>> for TextParagraph<'a> {
 #[derive(Default, Props)]
 pub struct TextProps {
     pub text: TextParagraph<'static>,
-    pub style: Style,
+    // 文本样式覆盖。`None` 用主题(`TextTheme`,从 `Palette` 派生),`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub style: Option<Style>,
     pub alignment: ratatui::layout::Alignment,
     pub scroll: Position,
     // 是否换行(trim)。可直接传 `bool`(自动 `Some`)或 `Option<bool>`。
@@ -87,12 +113,16 @@ pub struct TextProps {
 }
 
 #[component]
-pub fn Text(props: &TextProps) -> impl Into<AnyElement<'static>> {
+pub fn Text(props: &TextProps, hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    // 主题解析:theme slot 铺底,props 的 Option<Style> 在上 patch(None → 用主题)。
+    let theme = hooks.use_component_theme::<TextTheme>();
+    let style = resolve_style(theme.style, props.style);
+
     let paragraph = props
         .text
         .inner
         .clone()
-        .style(props.style)
+        .style(style)
         .scroll((props.scroll.x, props.scroll.y))
         .alignment(props.alignment);
 

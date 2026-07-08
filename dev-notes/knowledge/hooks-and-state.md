@@ -241,3 +241,21 @@ TRNovel 多处页面把异步请求拆成 `data/loading/error` 三个 `State`，
 - 内部构造 `RouterHistory` 优先用 `RouterHistory::new(initial_context, max_length)`，不要直接手写字段。
 
 **相关文件**：`crates/ratatui-kit/src/components/router/history.rs`、`crates/ratatui-kit/src/components/router/router_provider.rs`、`docs/src/content/docs/core/routing.mdx`
+
+### 主题系统:Palette 唯一色源 + per-component ComponentTheme
+
+主题协议 always-on(零新依赖,`crates/ratatui-kit/src/components/theme/`)。`Palette` 是**唯一颜色真源**(`#[non_exhaustive]`,`Palette::default()` 后改字段构造);每个组件定义自己的 `FooTheme`(`#[non_exhaustive]` + `Clone` + `Default` + `impl ComponentTheme`;内置主题同时 `Copy`;`Default == from_palette(&Palette::default())`),`from_palette(&Palette)` 只从 palette 取色、`DIM`/`BOLD`/可见选中态等非颜色决定在此承接。读取两条路径:函数组件用 `hooks.use_component_theme::<T>()`(`UseTheme`,Sealed);手写 `Component` 用 `updater.use_component_theme::<T>()`(`ComponentUpdater` 的 inherent 方法)。二者都返回 **owned 值**(内部 `try_use_context`/`get_context` 后 clone、读后即弃守卫)。解析链:显式 `FooTheme` override context → `from_palette(&palette)` → `default()`。
+
+样式 props 一律 `Option<Style>`,应用统一经 `crate::components::theme::resolve_style(theme_slot, prop_override)`，语义等价于 `theme.slot.patch(prop.unwrap_or_default())`——`None` 用主题,`Some(s)` 以 `patch` 覆盖,`Some(Style::reset())` 清回终端默认。合成方向承重:`theme.patch(props)`(props 的 Some 字段胜出)。
+
+**正确做法**:
+- 手写组件读主题:先跑完 `hooks`(其 `with_context_stack` 借了 `updater`),再 `updater.use_component_theme::<T>()`;NLL 释放后二者不冲突。样式字段在 `new`/`from_props` 里置 `Style::default()` 占位,`update` 里经主题解析后写入(Border/Modal/TreeSelect/VirtualList/Table 均此法);`Table` 的估高路径与样式无关,占位样式不影响。
+- 运行时换肤:把 `Palette` 放进 `Atom<Palette>` / `use_state`,`use_atom(&PALETTE)` 订阅 + `PaletteProvider(palette: ...)` 注入;写 Atom 唤醒整树重渲换色(见 `examples/components/theme.rs` 与 `render/harness.rs` 的 `runtime_theme_tests`)。
+- 组合组件(SearchInput/ConfirmModal/三 modal)自解析 `FooTheme` 后把 resolved `Style` 透传给内层 Border/Text/Input;内层组件如实渲染,不产生双重上色。modal 遮罩(DIM)委托给 `Modal` 的 `ModalTheme`,组合组件的 `style` prop 默认 `None` 透传即可。
+
+**不要做**:
+- 不要指望 context 自动响应式:`use_palette`/`use_component_theme` 是**被动读取**(不注册 hook/waker),换肤必须靠 Atom/state 驱动 Provider 重渲,不是 context 自己变。
+- 不要在手写组件里持有 `Ref` 守卫的同时 `update_children` / 拿 `&mut updater`——会 `AlreadyBorrowed` panic 或借用冲突;`use_*_theme` 已帮你 clone+drop,直接用返回的 owned 值。
+- 不要给中性组件的 slot 硬塞可见色而破坏原语义,除非是刻意的默认改进(如 `TreeSelectTheme` 补默认可见选中、`ModalTheme` 默认 DIM 遮罩——均可被 `Style::reset()` 清掉)。
+
+**相关文件**:`crates/ratatui-kit/src/components/theme/{mod.rs,palette.rs}`、各组件的 `FooTheme`(如 `components/border.rs`、`components/table/component.rs`)、`examples/components/theme.rs`、`render/harness.rs`(`theme_tests`/`runtime_theme_tests`)、`EXTENSION_API.md`

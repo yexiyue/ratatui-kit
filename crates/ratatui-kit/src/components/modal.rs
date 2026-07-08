@@ -17,16 +17,39 @@
 
 use ratatui::{
     layout::{Constraint, Flex, Layout, Margin, Offset},
-    style::Style,
+    style::{Modifier, Style},
     widgets::{Block, Clear, Widget},
 };
 use ratatui_kit_macros::{Props, with_layout_style};
 
 use crate::{
-    AnyElement, Component, Context, SystemContext,
+    AnyElement, Component, ComponentTheme, Context, Palette, SystemContext,
+    components::theme::resolve_style,
     input::{CurrentLayer, InputLayer},
     layout_style::LayoutStyle,
 };
+
+/// Modal 组件的主题 slot。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModalTheme {
+    /// 遮罩(背景)样式。默认 `DIM` 使弹窗下方内容变暗;`Style::reset()` 可清空。
+    pub style: Style,
+}
+
+impl ComponentTheme for ModalTheme {
+    fn from_palette(_palette: &Palette) -> Self {
+        Self {
+            style: Style::new().add_modifier(Modifier::DIM),
+        }
+    }
+}
+
+impl Default for ModalTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[derive(Default, Clone, Copy)]
 // 弹窗位置枚举。
@@ -65,8 +88,8 @@ impl Placement {
 pub struct ModalProps<'a> {
     // 弹窗内容。
     pub children: Vec<AnyElement<'a>>,
-    // 弹窗样式。
-    pub style: Style,
+    // 遮罩样式覆盖。`None` 用主题(`ModalTheme`,默认 `DIM`),`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub style: Option<Style>,
     // 弹窗位置。
     pub placement: Placement,
     // 是否显示弹窗。
@@ -103,7 +126,8 @@ impl Component for Modal {
             offset: props.offset,
             width: props.width,
             height: props.height,
-            style: props.style,
+            // 样式待 update 经主题解析后写入。
+            style: Style::default(),
             placement: props.placement,
         }
     }
@@ -119,8 +143,11 @@ impl Component for Modal {
         self.offset = props.offset;
         self.width = props.width;
         self.height = props.height;
-        self.style = props.style;
         self.placement = props.placement;
+        // 主题解析:theme 遮罩铺底,props 的 Option<Style> 在上 patch(None → 用主题)。
+        // use_component_theme 返回 owned 值、读后即弃守卫,不与后续 &mut updater 冲突。
+        let theme = updater.use_component_theme::<ModalTheme>();
+        self.style = resolve_style(theme.style, props.style);
 
         if self.open {
             let blocks = props.blocks_lower.unwrap_or(true);

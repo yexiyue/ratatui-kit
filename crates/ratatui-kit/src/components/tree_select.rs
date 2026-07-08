@@ -1,15 +1,42 @@
+use crate::components::theme::resolve_style;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
     style::Style,
     widgets::{Block, Scrollbar},
 };
 use ratatui_kit::{
-    Component, Handler, Props, State, UseEffect, UseEventHandler, UseState,
+    Component, ComponentTheme, Handler, Palette, Props, State, UseEffect, UseEventHandler,
+    UseState,
     input::{EventPriority, EventResult, EventScope},
     with_layout_style,
 };
 use std::hash::Hash;
 use tui_tree_widget::{TreeItem, TreeState};
+
+/// TreeSelect 组件的主题 slot。默认提供可见选中态(`on_accent` 前景 + `selection` 底)。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TreeSelectTheme {
+    /// 树基础样式。
+    pub style: Style,
+    /// 选中项高亮样式。
+    pub highlight_style: Style,
+}
+
+impl ComponentTheme for TreeSelectTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            style: Style::new().fg(palette.fg),
+            highlight_style: Style::new().fg(palette.on_accent).bg(palette.selection),
+        }
+    }
+}
+
+impl Default for TreeSelectTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 // 树形组件的属性定义
 #[with_layout_style(margin, offset, width, height)]
@@ -32,11 +59,11 @@ where
 
     // 滚动条组件，可选
     pub scrollbar: Option<Scrollbar<'static>>,
-    // 用于组件的基础样式
-    pub style: Style,
+    // 基础样式覆盖。`None` 用 `TreeSelectTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub style: Option<Style>,
 
-    // 用于渲染选中项的样式
-    pub highlight_style: Style,
+    // 选中项样式覆盖。`None` 用 `TreeSelectTheme`(默认可见),`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub highlight_style: Option<Style>,
     // 显示在选中项前面的符号（会将所有项右移）
     pub highlight_symbol: &'static str,
 
@@ -62,8 +89,8 @@ where
             default_selection: Vec::new(),
             on_select: Handler::default(),
             scrollbar: None,
-            style: Style::new(),
-            highlight_style: Style::new(),
+            style: None,
+            highlight_style: None,
             highlight_symbol: "",
             node_closed_symbol: "\u{25b6} ", // 向右箭头
             node_open_symbol: "\u{25bc} ",   // 向下箭头
@@ -132,8 +159,9 @@ where
             state: props.state,
             items: props.items.clone(),
             scrollbar: props.scrollbar.clone(),
-            style: props.style,
-            highlight_style: props.highlight_style,
+            // 样式待 update 经主题解析后写入。
+            style: Style::default(),
+            highlight_style: Style::default(),
             highlight_symbol: props.highlight_symbol,
             node_closed_symbol: props.node_closed_symbol,
             node_open_symbol: props.node_open_symbol,
@@ -233,8 +261,16 @@ where
 
         updater.set_layout_style(layout_style);
 
+        // 主题解析:theme slot 铺底,props 的 Option<Style> 在上 patch(None → 用主题)。
+        // use_component_theme 返回 owned 值、读后即弃守卫,不与 &mut updater 冲突。
+        let theme = updater.use_component_theme::<TreeSelectTheme>();
+        let style = resolve_style(theme.style, props.style);
+        let highlight_style = resolve_style(theme.highlight_style, props.highlight_style);
+
         *self = Self {
             state: Some(state),
+            style,
+            highlight_style,
             ..Self::from_props(props)
         };
     }

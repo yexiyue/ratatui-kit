@@ -6,16 +6,53 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Margin},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::Line,
 };
 use ratatui_kit_macros::{Props, component, element};
 
 use crate::{
-    AnyElement, Handler, Hooks, UseEffect, UseEventHandler, UseInputLayer, UseState,
+    AnyElement, ComponentTheme, Handler, Hooks, Palette, UseEffect, UseEventHandler, UseInputLayer,
+    UseState, UseTheme,
+    components::theme::resolve_style,
     components::{Border, Modal, Text, TextParagraph, View},
     input::{EventPriority, EventResult, EventScope},
 };
+
+/// ConfirmModal 组件的主题 slot。遮罩(背景变暗)委托给 [`Modal`] 的 `ModalTheme`,
+/// 本 slot 只负责边框/标题/正文/按钮样式;选中按钮的 `BOLD` 由主题承接。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConfirmModalTheme {
+    /// 边框样式。
+    pub border_style: Style,
+    /// 标题样式。
+    pub title_style: Style,
+    /// 正文样式。
+    pub content_style: Style,
+    /// 未选中按钮样式。
+    pub button_style: Style,
+    /// 选中按钮样式(含 `BOLD`)。
+    pub selected_button_style: Style,
+}
+
+impl ComponentTheme for ConfirmModalTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            border_style: Style::new().fg(palette.border),
+            title_style: Style::new().fg(palette.fg),
+            content_style: Style::new().fg(palette.fg),
+            button_style: Style::new().fg(palette.fg),
+            selected_button_style: Style::new().fg(palette.accent).add_modifier(Modifier::BOLD),
+        }
+    }
+}
+
+impl Default for ConfirmModalTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[derive(Props)]
 pub struct ConfirmModalProps {
@@ -28,12 +65,14 @@ pub struct ConfirmModalProps {
     pub on_cancel: Handler<'static, ()>,
     pub width: Constraint,
     pub height: Constraint,
-    pub style: Style,
-    pub border_style: Style,
-    pub title_style: Style,
-    pub content_style: Style,
-    pub button_style: Style,
-    pub selected_button_style: Style,
+    // 遮罩样式覆盖(透传给 `Modal`)。`None` 用 `ModalTheme`(默认 DIM)。
+    pub style: Option<Style>,
+    // 以下样式覆盖:`None` 用 `ConfirmModalTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub border_style: Option<Style>,
+    pub title_style: Option<Style>,
+    pub content_style: Option<Style>,
+    pub button_style: Option<Style>,
+    pub selected_button_style: Option<Style>,
 }
 
 impl Default for ConfirmModalProps {
@@ -48,14 +87,12 @@ impl Default for ConfirmModalProps {
             on_cancel: Handler::default(),
             width: Constraint::Percentage(50),
             height: Constraint::Length(10),
-            style: Style::default().dim(),
-            border_style: Style::default(),
-            title_style: Style::default(),
-            content_style: Style::default(),
-            button_style: Style::default(),
-            selected_button_style: Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+            style: None,
+            border_style: None,
+            title_style: None,
+            content_style: None,
+            button_style: None,
+            selected_button_style: None,
         }
     }
 }
@@ -115,6 +152,15 @@ pub fn ConfirmModal(
     let confirm_selected = confirm_selected.get();
     let button_width = confirm_button_width(&props.cancel_text, &props.confirm_text);
 
+    // 主题解析:每个 slot 铺底,对应 props 的 Option<Style> 在上 patch(None → 用主题)。
+    let theme = hooks.use_component_theme::<ConfirmModalTheme>();
+    let border_style = resolve_style(theme.border_style, props.border_style);
+    let title_style = resolve_style(theme.title_style, props.title_style);
+    let content_style = resolve_style(theme.content_style, props.content_style);
+    let button_style = resolve_style(theme.button_style, props.button_style);
+    let selected_button_style =
+        resolve_style(theme.selected_button_style, props.selected_button_style);
+
     element!(Modal(
         open: props.open,
         layer: Some(layer),
@@ -123,8 +169,8 @@ pub fn ConfirmModal(
         style: props.style,
     ) {
         Border(
-            border_style: props.border_style,
-            top_title: props.title.clone().style(props.title_style).centered(),
+            border_style: border_style,
+            top_title: props.title.clone().style(title_style).centered(),
         ) {
             View {
                 View(
@@ -133,7 +179,7 @@ pub fn ConfirmModal(
                 ) {
                     Text(
                         text: props.content.clone(),
-                        style: props.content_style,
+                        style: content_style,
                         alignment: Alignment::Center,
                         wrap: true,
                     )
@@ -147,15 +193,15 @@ pub fn ConfirmModal(
                         label: props.cancel_text.clone(),
                         selected: !confirm_selected,
                         width: button_width,
-                        style: props.button_style,
-                        selected_style: props.selected_button_style,
+                        style: button_style,
+                        selected_style: selected_button_style,
                     )
                     ConfirmButton(
                         label: props.confirm_text.clone(),
                         selected: confirm_selected,
                         width: button_width,
-                        style: props.button_style,
-                        selected_style: props.selected_button_style,
+                        style: button_style,
+                        selected_style: selected_button_style,
                     )
                 }
             }

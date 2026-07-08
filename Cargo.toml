@@ -91,6 +91,11 @@ name = "multi_select"
 path = "examples/components/multi_select.rs"
 
 [[example]]
+name = "theme"
+path = "examples/components/theme.rs"
+required-features = ["ratatui-kit/atom"]
+
+[[example]]
 name = "table"
 path = "examples/components/table.rs"
 required-features = ["ratatui-kit/table"]

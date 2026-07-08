@@ -50,6 +50,31 @@ and feature-gated `UseRouter` (`router`), `UseAtom` (`atom`).
 `State` (and the underlying `ReactiveHandle` + its `ReactiveRef` / `ReactiveMutRef` /
 `ReactiveMutNoUpdate` guards and operator overloads), `AsyncState`.
 
+### Theming (always-on protocol)
+The theme protocol ships in every build (zero extra deps):
+`Palette` (the single color source, `#[non_exhaustive]` — construct via `Palette::default()`
+then set fields), `ComponentTheme` (`Clone + Default + 'static`; implement it on your own
+`FooTheme` to derive component styles from a `Palette`), `UseTheme`
+(`Hooks::use_palette` / `Hooks::use_component_theme`),
+the inherent `ComponentUpdater::use_palette` / `ComponentUpdater::use_component_theme` (for
+hand-written `Component`s that read a theme in `update`), `PaletteProvider` (inject a global
+`Palette`), and `ThemeOverride<T>` (inject one component-level `FooTheme` override — needs a
+turbofish, e.g. `ThemeOverride::<BorderTheme>(theme: ...)`, since `element!` does not infer a
+hand-written generic component's type parameter).
+
+Each built-in component's `FooTheme` is part of the surface too (same feature gate as the
+component): always-on `TextTheme`, `BorderTheme`, `ModalTheme`, `ConfirmModalTheme`,
+`AlertModalTheme`, `ShortcutInfoModalTheme`, `SelectTheme`, `MultiSelectTheme`; gated
+`InputTheme` / `SearchInputTheme` (`input`), `TreeSelectTheme` (`tree`), `VirtualListTheme`
+(`virtual-list`), `TableTheme` (`table`). Resolve chain per component: explicit `FooTheme`
+override context → `FooTheme::from_palette(&palette)` → `FooTheme::default()`. Runtime
+theming = put the `Palette` in an `Atom` / `use_state` driving `PaletteProvider` (context
+reads are passive and do not subscribe on their own). Per-call style props are
+`Option<Style>`, applied with the same semantics as `theme.slot.patch(prop.unwrap_or_default())`
+(`None` → theme, `Some(Style::reset())` → clear to terminal default).
+
+Feature `serde` adds `Serialize` / `Deserialize` on `Palette` (pulls `ratatui/serde`).
+
 ### Context & events
 `Context`, `ContextStack` (opaque token — pass it by name, do not construct),
 `Handler`, `EventResult`, `EventPriority`, `EventScope`, `EventOptions`, `InputLayer`,

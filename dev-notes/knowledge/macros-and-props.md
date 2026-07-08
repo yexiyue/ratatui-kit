@@ -176,3 +176,11 @@ ratatui 0.30 起 `Block` 内含 `Arc<dyn CellEffect>`（阴影效果的类型擦
 `Modal` 新增 `layer: Option<InputLayer>` / `blocks_lower: Option<bool>` prop：外传 `layer` 时复用父级层不重复 push（「handler 在 Modal 父级」场景,需父级 `use_input_layer` + `use_event_handler(Layer(h))` + `Modal(layer: Some(h))` 三件套配对,漏传任一→父级 handler 失聪),否则自开层;均在拿到 layer id 后 drop 守卫再注入 `CurrentLayer` 给子树。
 
 **相关文件**：`crates/ratatui-kit/src/components/modal.rs`、`crates/ratatui-kit/src/components/scroll_view/mod.rs`、`crates/ratatui-kit/src/hooks/use_input.rs`、`crates/ratatui-kit/src/component/mod.rs`
+
+### 主题迁移:样式 props 用 Option<Style>,手写泛型组件的 override 要 turbofish
+
+主题系统把所有样式 props 从 `Style` 改成 `Option<Style>`(`None` 用主题,`Some(s)` 覆盖)。`element!` 对每个 prop 值套 `.into()`,靠 std `From<T> for Option<T>` 让裸 `Style` 自动 `Some`——所以 `Border(border_style: Style::new().red())` 与既有写法一致,无需显式 `Some`;要传 `Option` 也可(`From<Option<T>> for Option<T>` 恒等)。`Props::default()` 里样式一律 `None`。
+
+**关键坑**:`element!` **不会**为手写泛型 `Component` 推断类型参数。`ThemeOverride<T>` 必须写 turbofish `ThemeOverride::<BorderTheme>(theme: t)`,漏了报 "missing generics";同理 `Select<String>(...)`、`Table<Row>(...)`、`TreeSelect<&str>(...)` 都要显式写类型(`Select<T>` 能靠 items 推断是 `#[component]` 宏的特殊处理,手写泛型 Component 没有)。另:`Component: Any + Unpin`,泛型标记字段要用 `PhantomData<fn() -> T>`(非 `PhantomData<T>`),避免把 `T` 的 Unpin/auto-trait/drop 约束传染给组件。
+
+**相关文件**:`crates/ratatui-kit/src/components/theme/mod.rs`(`ThemeOverride`)、`crates/ratatui-kit/src/components/border.rs`、`examples/components/theme.rs`

@@ -40,6 +40,9 @@ pub use scroll_view::*;
 // 上下文提供者组件，实现依赖注入和全局状态共享。
 mod context_provider;
 pub use context_provider::*;
+// 主题协议与主题注入组件，和 router/adapter 一样属于组件层的配套能力。
+pub mod theme;
+pub use theme::*;
 // 中心布局组件，用于居中布局，适合内容居中显示。
 pub mod center;
 pub use center::*;

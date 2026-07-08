@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Alignment, Constraint},
-    style::{Color, Style},
+    style::Style,
     text::Line,
     widgets::{List, ListItem, ListState},
 };
@@ -13,10 +13,46 @@ use ratatui_kit_macros::{Props, component, element, with_layout_style};
 
 use super::list_state::sync_default_selection;
 use crate::{
-    AnyElement, Handler, Hooks, State, UseEffect, UseEventHandler, UseState,
+    AnyElement, ComponentTheme, Handler, Hooks, Palette, State, UseEffect, UseEventHandler,
+    UseState, UseTheme,
+    components::theme::resolve_style,
     components::{Border, Center, Text, TextParagraph},
     input::{EventPriority, EventResult, EventScope},
 };
+
+/// MultiSelect 组件的主题 slot。高亮为「`on_accent` 前景 + `selection` 底」;已勾选项取 `accent`。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MultiSelectTheme {
+    /// 列表项常规样式。
+    pub style: Style,
+    /// 边框样式。
+    pub border_style: Style,
+    /// 光标所在项高亮样式。
+    pub highlight_style: Style,
+    /// 已勾选项样式。
+    pub selected_item_style: Style,
+    /// 空态提示样式。
+    pub empty_style: Style,
+}
+
+impl ComponentTheme for MultiSelectTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            style: Style::new().fg(palette.fg),
+            border_style: Style::new().fg(palette.border),
+            highlight_style: Style::new().fg(palette.on_accent).bg(palette.selection),
+            selected_item_style: Style::new().fg(palette.accent),
+            empty_style: Style::new().fg(palette.warning),
+        }
+    }
+}
+
+impl Default for MultiSelectTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[with_layout_style(margin, offset, width, height)]
 #[derive(Props)]
@@ -35,11 +71,12 @@ where
     pub default_index: Option<usize>,
     pub empty_message: TextParagraph<'static>,
     pub highlight_symbol: Option<&'static str>,
-    pub style: Style,
-    pub border_style: Style,
-    pub highlight_style: Style,
-    pub selected_item_style: Style,
-    pub empty_style: Style,
+    // 以下样式覆盖:`None` 用 `MultiSelectTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub style: Option<Style>,
+    pub border_style: Option<Style>,
+    pub highlight_style: Option<Style>,
+    pub selected_item_style: Option<Style>,
+    pub empty_style: Option<Style>,
     pub empty_width: Constraint,
     pub empty_height: Constraint,
 }
@@ -61,11 +98,11 @@ where
             default_index: None,
             empty_message: TextParagraph::from("No data"),
             highlight_symbol: None,
-            style: Style::default(),
-            border_style: Style::default(),
-            highlight_style: Style::default().fg(Color::Black).bg(Color::Cyan),
-            selected_item_style: Style::default().fg(Color::Cyan),
-            empty_style: Style::default().fg(Color::Yellow),
+            style: None,
+            border_style: None,
+            highlight_style: None,
+            selected_item_style: None,
+            empty_style: None,
             empty_width: Constraint::Percentage(50),
             empty_height: Constraint::Length(5),
             margin: Default::default(),
@@ -178,6 +215,14 @@ where
         }
     });
 
+    // 主题解析:每个 slot 铺底,对应 props 的 Option<Style> 在上 patch(None → 用主题)。
+    let theme = hooks.use_component_theme::<MultiSelectTheme>();
+    let style = resolve_style(theme.style, props.style);
+    let border_style = resolve_style(theme.border_style, props.border_style);
+    let highlight_style = resolve_style(theme.highlight_style, props.highlight_style);
+    let selected_item_style = resolve_style(theme.selected_item_style, props.selected_item_style);
+    let empty_style = resolve_style(theme.empty_style, props.empty_style);
+
     let is_empty = props.items.is_empty();
     let selected_snapshot = selected.read().clone();
     let list_items: Vec<ListItem<'static>> = props
@@ -188,7 +233,7 @@ where
         .map(|(index, item)| {
             let item: ListItem<'static> = item.into();
             if selected_snapshot.contains(&index) {
-                item.style(props.selected_item_style)
+                item.style(selected_item_style)
             } else {
                 item
             }
@@ -196,8 +241,8 @@ where
         .collect();
 
     let mut list = List::new(list_items)
-        .style(props.style)
-        .highlight_style(props.highlight_style);
+        .style(style)
+        .highlight_style(highlight_style);
 
     if let Some(highlight_symbol) = props.highlight_symbol {
         list = list.highlight_symbol(highlight_symbol);
@@ -208,7 +253,7 @@ where
         offset: props.offset,
         width: props.width,
         height: props.height,
-        border_style: props.border_style,
+        border_style: border_style,
         top_title: props.top_title.clone(),
         bottom_title: props.bottom_title.clone(),
     ) {
@@ -220,7 +265,7 @@ where
                 Text(
                     text: props.empty_message.clone(),
                     alignment: Alignment::Center,
-                    style: props.empty_style,
+                    style: empty_style,
                     wrap: true,
                 )
             }

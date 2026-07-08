@@ -3,16 +3,51 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Direction, Margin},
-    style::{Color, Style},
+    style::Style,
     text::Line,
 };
 use ratatui_kit_macros::{Props, component, element};
 
 use crate::{
-    AnyElement, Handler, Hooks, UseEventHandler, UseInputLayer,
+    AnyElement, ComponentTheme, Handler, Hooks, Palette, UseEventHandler, UseInputLayer, UseTheme,
+    components::theme::resolve_style,
     components::{Border, Modal, ScrollView, Text, View},
     input::{EventPriority, EventResult, EventScope},
 };
+
+/// ShortcutInfoModal 组件的主题 slot。快捷键取 `accent` 高亮,其余中性;遮罩委托给 [`Modal`]。
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShortcutInfoModalTheme {
+    /// 外框及分组框样式。
+    pub border_style: Style,
+    /// 标题样式。
+    pub title_style: Style,
+    /// 分组标题样式。
+    pub section_title_style: Style,
+    /// 快捷键描述样式。
+    pub description_style: Style,
+    /// 快捷键按键样式(高亮)。
+    pub key_style: Style,
+}
+
+impl ComponentTheme for ShortcutInfoModalTheme {
+    fn from_palette(palette: &Palette) -> Self {
+        Self {
+            border_style: Style::new().fg(palette.border),
+            title_style: Style::new().fg(palette.fg),
+            section_title_style: Style::new().fg(palette.fg),
+            description_style: Style::new().fg(palette.fg),
+            key_style: Style::new().fg(palette.accent),
+        }
+    }
+}
+
+impl Default for ShortcutInfoModalTheme {
+    fn default() -> Self {
+        Self::from_palette(&Palette::default())
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ShortcutInfo {
@@ -63,12 +98,14 @@ pub struct ShortcutInfoModalProps {
     pub on_close: Handler<'static, ()>,
     pub width: Constraint,
     pub height: Constraint,
-    pub style: Style,
-    pub border_style: Style,
-    pub title_style: Style,
-    pub section_title_style: Style,
-    pub description_style: Style,
-    pub key_style: Style,
+    // 遮罩样式覆盖(透传给 `Modal`)。`None` 用 `ModalTheme`(默认 DIM)。
+    pub style: Option<Style>,
+    // 以下样式覆盖:`None` 用 `ShortcutInfoModalTheme`,`Some(s)` 以 `theme.patch(s)` 覆盖。
+    pub border_style: Option<Style>,
+    pub title_style: Option<Style>,
+    pub section_title_style: Option<Style>,
+    pub description_style: Option<Style>,
+    pub key_style: Option<Style>,
 }
 
 impl Default for ShortcutInfoModalProps {
@@ -82,12 +119,12 @@ impl Default for ShortcutInfoModalProps {
             on_close: Handler::default(),
             width: Constraint::Percentage(60),
             height: Constraint::Percentage(50),
-            style: Style::default().dim(),
-            border_style: Style::default(),
-            title_style: Style::default(),
-            section_title_style: Style::default(),
-            description_style: Style::default(),
-            key_style: Style::default().fg(Color::Yellow),
+            style: None,
+            border_style: None,
+            title_style: None,
+            section_title_style: None,
+            description_style: None,
+            key_style: None,
         }
     }
 }
@@ -116,6 +153,14 @@ pub fn ShortcutInfoModal(
         },
     );
 
+    // 主题解析:每个 slot 铺底,对应 props 的 Option<Style> 在上 patch(None → 用主题)。
+    let theme = hooks.use_component_theme::<ShortcutInfoModalTheme>();
+    let border_style = resolve_style(theme.border_style, props.border_style);
+    let title_style = resolve_style(theme.title_style, props.title_style);
+    let section_title_style = resolve_style(theme.section_title_style, props.section_title_style);
+    let description_style = resolve_style(theme.description_style, props.description_style);
+    let key_style = resolve_style(theme.key_style, props.key_style);
+
     element!(Modal(
         open: props.open,
         layer: Some(layer),
@@ -124,8 +169,8 @@ pub fn ShortcutInfoModal(
         style: props.style,
     ) {
         Border(
-            border_style: props.border_style,
-            top_title: props.title.clone().style(props.title_style).centered(),
+            border_style: border_style,
+            top_title: props.title.clone().style(title_style).centered(),
             bottom_title: props.close_hint.clone(),
         ) {
             ScrollView(margin: Margin::new(1, 1)) {
@@ -133,8 +178,8 @@ pub fn ShortcutInfoModal(
                     Border(
                         key: section_index,
                         height: Constraint::Length(section.items.len() as u16 + 2),
-                        border_style: props.border_style,
-                        top_title: Line::from(section.title).style(props.section_title_style).centered(),
+                        border_style: border_style,
+                        top_title: Line::from(section.title).style(section_title_style).centered(),
                     ) {
                         View(flex_direction: Direction::Vertical) {
                             for (row_index, item) in section.items.into_iter().enumerate() {
@@ -146,13 +191,13 @@ pub fn ShortcutInfoModal(
                                     View(width: Constraint::Percentage(55)) {
                                         Text(
                                             text: item.description,
-                                            style: props.description_style,
+                                            style: description_style,
                                         )
                                     }
                                     View(width: Constraint::Percentage(45)) {
                                         Text(
                                             text: Line::from(item.keys).right_aligned(),
-                                            style: props.key_style,
+                                            style: key_style,
                                         )
                                     }
                                 }
