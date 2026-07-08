@@ -1,3 +1,16 @@
+## [0.10.1] - 2026-07-08
+
+### 🚀 Features
+
+- *(test-util)* 新增离屏渲染测试 helper,供 contrib 扩展 crate 使用
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.10.0 [skip ci]
+
+### ⚙️ Miscellaneous Tasks
+
+- *(openspec)* Archive add-theme-system and harden-audit-findings
 ## [0.10.0] - 2026-07-08
 
 ### 🚀 Features
