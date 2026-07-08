@@ -202,6 +202,12 @@ Prefer tuning the palette once over hardcoding colors everywhere:
   ```
 - **Switch at runtime** — context reads are passive, so drive the `Palette` from reactive state: `static PALETTE: Atom<Palette> = Atom::new(Palette::default);`, subscribe with `hooks.use_atom(&PALETTE)`, feed `PaletteProvider(palette: palette.get())`, and `PALETTE.set(...)` re-themes on the next frame. See the `theme` example.
 
+These four mechanics are all you need for most apps. For the complete
+`Palette` field table (including which fields no built-in component actually
+reads), every built-in component's `*Theme` field list, how to make your own
+component theme-aware, and using a preset color scheme instead of hand-tuning
+one, see `references/theming.md`.
+
 The subsections below are the per-element polish tools; reach for a bare `Style` prop or `ThemeOverride` when one spot needs to deviate, but let the palette carry the base scheme.
 
 ### Visual hierarchy — color + weight + alignment

@@ -84,6 +84,7 @@ For anything beyond the essentials on this page, open the matching reference:
 | `element!` grammar, `#[component]`, `#[derive(Props)]`, `routes!`, adapters | `references/syntax-and-macros.md` |
 | Keyboard/mouse events, input layers, state, routing | `references/events-state-routing.md` |
 | App skeleton, layout & visual polish, interactive patterns, pitfalls | `references/building-polished-uis.md` |
+| Every `Palette`/`*Theme` field, custom `ComponentTheme`, preset themes | `references/theming.md` |
 
 ---
 
@@ -377,7 +378,12 @@ app by tuning a `Palette` inside `PaletteProvider`; override one spot with a bar
 `Style` prop (every style prop is `Option<Style>`, patched over the theme);
 re-style one component type with `ThemeOverride::<FooTheme>(theme: ...)` (turbofish
 required); or drive the `Palette` from an `Atom<Palette>` to switch themes at
-runtime. Full mechanics in `references/building-polished-uis.md` §3.
+runtime. If the user wants a named color scheme (Dracula, Nord, Catppuccin, ...)
+rather than a hand-picked one, reach for the official `ratatui-kit-themes`
+extension crate instead of hand-tuning `Palette` fields — see
+`references/theming.md` §7. For every `Palette` field, every built-in
+component's `*Theme` fields, and how to make your own component theme-aware,
+see `references/theming.md`.
 
 Principles, and the tools that achieve them:
 

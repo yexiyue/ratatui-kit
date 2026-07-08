@@ -9,7 +9,7 @@ All hooks are obtained by calling a method on `Hooks` (`#[component] fn Foo(mut 
 ## Table of contents
 
 - [`State<T>` / `AtomState<T>` capabilities](#statet--atomstatet-capabilities-core-data-type)
-- Core hooks: `use_state`, `use_future`, `use_effect` / `use_async_effect`, `use_async_state`, `use_memo`, `use_context*`, `use_event_handler*`, `use_input_layer`, `use_insert_before`, `use_terminal_size`, `use_previous_size`, `use_exit`, `use_on_drop`
+- Core hooks: `use_state`, `use_future`, `use_effect` / `use_async_effect`, `use_async_state`, `use_memo`, `use_context*`, `use_palette` / `use_component_theme`, `use_event_handler*`, `use_input_layer`, `use_insert_before`, `use_terminal_size`, `use_previous_size`, `use_exit`, `use_on_drop`
 - Router hooks (feature `router`): `use_navigate`, `use_route`, `use_params`, `use_route_state` / `try_use_route_state`
 - Global state (feature `atom`): `use_atom`
 
@@ -174,6 +174,35 @@ All hooks are obtained by calling a method on `Hooks` (`#[component] fn Foo(mut 
   let mut sys = hooks.use_context_mut::<SystemContext>();
   ```
 - **Pitfalls**: this is not a hook slot (it does not occupy an order position and does not call `use_hook`), but it **requires a context-aware `Hooks`**: `#[component]` function components are auto-upgraded by the macro via `with_context_stack`; a **hand-written `Component`** must first do `let mut hooks = hooks.with_context_stack(updater.component_context_stack());`, otherwise `self.context` is `None` and `use_context*` will panic (`"context not available"`). Only one guard of the same context type may be held at a time; a repeated borrow panics (`AlreadyBorrowed`).
+
+## use_palette / use_component_theme
+
+- **Purpose**: read the always-on theme protocol — the current `Palette` from
+  the nearest `PaletteProvider`, or a specific component's resolved
+  `FooTheme`. Full field-by-field reference, per-component `*Theme` tables,
+  and how to make your own component theme-aware: `references/theming.md`.
+- **Feature**: core (always on, zero extra deps).
+- **Signature** (`trait UseTheme`, on `Hooks`; also inherent methods on
+  `ComponentUpdater` for hand-written `Component`s):
+  ```rust
+  fn use_palette(&self) -> Palette;                       // owned copy
+  fn use_component_theme<T: ComponentTheme>(&self) -> T;  // resolved FooTheme
+  ```
+- **Minimal usage**:
+  ```rust
+  let palette = hooks.use_palette();
+  let border_theme = hooks.use_component_theme::<BorderTheme>();
+  ```
+- **Pitfalls**: both are **passive reads, not subscriptions** — they don't
+  register a waker themselves, so reading `use_palette()` alone never causes
+  a re-render on its own. Runtime theme switching works by writing the
+  `Palette` into `use_state`/`Atom` state that drives `PaletteProvider`; the
+  *next* render (triggered by that state write) then sees the new value.
+  With no `PaletteProvider` in scope, `use_palette()` returns
+  `Palette::default()` — it never panics. In a hand-written `Component`, call
+  `updater.use_palette()` / `updater.use_component_theme::<T>()` in `update`
+  instead — same resolve chain, no `Hooks` context-stack upgrade needed
+  (unlike `use_context`, above).
 
 ## use_event_handler / use_event_handler_with_options
 

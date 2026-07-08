@@ -39,7 +39,7 @@ Colors come from a **shared `Palette`** (semantic slots: `accent`, `border`, `se
 - **Re-style one component type** — `ThemeOverride::<BorderTheme>(theme: t) { … }` (turbofish required; `element!` can't infer a hand-written generic's type param).
 - **Runtime switching** — put the `Palette` in an `Atom<Palette>` driving `PaletteProvider` (context reads are passive; a state write re-themes on the next frame).
 
-`Palette`, `ComponentTheme`, `PaletteProvider`, `ThemeOverride`, `use_palette` / `use_component_theme`, and every `FooTheme` are in `prelude::*`.
+`Palette`, `ComponentTheme`, `PaletteProvider`, `ThemeOverride`, `use_palette` / `use_component_theme`, and every `FooTheme` are in `prelude::*`. For each component's exact `*Theme` fields (what `ThemeOverride::<FooTheme>` can actually touch), see `references/theming.md` §2.
 
 ---
 
