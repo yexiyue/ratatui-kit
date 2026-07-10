@@ -36,7 +36,7 @@ loop {
   render();
   if should_exit break;
   select(component.wait(), terminal.next_event()).await;
-  if event { ctrl_c ? break : input.dispatch(event); continue; }
+  if event { auto_quit && ctrl_c ? break : input.dispatch(event); continue; }
 }
 ```
 
@@ -112,7 +112,7 @@ loop {
 
 ### 中央 InputRuntime 分发取代广播订阅
 
-事件系统从「广播订阅」(每个 `use_events` 各自订阅、所有 handler 平等收到同一事件)重写为「单 raw 源 + 中央 `InputRuntime` 分发」(`input/mod.rs`)。`Terminal` 退化为纯 raw source（`next_event`,删 `events()`/`wait()`/订阅者)；`render_loop`（`tree.rs`)取一个事件 → `CrossTerminal::received_ctrl_c` 先判退出 → 否则 `system_context.input.dispatch(event)`。
+事件系统从「广播订阅」(每个 `use_events` 各自订阅、所有 handler 平等收到同一事件)重写为「单 raw 源 + 中央 `InputRuntime` 分发」(`input/mod.rs`)。`Terminal` 退化为纯 raw source（`next_event`,删 `events()`/`wait()`/订阅者)；`render_loop`（`tree.rs`)取一个事件 → Ctrl+C 且 `SystemContext::auto_quit_on_ctrl_c()` 为真时直接退出 → 否则 `system_context.input.dispatch(event)`。应用层需自定义 Ctrl+C 时，每帧通过 `set_auto_quit_on_ctrl_c(false)` 关闭默认退出，并用 Global handler 优先处理该事件。
 
 **正确做法**：理解三个不变量——
 - **每帧重建**：`update_once` 开头 `input.begin_frame()` 清空层/handler 并铸造 root 层,组件 update 期间经 `use_input_layer`/`use_event_handler` 重新登记。无跨帧持久状态 → 关闭的弹窗/卸载的组件下一帧自动退出,无泄漏、无 id 串号。`begin_frame` 必须在 `ContextStack::root` 借走 `&mut system_context` **之前**调。

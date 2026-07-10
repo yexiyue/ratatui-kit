@@ -158,10 +158,7 @@ impl<'a> ContextStack<'a> {
 
 pub struct SystemContext {
     should_exit: bool,
-    /// 收到 Ctrl+C 键盘事件时是否自动退出 fullscreen event loop。
-    /// 默认 true（向后兼容）。若设为 false，Ctrl+C 仍会经 input.dispatch 分发给
-    /// Global handler，由应用层自行决定行为（如双击退出、取消 agent 等）。
-    pub auto_quit_on_ctrl_c: bool,
+    auto_quit_on_ctrl_c: bool,
     // 中央输入事件运行时。组件经 `get_context_mut::<SystemContext>().input` 登记层/handler,
     // 渲染循环经 `system_context.input.dispatch(event)` 分发。运行时单线程,无需 Send + Sync。
     pub(crate) input: crate::input::InputRuntime,
@@ -171,7 +168,7 @@ impl SystemContext {
     pub(crate) fn new() -> Self {
         Self {
             should_exit: false,
-            auto_quit_on_ctrl_c: true, // 默认 true，保持向后兼容
+            auto_quit_on_ctrl_c: true,
             input: crate::input::InputRuntime::default(),
         }
     }
@@ -182,5 +179,17 @@ impl SystemContext {
 
     pub fn exit(&mut self) {
         self.should_exit = true;
+    }
+
+    /// 设置收到 Ctrl+C 时是否由渲染循环直接退出。
+    ///
+    /// 默认为 `true`。设为 `false` 后，Ctrl+C 会进入中央事件分发器，由应用层
+    /// handler 实现取消任务、二次确认退出等行为。
+    pub fn set_auto_quit_on_ctrl_c(&mut self, enabled: bool) {
+        self.auto_quit_on_ctrl_c = enabled;
+    }
+
+    pub(crate) fn auto_quit_on_ctrl_c(&self) -> bool {
+        self.auto_quit_on_ctrl_c
     }
 }

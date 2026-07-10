@@ -98,10 +98,10 @@ Phase 1 的 Global handler **遵守 `Consumed`/`Ignored`**:帮助键这类「全
 
 `render_loop` 的 `select(root_component.wait(), terminal.next_event())` 两分支:
 - **`Left(())`**（组件树/状态变更)→ `continue`,仅回 loop 顶重渲染。
-- **`Right(Some(event))`** → 先 `CrossTerminal::received_ctrl_c(event.clone())` 命中即 `break`;否则 `system_context.input.dispatch(event)`,再**无条件 `continue`**（红队必改 1,复查 `should_exit`)。
+- **`Right(Some(event))`** → `auto_quit_on_ctrl_c` 开启且 `CrossTerminal::received_ctrl_c(event.clone())` 命中时 `break`;否则 `system_context.input.dispatch(event)`,再**无条件 `continue`**（红队必改 1,复查 `should_exit`)。
 - **`Right(None)`** → `break`（事件流结束)。
 
-ctrl_c 经 `TerminalImpl::received_ctrl_c` 在 `dispatch` **之前**即时判定,任何层的 `Consumed` 都吞不掉它。`render()` 内原 `if terminal.received_ctrl_c()` 检查删除。
+ctrl_c 默认经 `TerminalImpl::received_ctrl_c` 在 `dispatch` **之前**即时判定,任何层的 `Consumed` 都吞不掉它。应用层显式关闭 `auto_quit_on_ctrl_c` 后,Ctrl+C 改由中央分发器处理，Global handler 可返回 `Consumed` 阻止继续投递。`render()` 内原 `if terminal.received_ctrl_c()` 检查删除。
 
 ### D10. 特殊事件:Resize 必须 Global
 

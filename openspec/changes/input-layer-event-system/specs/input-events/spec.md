@@ -2,11 +2,11 @@
 
 ### Requirement: 单一事件源与中央分发
 
-终端 SHALL 退化为单一 raw event 源（异步、泛型签名 `Terminal::<T>::next_event(&mut self) -> Option<T::Event>`，`None` 表示事件流结束），不再向多个订阅者广播。渲染循环取到一个 raw event 后,MUST 经唯一的中央分发器 `InputRuntime::dispatch` 投递给当前帧登记的事件 handler。框架 MUST NOT 把同一事件无差别 clone 给所有 handler。`Ctrl+C` MUST 在 `dispatch` 之前由 `TerminalImpl::received_ctrl_c` 判定。
+终端 SHALL 退化为单一 raw event 源（异步、泛型签名 `Terminal::<T>::next_event(&mut self) -> Option<T::Event>`，`None` 表示事件流结束），不再向多个订阅者广播。渲染循环取到一个 raw event 后,MUST 经唯一的中央分发器 `InputRuntime::dispatch` 投递给当前帧登记的事件 handler。框架 MUST NOT 把同一事件无差别 clone 给所有 handler。`Ctrl+C` 默认 MUST 在 `dispatch` 之前由 `TerminalImpl::received_ctrl_c` 判定并退出；应用显式关闭自动退出时，MUST 改由中央分发器投递。
 
 #### Scenario: 渲染循环两分支
 - **WHEN** 渲染循环 `select` 在「组件树变更」与「下一个 raw 事件」之间等待
-- **THEN** 组件树变更分支仅回到重渲染;事件分支先判 `Ctrl+C`(命中则退出)、否则 `dispatch` 后无条件回到循环顶端复查退出条件;事件流结束分支退出循环
+- **THEN** 组件树变更分支仅回到重渲染;事件分支在自动退出开启时先判 `Ctrl+C`(命中则退出)、否则 `dispatch` 后无条件回到循环顶端复查退出条件;事件流结束分支退出循环
 
 #### Scenario: 事件经中央分发而非广播
 - **WHEN** 终端产生一个按键事件,且当前帧有多个组件登记了 handler
@@ -145,15 +145,19 @@
 
 ### Requirement: 退出与全局事件经安全通道
 
-事件 handler 闭包为 `'static`,MUST NOT 直接访问 `SystemContext`/调用 `exit()`;退出意图 MUST 经写入响应式状态（`State<bool>`),由组件内 `use_exit` 落地。`dispatch` MUST 发生在 update/draw 之外的非借用期,闭包内写 `State` 安全。`dispatch` 之后渲染循环 MUST 复查退出条件（避免纯副作用 handler 不触发重绘导致退出失效)。`Ctrl+C` MUST 在 `dispatch` 之前判定,任何层的 `Consumed` 都不能吞掉它;`Resize` MUST 以 `Global` 投递且不被消费,使所有尺寸订阅者都能收到。
+事件 handler 闭包为 `'static`,MUST NOT 直接访问 `SystemContext`/调用 `exit()`;退出意图 MUST 经写入响应式状态（`State<bool>`),由组件内 `use_exit` 落地。`dispatch` MUST 发生在 update/draw 之外的非借用期,闭包内写 `State` 安全。`dispatch` 之后渲染循环 MUST 复查退出条件（避免纯副作用 handler 不触发重绘导致退出失效)。`Ctrl+C` 在自动退出开启时 MUST 在 `dispatch` 之前判定,任何层的 `Consumed` 都不能吞掉它；自动退出关闭时 MUST 交由中央分发。`Resize` MUST 以 `Global` 投递且不被消费,使所有尺寸订阅者都能收到。
 
 #### Scenario: 退出经状态生效
 - **WHEN** 某 handler 写入退出状态 `State<bool>`
 - **THEN** 该写入唤醒重绘,下一轮组件内 `use_exit` 读到并触发退出,渲染循环复查后结束
 
-#### Scenario: Ctrl+C 不被消费吞掉
-- **WHEN** 栈顶模态层的 handler 对所有键返回 `Consumed`,用户按下 `Ctrl+C`
+#### Scenario: Ctrl+C 默认不被消费吞掉
+- **WHEN** 自动退出保持默认开启,且栈顶模态层的 handler 对所有键返回 `Consumed`,用户按下 `Ctrl+C`
 - **THEN** 渲染循环在 dispatch 之前判定 `Ctrl+C` 并退出
+
+#### Scenario: 应用接管 Ctrl+C
+- **WHEN** 应用调用 `SystemContext::set_auto_quit_on_ctrl_c(false)`,并注册了 Ctrl+C handler
+- **THEN** Ctrl+C 进入中央分发器,Global handler 可处理并返回 `Consumed` 阻止层内 handler 继续接收
 
 #### Scenario: 弹窗打开时窗口仍可缩放
 - **WHEN** 一个 `blocks_lower` 弹窗打开,终端窗口尺寸改变

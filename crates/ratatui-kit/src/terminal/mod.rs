@@ -21,8 +21,8 @@ pub trait TerminalImpl: Send {
 // 终端封装：纯 raw event source。
 //
 // 事件分发已从「发布订阅广播」迁移到中央 `InputRuntime`（见 [`crate::input`]):
-// 渲染循环经 [`Terminal::next_event`] 取单个 raw 事件,先经 [`TerminalImpl::received_ctrl_c`]
-// 判定退出,否则交 `system_context.input.dispatch(event)` 分层投递。
+// 渲染循环经 [`Terminal::next_event`] 取单个 raw 事件；Ctrl+C 默认先判定退出，
+// 关闭自动退出后则与其他事件一样交 `system_context.input.dispatch(event)` 分层投递。
 pub struct Terminal<T = CrossTerminal>
 where
     T: TerminalImpl,

@@ -23,6 +23,10 @@ impl Drop for RestoreGuard {
     }
 }
 
+fn should_quit_on_ctrl_c(system_context: &SystemContext, event: &crossterm::event::Event) -> bool {
+    system_context.auto_quit_on_ctrl_c() && CrossTerminal::received_ctrl_c(event.clone())
+}
+
 #[doc(hidden)]
 pub struct Tree<'a> {
     root_component: InstantiatedComponent,
@@ -87,12 +91,7 @@ impl<'a> Tree<'a> {
                 Either::Left(((), _)) => continue,
                 // 取到一个 raw 事件。
                 Either::Right((Some(event), _)) => {
-                    // Ctrl+C: 仅当 SystemContext.auto_quit_on_ctrl_c 为 true 时无条件退出。
-                    // 应用层可通过 system_ctx.auto_quit_on_ctrl_c = false 自行管理
-                    // Ctrl+C 行为（如三级优先级链：双击退出、取消 agent 等）。
-                    if self.system_context.auto_quit_on_ctrl_c
-                        && CrossTerminal::received_ctrl_c(event.clone())
-                    {
+                    if should_quit_on_ctrl_c(&self.system_context, &event) {
                         break;
                     }
                     self.system_context.input.dispatch(event);
@@ -117,4 +116,37 @@ pub(crate) async fn render_loop<E: ElementRepr>(
     let _restore_guard = RestoreGuard;
 
     tree.render_loop(&mut terminal).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+
+    fn ctrl_c_event() -> Event {
+        Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL))
+    }
+
+    #[test]
+    fn ctrl_c_quits_by_default() {
+        assert!(should_quit_on_ctrl_c(
+            &SystemContext::new(),
+            &ctrl_c_event()
+        ));
+    }
+
+    #[test]
+    fn ctrl_c_is_dispatched_when_auto_quit_is_disabled() {
+        let mut system_context = SystemContext::new();
+        system_context.set_auto_quit_on_ctrl_c(false);
+
+        assert!(!should_quit_on_ctrl_c(&system_context, &ctrl_c_event()));
+    }
+
+    #[test]
+    fn regular_key_does_not_quit() {
+        let event = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE));
+
+        assert!(!should_quit_on_ctrl_c(&SystemContext::new(), &event));
+    }
 }
