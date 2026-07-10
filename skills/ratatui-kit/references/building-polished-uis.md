@@ -25,7 +25,7 @@ The main library ships with **zero features enabled** by default; opt in as need
 [dependencies]
 # Enable `input` for Input/SearchInput; `tree` for TreeSelect; `virtual-list` for VirtualList;
 # `router` for routing; `atom` for global Atom. Use `full` to turn everything on.
-ratatui-kit = { version = "0.6", features = ["full"] }
+ratatui-kit = { version = "0.10", features = ["full"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 
@@ -71,7 +71,7 @@ async fn main() {
 
 ### Top-level component + exit convention (copy directly)
 
-There are two exit paths: the closure from `use_exit()` handles your business key (by convention `q`/`Q`), and Ctrl+C is built into the framework. Every example's event handler has the same shape — **destructure `Event::Key` first, then check `KeyEventKind::Press`, then `match key.code`** — returning `Consumed` when handled and `Ignored` otherwise.
+There are two default exit paths: the closure from `use_exit()` handles your business key (by convention `q`/`Q`), and Ctrl+C exits directly through the framework. Applications that need agent cancellation, confirmation, or double-press exit can disable the automatic Ctrl+C exit and handle it as a `Global` event; use the borrow-safe pattern in `events-state-routing.md` §1.5. Every event handler has the same shape — **destructure `Event::Key` first, then check `KeyEventKind::Press`, then `match key.code`** — returning `Consumed` when handled and `Ignored` otherwise.
 
 ```rust
 #[component]

@@ -16,7 +16,7 @@ license: MIT
 metadata:
   author: yexiyue
   framework: ratatui-kit
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # ratatui-kit — Building Terminal UIs in Rust
@@ -66,7 +66,9 @@ When asked to build, scaffold, or extend a ratatui-kit UI, work in this order:
 
 4. **Wire input and lifecycle.** Register keyboard/mouse handlers with
    `use_event_handler` (always the same shape — see below). Get the quit callback
-   from `use_exit`. Ctrl+C is handled by the framework.
+   from `use_exit`. Ctrl+C exits through the framework by default; applications
+   that need cancellation or double-press exit can explicitly route it through
+   the central event dispatcher.
 
 5. **Verify by compiling — this is the definition of done.** Run `cargo check` with
    the features you used, read the errors, and fix them; iterate check → fix → check
@@ -95,7 +97,7 @@ runtime is required — the docs and examples use Tokio.
 
 ```toml
 [dependencies]
-ratatui-kit = { version = "0.6", features = ["full"] }
+ratatui-kit = { version = "0.10", features = ["full"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 
@@ -308,6 +310,13 @@ reacting) use an **input layer**. Prefer the built-in `ConfirmModal` / `AlertMod
 / `ShortcutInfoModal`, which manage their own layer — you only pass `open` + a
 callback. Roll your own layer only for custom modal interactions; see
 `references/events-state-routing.md` for `use_input_layer` and the layering rules.
+
+**Custom Ctrl+C behavior.** The default remains immediate framework exit. To
+implement agent cancellation, confirmation, or double-press exit, call
+`SystemContext::set_auto_quit_on_ctrl_c(false)` from the root component and
+register a `Global` handler for Ctrl+C. Return `Consumed` after handling it so the
+event does not continue into the active layer. The exact borrow-safe pattern is in
+`references/events-state-routing.md` §1.5.
 
 **Text field that coexists with command keys.** When the user types into a field
 *and* single-letter keys (`j`/`k`/Space/`q`) are commands, reach for **SearchInput**

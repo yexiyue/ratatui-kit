@@ -158,6 +158,55 @@ Consuming all keys to forward them to `tui_input::Input` means global command ke
 - The `InputLayer` returned by `use_input_layer` is valid only **within the same frame**; never hold it across frames in `use_state`. Use it to pass the handle to a child `Modal` (`layer` prop) or to this component's own `EventScope::Layer(handle)`.
 - A hand-written `Component` (not a `#[component]` function component) must call `let mut hooks = hooks.with_context_stack(updater.component_context_stack());` before using these hooks. Function components are upgraded automatically by the macro and work out of the box.
 
+### 1.5 Custom Ctrl+C behavior
+
+Ctrl+C exits the render loop before event dispatch by default. Keep that default
+for ordinary applications. When the application needs to cancel an agent, ask for
+confirmation, or require a second press to quit, disable the automatic exit from
+the root component and handle Ctrl+C through a `Global` handler:
+
+```rust
+use ratatui_kit::{
+    crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers},
+    prelude::*,
+};
+
+#[component]
+fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut cancel_requested = hooks.use_state(|| false);
+
+    // SystemContext is shared by the whole tree. Release its RefMut before
+    // registering handlers or rendering children.
+    {
+        let mut system = hooks.use_context_mut::<SystemContext>();
+        system.set_auto_quit_on_ctrl_c(false);
+    }
+
+    hooks.use_event_handler(EventScope::Global, EventPriority::High, move |event| {
+        let Event::Key(key) = event else {
+            return EventResult::Ignored;
+        };
+        if key.kind == KeyEventKind::Press
+            && key.code == KeyCode::Char('c')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+        {
+            cancel_requested.set(true);
+            return EventResult::Consumed;
+        }
+        EventResult::Ignored
+    });
+
+    element!(/* render from cancel_requested.get(), or trigger app logic */)
+}
+```
+
+The setter is persistent state on `SystemContext`; call it from the root component
+on every update so the intended policy stays explicit. If the policy is conditional,
+set both branches (`set_auto_quit_on_ctrl_c(!custom_ctrl_c)`) rather than only ever
+setting `false`. Once automatic exit is disabled, Ctrl+C follows normal dispatch:
+Global handlers run first, and `Ignored` allows the event to continue into active
+layer handlers. Return `Consumed` when the global action owns the key.
+
 ---
 
 ## 2. State: `use_state` (local) vs `Atom`/`use_atom` (global, `atom` feature)
