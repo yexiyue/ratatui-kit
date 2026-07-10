@@ -87,8 +87,12 @@ impl<'a> Tree<'a> {
                 Either::Left(((), _)) => continue,
                 // 取到一个 raw 事件。
                 Either::Right((Some(event), _)) => {
-                    // ctrl_c 先于 dispatch 判定,任何层的 Consumed 都吞不掉它。
-                    if CrossTerminal::received_ctrl_c(event.clone()) {
+                    // Ctrl+C: 仅当 SystemContext.auto_quit_on_ctrl_c 为 true 时无条件退出。
+                    // 应用层可通过 system_ctx.auto_quit_on_ctrl_c = false 自行管理
+                    // Ctrl+C 行为（如三级优先级链：双击退出、取消 agent 等）。
+                    if self.system_context.auto_quit_on_ctrl_c
+                        && CrossTerminal::received_ctrl_c(event.clone())
+                    {
                         break;
                     }
                     self.system_context.input.dispatch(event);
