@@ -1,3 +1,15 @@
+## [0.10.2] - 2026-07-10
+
+### 🚀 Features
+
+- Add auto_quit_on_ctrl_c flag to SystemContext
+- Allow custom Ctrl+C handling
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.10.1 [skip ci]
+- *(openspec)* Add add-contrib-themes change proposal
+- *(skills)* 给 ratatui-kit skill 补全主题系统参考
 ## [0.10.1] - 2026-07-08
 
 ### 🚀 Features
