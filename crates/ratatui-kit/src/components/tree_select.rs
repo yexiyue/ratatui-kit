@@ -114,7 +114,16 @@ fn sync_default_tree_selection<T>(
     let default_changed = last_default_selection.as_deref() != Some(default_selection);
 
     if default_changed {
+        let first_sync = last_default_selection.is_none();
         *last_default_selection = Some(default_selection.to_vec());
+        // 首次同步且 `default_selection` 为空 —— 即调用方**根本没传**这个 prop(它默认为空 Vec)。
+        // 此时不能 `select(vec![])`:空路径在 tui-tree-widget 里表示**清除选中**,会把调用方
+        // 经 `state` 自行预设的选中抹掉。组件树是父先子后更新,这次清除总发生在父组件 seeding
+        // 之后,表现为「传了 state、预设了选中,挂载后却没有任何高亮」。
+        // 「从非空显式改回空 = 清除选中」仍受支持(那时 first_sync 为 false)。
+        if first_sync && default_selection.is_empty() {
+            return;
+        }
         state.select(default_selection.to_vec());
         open_ancestors(state, default_selection);
     } else if state.selected().is_empty() && !default_selection.is_empty() {
@@ -331,6 +340,19 @@ mod tests {
         let mut last_default = None;
 
         sync_default_tree_selection(&mut state, &mut last_default, &["components", "select"]);
+
+        assert_eq!(state.selected(), ["components", "select"]);
+    }
+
+    #[test]
+    fn absent_default_selection_preserves_seeded_selection() {
+        // 调用方传了自己的 `state` 并预设选中,但没传 `default_selection`(默认空)。
+        // 首次同步不得把它清掉 —— 否则任何「state 预设选中」的用法都会在挂载帧失效。
+        let mut state = TreeState::<&'static str>::default();
+        state.select(vec!["components", "select"]);
+        let mut last_default = None;
+
+        sync_default_tree_selection(&mut state, &mut last_default, &[]);
 
         assert_eq!(state.selected(), ["components", "select"]);
     }
