@@ -1,3 +1,13 @@
+## [0.10.3] - 2026-07-16
+
+### 🐛 Bug Fixes
+
+- *(tree_select)* 不再用空 default_selection 清掉调用方预设的选中
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.10.2 [skip ci]
+- *(skills)* Document custom Ctrl+C handling
 ## [0.10.2] - 2026-07-10
 
 ### 🚀 Features
