@@ -117,6 +117,19 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                         });
                         true
                     },
+                    on_arrow: move |key_code: KeyCode| match key_code {
+                        // 编辑态内 ↑/↓ 只移动选中项，不写进输入框。
+                        KeyCode::Down if selected.get() + 1 < COMMANDS.len() => {
+                            selected += 1;
+                            true
+                        }
+                        KeyCode::Up if selected.get() > 0 => {
+                            selected -= 1;
+                            true
+                        }
+                        // 其它导航键(如 Left/Right)交回输入框移动光标。
+                        _ => false,
+                    },
                     validate: move |value: String| {
                         if value.len() > 18 {
                             (false, "too long".to_string())

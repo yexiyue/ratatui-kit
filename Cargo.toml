@@ -59,6 +59,10 @@ name = "search_input"
 path = "examples/components/search_input.rs"
 
 [[example]]
+name = "search_filter"
+path = "examples/components/search_filter.rs"
+
+[[example]]
 name = "scrollview"
 path = "examples/components/scrollview.rs"
 

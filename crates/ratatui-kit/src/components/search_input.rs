@@ -80,6 +80,8 @@ pub struct SearchInputProps {
     pub on_submit: Handler<'static, String, bool>,
     // 清空回调。
     pub on_clear: Handler<'static, ()>,
+    // 允许使用导航键选择选项。
+    pub on_arrow: Handler<'static, KeyCode, bool>,
     // 同步校验回调，返回 `(是否有效, 状态文案)`。
     pub validate: Handler<'static, String, (bool, String)>,
     // 提交成功后是否清空输入。
@@ -108,6 +110,7 @@ impl Default for SearchInputProps {
             on_change: Handler::default(),
             on_submit: Handler::default(),
             on_clear: Handler::default(),
+            on_arrow: Handler::default(),
             validate: Handler::default(),
             clear_on_submit: false,
             clear_on_escape: false,
@@ -192,6 +195,7 @@ pub fn SearchInput(
     let mut on_change = props.on_change.take();
     let mut on_submit = props.on_submit.take();
     let mut on_clear = props.on_clear.take();
+    let mut on_arrow = props.on_arrow.take();
     let mut validate = props.validate.take();
     let clear_on_submit = props.clear_on_submit;
     let clear_on_escape = props.clear_on_escape;
@@ -246,6 +250,12 @@ pub fn SearchInput(
                     EventResult::Consumed
                 }
                 _ => {
+                    if matches!(key.code, KeyCode::Up | KeyCode::Down)
+                        && !on_arrow.is_default()
+                        && on_arrow(key.code)
+                    {
+                        return EventResult::Consumed;
+                    }
                     input.write().handle_event(&Event::Key(key));
                     let next_value = input.read().value().to_string();
                     on_change(next_value.clone());
