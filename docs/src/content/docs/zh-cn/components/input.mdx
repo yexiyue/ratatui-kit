@@ -86,6 +86,6 @@ Input(
 
 ## 与 SearchInput 的边界
 
-直接用 `Input` 时，你拥有所有输入语义：什么时候激活、如何校验、是否清空、是否打开独占 input layer。这个低层形态适合自定义命令行、编辑器状态栏、过滤器、表单字段。
+直接用 `Input` 时，你拥有所有输入语义：什么时候激活、如何校验、是否清空、是否打开独占 input layer。这个低层形态适合自定义命令行、编辑器状态栏、过滤器、表单字段。需要让文本输入和候选项导航共享同一个独占层时，可运行 [search_filter](https://github.com/yexiyue/ratatui-kit/blob/main/examples/input/search_filter.rs)：它用 `Input` 配合 `use_input_layer` 组合，而不是给 `SearchInput` 增加列表专用回调。
 
 如果只是普通搜索框，优先用 [SearchInput](/ratatui-kit/zh-cn/components/search-input/)。它已经封装了激活键、提交、清空、校验提示和输入互斥。

@@ -86,6 +86,6 @@ For read-only display, recordings, or unfocused states, pass `hide_cursor: true`
 
 ## Boundary with SearchInput
 
-When you use `Input` directly, you own every input semantic: when editing activates, how validation works, whether to clear, and whether to open an exclusive input layer. This low-level form fits custom command lines, editor status bars, filters, and form fields.
+When you use `Input` directly, you own every input semantic: when editing activates, how validation works, whether to clear, and whether to open an exclusive input layer. This low-level form fits custom command lines, editor status bars, filters, and form fields. For a composed filter that keeps text input and candidate navigation in one exclusive layer, run [search_filter](https://github.com/yexiyue/ratatui-kit/blob/main/examples/input/search_filter.rs): it uses `Input` plus `use_input_layer` instead of extending `SearchInput` with list-specific callbacks.
 
 For an ordinary search box, prefer [SearchInput](/ratatui-kit/components/search-input/). It already wraps activation keys, submit, clear, validation hints, and input exclusivity.

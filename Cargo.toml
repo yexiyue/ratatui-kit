@@ -51,6 +51,10 @@ name = "input_mutex"
 path = "examples/input/input_mutex.rs"
 
 [[example]]
+name = "search_filter"
+path = "examples/input/search_filter.rs"
+
+[[example]]
 name = "input"
 path = "examples/components/input.rs"
 
