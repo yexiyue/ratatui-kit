@@ -1,15 +1,41 @@
-/* Ratatui Kit brand colors: teal and amber from the logo. Dark pages use amber
-   accents, light pages use teal accents. :root:root raises specificity enough
-   to override starlight-theme-nova's neutral default accents. */
+/*
+	Ratatui Kit docs chrome — the "site is a TUI app" world applied to every page.
+
+	Dark is the baseline scene (developers in terminals, often at night); light is
+	the paper variant. Teal is structure, amber is reserved for active/live state.
+	Terminal windows stay dark in both themes — a terminal is dark.
+*/
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/jetbrains-mono';
+
 :root:root {
-	--sl-color-accent-low: #3a2808;
-	--sl-color-accent: #c47512;
-	--sl-color-accent-high: #ffdca6;
-	--sl-color-text-accent: #fca91b;
-	--sl-color-asides-text-accent: #fca91b;
+	--rk-font-sans:
+		'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+	--rk-font-mono:
+		'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
+		monospace;
+
+	/* wire the pair into starlight/nova (nova maps --sl-font to these) */
+	--font-sans: var(--rk-font-sans);
+	--font-mono: var(--rk-font-mono);
+
+	/* brand duo, dark scene: teal structure + amber for active state */
+	--rk-teal: #46c2c7;
+	--rk-teal-deep: #2e8a90;
+	--rk-amber: #fca91c;
+
+	--sl-color-accent-low: #123338;
+	--sl-color-accent: #2e8a90;
+	--sl-color-accent-high: #bfe9ec;
+	--sl-color-text-accent: #46c2c7;
+	--sl-color-asides-text-accent: #46c2c7;
 }
 
 :root:root[data-theme='light'] {
+	--rk-teal: #0a5b60;
+	--rk-teal-deep: #084b50;
+	--rk-amber: #b06a05;
+
 	--sl-color-accent-low: #cfe6e4;
 	--sl-color-accent: #0a5b60;
 	--sl-color-accent-high: #053034;
@@ -17,17 +43,43 @@
 	--sl-color-asides-text-accent: #0a5b60;
 }
 
-/* Installation pages use astro:components <Code themes={{light,dark}}> blocks
-   so the version can be interpolated. That component outputs a bare
-   pre.astro-code, so these rules align it with Starlight's code block styling
-   and switch Shiki tokens to --shiki-dark on dark pages. */
+/* ---- browser surfaces: selection, focus, caret, scrollbar ---- */
+::selection {
+	background: rgba(252, 169, 27, 0.32);
+	color: inherit;
+}
+
+:focus-visible {
+	outline: 2px solid var(--rk-amber, #fca91c);
+	outline-offset: 2px;
+	border-radius: 1px;
+}
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in srgb, currentColor 22%, transparent)
+		transparent;
+}
+
+/* ---- square chrome: no soft-corner SaaS cards on a terminal product ---- */
+.sl-markdown-content :is(.sl-link-card, .sl-link-grid > *) {
+	border-radius: 2px;
+}
+
+/* code blocks: hairline frame, mono at reading size, square corners */
 .sl-markdown-content .astro-code {
 	padding: 0.85rem 1.1rem;
-	border-radius: 0.5rem;
+	border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+	border-radius: 2px;
 	overflow-x: auto;
 	tab-size: 2;
 	font-size: var(--sl-text-code, 0.875rem);
 	line-height: 1.7;
+}
+
+.sl-markdown-content .expressive-code,
+.sl-markdown-content .expressive-code pre {
+	border-radius: 2px;
 }
 
 :root[data-theme='dark'] .sl-markdown-content .astro-code {

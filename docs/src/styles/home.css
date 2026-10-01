@@ -1,0 +1,1344 @@
+/*
+	rk-home — "the site is a TUI app" (direction seed 296d2b21, index 3).
+
+	World rules that keep this coherent:
+	- deep ink-teal ground that deepens one step per act (dive raise);
+	- square hairline panes with a small mono tab sitting ON the border
+	  (the boxed-title grammar terminals taught us);
+	- teal is structure; amber exists only where something is live or active
+	  (oscilloscope raise) — cursor, selection, running state, primary CTA;
+	- terminal windows stay dark in both page themes — a terminal is dark;
+	- one authored moment: the live hero terminal (motion elsewhere is state
+	  change, not entrance theater).
+*/
+
+/* ===== nova integration: full-bleed homepage, header blended into the scene =====
+   NOTE: this file is a plain (unscoped) stylesheet — :global() is an Astro
+   scoped-style directive and would be an invalid selector here. */
+.main-pane:has(.rk-home) {
+	overflow-x: clip;
+	overflow-y: visible;
+}
+
+.sl-container:has(.rk-home) {
+	max-width: none;
+	padding-inline: 0;
+}
+
+/* the splash template renders the page title ("Ratatui Kit") in its own
+   content panel before the homepage panel — hide it on homepage routes */
+main > .content-panel:has(+ .content-panel .rk-home) {
+	display: none;
+}
+
+/* one column for chrome and content: the header's inner row joins the shell */
+body:has(.rk-home) header > div {
+	width: 100%;
+	max-width: 1152px;
+	margin-inline: auto;
+}
+
+[data-theme='dark'] body:has(.rk-home) {
+	background: #081518;
+}
+
+[data-theme='light'] body:has(.rk-home) {
+	background: #f4f0e6;
+}
+
+[data-theme='dark'] body:has(.rk-home) header {
+	background: rgba(8, 21, 24, 0.82);
+	border-bottom-color: rgba(151, 201, 206, 0.16);
+}
+
+[data-theme='light'] body:has(.rk-home) header {
+	background: rgba(246, 242, 232, 0.85);
+	border-bottom-color: rgba(10, 70, 75, 0.16);
+}
+
+/* ===== tokens ===== */
+.rk-home {
+	--rk-ease: cubic-bezier(0.32, 0.72, 0, 1);
+	--rk-font-sans:
+		'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+	--rk-font-mono:
+		'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
+		monospace;
+
+	--rk-bg: #081518;
+	--rk-panel: #0a1a1e;
+	--rk-panel2: #0d2126;
+	--rk-line: rgba(151, 201, 206, 0.16);
+	--rk-line-strong: rgba(151, 201, 206, 0.34);
+	--rk-ink: #e8e3d5;
+	--rk-dim: rgba(232, 227, 213, 0.74);
+	--rk-faint: rgba(232, 227, 213, 0.46);
+	--rk-teal: #46c2c7;
+	--rk-teal-deep: #2e8a90;
+	--rk-amber: #fca91c;
+	--rk-amber-ink: #1a1206;
+
+	/* terminal windows: fixed dark scene, immune to page theme */
+	--term-bg: #05090b;
+	--term-panel: #081114;
+	--term-line: rgba(70, 194, 199, 0.34);
+	--term-ink: #d9e6e6;
+	--term-dim: rgba(217, 230, 230, 0.55);
+
+	position: relative;
+	overflow-x: clip;
+	margin-inline: calc(50% - 50vw);
+	padding: 0.75rem var(--sl-nav-pad-x, 1.5rem) 0;
+	color: var(--rk-ink);
+	/* the dive raise: the ground deepens one tone per act */
+	background: linear-gradient(
+		180deg,
+		#081518 0%,
+		#071316 28%,
+		#061113 55%,
+		#050f11 80%,
+		#040d0f 100%
+	);
+	font-family: var(--rk-font-sans);
+	font-feature-settings: 'ss01';
+	scrollbar-color: rgba(151, 201, 206, 0.28) transparent;
+}
+
+[data-theme='light'] .rk-home {
+	--rk-bg: #f4f0e6;
+	--rk-panel: #faf7ee;
+	--rk-panel2: #f0ecdf;
+	--rk-line: rgba(10, 70, 75, 0.18);
+	--rk-line-strong: rgba(10, 70, 75, 0.4);
+	--rk-ink: #0c3236;
+	--rk-dim: rgba(12, 50, 54, 0.72);
+	--rk-faint: rgba(12, 50, 54, 0.48);
+	--rk-teal: #0a5b60;
+	--rk-teal-deep: #084b50;
+	--rk-amber: #b06a05;
+
+	background: linear-gradient(
+		180deg,
+		#f6f2e8 0%,
+		#f2eee2 30%,
+		#efeadd 60%,
+		#ece6d6 100%
+	);
+	scrollbar-color: rgba(10, 70, 75, 0.3) transparent;
+}
+
+.rk-shell {
+	max-width: 1152px;
+	margin-inline: auto;
+}
+
+.rk-home h1,
+.rk-home h2,
+.rk-home h3 {
+	margin: 0;
+	color: var(--rk-ink);
+	font-weight: 560;
+	letter-spacing: -0.022em;
+	line-height: 1.06;
+	text-wrap: balance;
+}
+
+.rk-home p {
+	margin: 0;
+	color: var(--rk-dim);
+	font-size: 1.02rem;
+	line-height: 1.68;
+	max-width: 62ch;
+}
+
+.rk-home a {
+	color: inherit;
+}
+
+.rk-section {
+	display: grid;
+	gap: clamp(1.4rem, 2.6vw, 2.2rem);
+	margin-block-start: clamp(5rem, 10vw, 8.5rem);
+}
+
+/* ===== the pane: the page's one container idea ===== */
+.rk-panel {
+	position: relative;
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	background: var(--rk-panel);
+}
+
+.rk-panel__tab,
+.rk-pane__tab {
+	position: absolute;
+	top: -0.72em;
+	left: 1rem;
+	padding-inline: 0.5rem;
+	background: var(--rk-panel);
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	font-size: 0.72rem;
+	line-height: 1.4;
+	letter-spacing: 0.06em;
+	white-space: nowrap;
+}
+
+.rk-panel__tab--amber {
+	color: var(--rk-amber);
+}
+
+.rk-section > header,
+.rk-panel > header {
+	display: grid;
+	gap: 0.8rem;
+	max-width: 62ch;
+}
+
+.rk-section h2,
+.rk-panel h2 {
+	font-size: clamp(1.7rem, 3vw, 2.5rem);
+}
+
+/* mono utility for keycaps, data, labels */
+.rk-mono {
+	font-family: var(--rk-font-mono);
+	font-size: 0.92em;
+}
+
+/* ===== buttons ===== */
+.rk-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+	min-height: 2.6rem;
+	padding: 0.6rem 1.15rem;
+	border: 1px solid transparent;
+	border-radius: 2px;
+	font-family: var(--rk-font-mono);
+	font-size: 0.88rem;
+	font-weight: 560;
+	letter-spacing: 0.02em;
+	text-decoration: none;
+	white-space: nowrap;
+	transition:
+		background 240ms var(--rk-ease),
+		border-color 240ms var(--rk-ease),
+		color 240ms var(--rk-ease);
+}
+
+.rk-btn--amber {
+	background: #fca91c;
+	border-color: #fca91c;
+	color: #1a1206;
+}
+
+.rk-btn--amber:hover {
+	background: #ffbd45;
+	border-color: #ffbd45;
+}
+
+.rk-btn--line {
+	border-color: rgba(151, 201, 206, 0.56);
+	color: var(--rk-ink);
+	background: transparent;
+}
+
+.rk-btn--line:hover {
+	border-color: var(--rk-teal);
+	color: var(--rk-teal);
+}
+
+.rk-btn--sm {
+	padding: 0.45rem 0.8rem;
+	font-size: 0.8rem;
+}
+
+.rk-btn .rk-btn__arrow {
+	transition: transform 240ms var(--rk-ease);
+}
+
+.rk-btn:hover .rk-btn__arrow {
+	transform: translateX(3px);
+}
+
+/* text links inside copy */
+.rk-link {
+	color: var(--rk-teal);
+	text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+	text-underline-offset: 3px;
+	font-weight: 520;
+}
+
+.rk-link:hover {
+	text-decoration-color: currentColor;
+}
+
+/* ===== hero ===== */
+.rk-hero {
+	display: grid;
+	gap: clamp(0.95rem, 1.6vw, 1.3rem);
+	padding-block: clamp(0.75rem, 1.5vw, 1.25rem) clamp(0.3rem, 0.8vw, 0.6rem);
+}
+
+.rk-hero h1 {
+	max-width: 16ch;
+	font-size: clamp(2.2rem, 5vw, 3.6rem);
+	font-weight: 620;
+	letter-spacing: -0.028em;
+}
+
+.rk-hero__lead {
+	font-size: clamp(1rem, 1.3vw, 1.14rem);
+	max-width: 46ch;
+}
+
+.rk-hero__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.7rem;
+}
+
+/* ===== the terminal (always dark) ===== */
+[data-theme='light'] .rk-home .rk-term {
+	box-shadow: 0 10px 34px rgba(10, 50, 54, 0.2);
+}
+
+.rk-term {
+	margin: 0;
+	max-width: min(100%, 1128px);
+	margin-inline: auto;
+	border: 1px solid var(--term-line);
+	border-radius: 2px;
+	background: var(--term-bg);
+	font-family: var(--rk-font-mono);
+	overflow: hidden;
+}
+
+.rk-term__bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.4rem 0.9rem;
+	border-bottom: 1px solid rgba(70, 194, 199, 0.26);
+	color: rgba(217, 230, 230, 0.68);
+	font-size: 0.74rem;
+	letter-spacing: 0.04em;
+}
+
+.rk-term__bar-id {
+	color: var(--rk-teal);
+}
+
+.rk-term__bar-status {
+	font-variant-numeric: tabular-nums;
+}
+
+.rk-term__app {
+	position: relative;
+	padding: 0.65rem 0.75rem;
+	min-height: 300px;
+}
+
+.rk-term__app:focus-visible {
+	outline: 2px solid var(--rk-amber);
+	outline-offset: -2px;
+}
+
+/* the app layout mirrors examples/apps/todo_app.rs */
+.rk-app {
+	display: grid;
+	gap: 0.45rem;
+	max-width: 760px;
+	margin-inline: auto;
+}
+
+@media (max-width: 720px) {
+	.rk-app {
+		gap: 0.6rem;
+	}
+
+	.rk-pane {
+		padding: 0.7rem 0.8rem 0.65rem;
+	}
+
+	.rk-pane__tab {
+		margin-top: -0.65rem;
+	}
+
+	.rk-state__rows,
+	.rk-event__text {
+		font-size: 0.78rem;
+	}
+
+	.rk-state__rows > div {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+}
+
+.rk-app__main {
+	display: grid;
+	grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+	gap: 0.9rem;
+	align-items: stretch;
+}
+
+.rk-app__side {
+	display: grid;
+	gap: 0.9rem;
+	grid-template-rows: auto 1fr;
+}
+
+.rk-pane {
+	position: relative;
+	border: 1px solid var(--term-line);
+	border-radius: 2px;
+	background: var(--term-panel);
+	padding: 0.6rem 0.75rem 0.55rem;
+	min-width: 0;
+}
+
+.rk-pane__tab {
+	position: static;
+	display: table;
+	margin: -0.55rem auto 0.55rem;
+	padding: 0 0.5rem;
+	background: var(--term-panel);
+	color: var(--rk-teal);
+	font-size: 0.68rem;
+	letter-spacing: 0.05em;
+}
+
+/* search input row (SearchInput in the source) */
+.rk-search__field {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	min-height: 1.05em;
+	color: var(--term-dim);
+	font-size: 0.84rem;
+}
+
+.rk-search__input {
+	flex: 1;
+	min-width: 0;
+	border: 0;
+	background: transparent;
+	color: var(--term-ink);
+	font: inherit;
+	caret-color: #fca91c;
+	outline: none;
+}
+
+/* task rows */
+.rk-tasks__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 1px;
+	font-size: 0.84rem;
+}
+
+.rk-task {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0.14rem 0.5rem;
+	border-radius: 1px;
+	color: var(--term-ink);
+	cursor: default;
+}
+
+.rk-task__marker {
+	width: 1ch;
+	color: transparent;
+}
+
+.rk-task--done {
+	color: var(--term-dim);
+}
+
+.rk-task[aria-selected='true'] {
+	background: #46c2c7;
+	color: #04181a;
+}
+
+.rk-task[aria-selected='true'] .rk-task__marker {
+	color: #04181a;
+}
+
+.rk-task__box {
+	font-variant-numeric: tabular-nums;
+}
+
+.rk-tasks__empty {
+	padding: 1.4rem 0.5rem;
+	color: #fca91c;
+	font-size: 0.88rem;
+	text-align: center;
+}
+
+/* state / event panes */
+.rk-state__rows {
+	display: grid;
+	gap: 0.12rem;
+	font-size: 0.8rem;
+	color: var(--term-ink);
+	font-variant-numeric: tabular-nums;
+}
+
+.rk-state__rows span {
+	color: var(--term-dim);
+}
+
+.rk-event__text {
+	color: var(--term-ink);
+	font-size: 0.8rem;
+	line-height: 1.5;
+	min-height: 2.2em;
+}
+
+/* the caret: amber, blinking — the only repeating motion on the page */
+.rk-caret {
+	display: inline-block;
+	width: 0.55em;
+	height: 1.05em;
+	margin-left: 1px;
+	background: #fca91c;
+	vertical-align: text-bottom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.rk-caret {
+		animation: rk-blink 1.1s steps(1) infinite;
+	}
+}
+
+@keyframes rk-blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+/* confirm modal overlay (ConfirmModal in the source) */
+.rk-modal {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: grid;
+	place-items: center;
+	padding: 1rem;
+	background: rgba(3, 7, 8, 0.62);
+}
+
+.rk-modal[hidden] {
+	display: none;
+}
+
+.rk-modal__box {
+	display: grid;
+	gap: 0.55rem;
+	justify-items: center;
+	padding: 1.1rem 1.6rem 1.2rem;
+	border: 1px solid #fca91c;
+	border-radius: 2px;
+	background: var(--term-panel);
+	text-align: center;
+	min-width: min(320px, 100%);
+}
+
+.rk-modal__title {
+	color: #fca91c;
+	font-size: 0.95rem;
+	font-weight: 640;
+}
+
+.rk-modal__text {
+	color: var(--term-ink);
+	font-size: 0.86rem;
+}
+
+.rk-modal__btns {
+	display: flex;
+	gap: 0.6rem;
+	margin-top: 0.4rem;
+}
+
+.rk-modal__btn {
+	padding: 0.32rem 0.95rem;
+	border: 1px solid var(--term-line);
+	border-radius: 1px;
+	background: transparent;
+	color: var(--term-dim);
+	font: inherit;
+	font-size: 0.84rem;
+	cursor: pointer;
+}
+
+.rk-modal__btn[aria-selected='true'] {
+	border-color: #fca91c;
+	color: #fca91c;
+	font-weight: 640;
+}
+
+/* exited overlay */
+.rk-exit {
+	position: absolute;
+	inset: 0;
+	z-index: 4;
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: 0.5rem;
+	background: rgba(3, 7, 8, 0.82);
+	color: var(--term-dim);
+	font-size: 0.86rem;
+	text-align: center;
+}
+
+.rk-exit[hidden] {
+	display: none;
+}
+
+.rk-exit__title {
+	color: var(--term-ink);
+}
+
+.rk-exit kbd {
+	padding: 0.05rem 0.4rem;
+	border: 1px solid var(--term-line);
+	border-radius: 2px;
+	font: inherit;
+	font-size: 0.8rem;
+	color: var(--term-ink);
+}
+
+/* terminal status line */
+.rk-term__status {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 0.4rem 1rem;
+	padding: 0.4rem 0.9rem;
+	border-top: 1px solid rgba(70, 194, 199, 0.18);
+	color: var(--term-dim);
+	font-size: 0.74rem;
+	letter-spacing: 0.03em;
+}
+
+.rk-term__hint {
+	color: #fca91c;
+}
+
+/* ===== code windows (shiki Code component lives inside) ===== */
+.rk-code {
+	margin: 0;
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	background: var(--rk-panel);
+	overflow: hidden;
+}
+
+.rk-code .rk-pane__tab {
+	position: static;
+	display: table;
+	margin: 0.85rem auto 0;
+	padding: 0 0.5rem;
+	background: var(--rk-panel);
+	color: var(--rk-faint);
+}
+
+[data-theme='dark'] .rk-code {
+	background: #0a161a;
+}
+
+[data-theme='dark'] .rk-code .rk-pane__tab {
+	background: #0a161a;
+}
+
+.rk-code pre.astro-code {
+	margin: 0;
+	padding: 0.4rem 1rem 1rem;
+	background: transparent !important;
+	overflow-x: auto;
+}
+
+.rk-code pre.astro-code code {
+	font-family: var(--rk-font-mono);
+	font-size: 0.8rem;
+	line-height: 1.66;
+}
+
+[data-theme='dark'] .rk-code pre.astro-code,
+[data-theme='dark'] .rk-code pre.astro-code span {
+	color: var(--shiki-dark) !important;
+	font-style: var(--shiki-dark-font-style) !important;
+	font-weight: var(--shiki-dark-font-weight) !important;
+}
+
+/* ===== versus section ===== */
+.rk-versus__head {
+	display: grid;
+	gap: 0.9rem;
+	max-width: none;
+	padding: 1.9rem 1.4rem 0;
+}
+
+.rk-versus__grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1px;
+	margin: 1.4rem;
+	background: var(--rk-line);
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.rk-versus__grid > .rk-code {
+	border: 0;
+	border-radius: 0;
+	background: var(--rk-panel);
+}
+
+.rk-versus__grid > .rk-code pre.astro-code code {
+	font-size: 0.72rem;
+	line-height: 1.6;
+}
+
+.rk-versus__grid > .rk-code .rk-pane__tab {
+	background: var(--rk-panel);
+	margin-top: 0.85rem;
+}
+
+.rk-versus__note {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1.6rem;
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	font-size: 0.78rem;
+}
+
+.rk-versus__note b {
+	color: var(--rk-ink);
+	font-weight: 560;
+}
+
+/* run strip */
+.rk-run {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 1px;
+	margin: 0 1.4rem 1.4rem;
+	background: var(--rk-line);
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.rk-run__step {
+	display: grid;
+	gap: 0.5rem;
+	align-content: start;
+	padding: 1rem 1.1rem 1.1rem;
+	background: var(--rk-panel);
+}
+
+.rk-run__step .rk-step__label {
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	font-size: 0.74rem;
+	letter-spacing: 0.06em;
+}
+
+.rk-run__step .rk-step__cmd {
+	color: var(--rk-teal);
+	font-family: var(--rk-font-mono);
+	font-size: 0.86rem;
+	overflow-wrap: anywhere;
+}
+
+.rk-run__step p {
+	font-size: 0.88rem;
+	line-height: 1.55;
+	max-width: none;
+}
+
+/* ===== mechanism modules (density raise: collapsed hairline grid) ===== */
+.rk-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 1px;
+	background: var(--rk-line);
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.rk-module {
+	display: grid;
+	gap: 0.6rem;
+	align-content: start;
+	padding: 1.5rem 1.3rem 1.4rem;
+	background: var(--rk-panel);
+	min-height: 200px;
+}
+
+.rk-module__token {
+	color: var(--rk-teal);
+	font-family: var(--rk-font-mono);
+	font-size: 0.76rem;
+	letter-spacing: 0.05em;
+}
+
+.rk-module h3 {
+	font-size: 1.18rem;
+	font-weight: 580;
+	letter-spacing: -0.014em;
+}
+
+.rk-module p {
+	font-size: 0.92rem;
+	line-height: 1.62;
+	max-width: 38ch;
+}
+
+/* ===== input layers: the depth axis (dive raise) ===== */
+.rk-layers__grid {
+	display: grid;
+	grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+	gap: clamp(1.6rem, 3.5vw, 3rem);
+	align-items: start;
+}
+
+.rk-depth {
+	display: grid;
+	grid-template-columns: 2.2rem 1fr;
+	gap: 0.9rem;
+}
+
+.rk-depth__rail {
+	position: relative;
+	display: grid;
+}
+
+.rk-depth__rail::before {
+	content: '';
+	position: absolute;
+	left: 50%;
+	inset-block: 0.4rem;
+	width: 1px;
+	background: var(--rk-line-strong);
+}
+
+.rk-depth__ticks {
+	display: grid;
+	justify-items: center;
+	align-content: space-between;
+	position: relative;
+}
+
+.rk-depth__tick {
+	width: 0.72rem;
+	height: 0.72rem;
+	border: 1px solid var(--rk-line-strong);
+	border-radius: 1px;
+	background: var(--rk-bg);
+	transform: rotate(45deg);
+}
+
+.rk-depth__tick--active {
+	border-color: #fca91c;
+	background: #fca91c;
+	box-shadow: 0 0 0 4px rgba(252, 169, 27, 0.18);
+}
+
+.rk-depth__stack {
+	display: grid;
+	gap: 0.7rem;
+	align-content: start;
+}
+
+.rk-depth__layer {
+	display: grid;
+	gap: 0.3rem;
+	padding: 0.9rem 1rem;
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	background: var(--rk-panel);
+}
+
+.rk-depth__layer--active {
+	border-color: rgba(252, 169, 27, 0.6);
+	background: linear-gradient(
+		180deg,
+		rgba(252, 169, 27, 0.07),
+		transparent
+	);
+}
+
+.rk-depth__name {
+	color: var(--rk-ink);
+	font-family: var(--rk-font-mono);
+	font-size: 0.84rem;
+}
+
+.rk-depth__layer--active .rk-depth__name {
+	color: #fca91c;
+}
+
+.rk-depth__layer--active .rk-depth__name::after {
+	content: ' · active';
+}
+
+.rk-depth__desc {
+	color: var(--rk-dim);
+	font-size: 0.85rem;
+	line-height: 1.5;
+}
+
+.rk-depth__keys {
+	margin-top: 0.9rem;
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	font-size: 0.78rem;
+}
+
+.rk-depth__keys b {
+	color: #fca91c;
+	font-weight: 560;
+}
+
+.rk-layers__demo {
+	display: grid;
+	gap: 1rem;
+}
+
+.rk-layers__demo .rk-code pre.astro-code code {
+	font-size: 0.76rem;
+}
+
+/* ===== reactive ripple ===== */
+.rk-react__grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+	gap: clamp(1.6rem, 3.5vw, 3rem);
+	align-items: center;
+}
+
+.rk-tree {
+	display: grid;
+	gap: 0.9rem;
+	padding: 1.3rem 1.2rem 1.2rem;
+	font-family: var(--rk-font-mono);
+	font-size: 0.86rem;
+}
+
+.rk-tree__lines {
+	margin: 0;
+	padding: 1.1rem 1.1rem;
+	border: 1px solid var(--term-line);
+	border-radius: 2px;
+	background: var(--term-bg);
+	color: var(--term-ink);
+	line-height: 1.9;
+	white-space: pre;
+	overflow-x: auto;
+}
+
+.rk-tree__lines .rk-tree__root {
+	color: var(--rk-teal);
+}
+
+.rk-tree__lines b {
+	color: #fca91c;
+	font-weight: 640;
+	font-variant-numeric: tabular-nums;
+}
+
+.rk-tree__btn {
+	justify-self: start;
+}
+
+/* ===== component browser ===== */
+.rk-browser {
+	display: grid;
+	grid-template-columns: minmax(0, 0.42fr) minmax(0, 1.58fr);
+	gap: 1px;
+	background: var(--rk-line);
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.rk-browser__list {
+	display: flex;
+	flex-direction: column;
+	background: var(--rk-panel);
+	padding: 0.6rem 0;
+	max-height: 560px;
+	overflow-y: auto;
+}
+
+.rk-browser__item {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0.42rem 0.95rem;
+	border: 0;
+	background: transparent;
+	color: var(--rk-dim);
+	font-family: var(--rk-font-mono);
+	font-size: 0.82rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.rk-browser__item .rk-browser__mark {
+	color: transparent;
+	width: 1ch;
+	flex: none;
+}
+
+.rk-browser__item:hover {
+	color: var(--rk-ink);
+	background: var(--rk-panel2);
+}
+
+.rk-browser__item[aria-selected='true'] {
+	color: var(--rk-ink);
+	background: var(--rk-panel2);
+}
+
+.rk-browser__item[aria-selected='true'] .rk-browser__mark {
+	color: #fca91c;
+}
+
+.rk-browser__item .rk-browser__tag {
+	margin-left: auto;
+	color: var(--rk-faint);
+	font-size: 0.68rem;
+	letter-spacing: 0.04em;
+}
+
+.rk-browser__stage {
+	background: var(--rk-panel);
+	min-width: 0;
+}
+
+.rk-browser__panel {
+	display: none;
+	grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+	gap: 1rem;
+	padding: 1.3rem 1.2rem 1.4rem;
+	align-items: start;
+}
+
+.rk-browser__panel.is-active {
+	display: grid;
+}
+
+.rk-browser__panel--single {
+	grid-template-columns: 1fr;
+}
+
+.rk-browser__head {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 0.4rem 1.4rem;
+}
+
+.rk-browser__desc {
+	max-width: 60ch;
+	font-size: 0.9rem;
+}
+
+.rk-browser__doclink {
+	white-space: nowrap;
+	font-size: 0.86rem;
+}
+
+.rk-browser__panel .rk-code {
+	align-self: stretch;
+}
+
+.rk-browser__panel .rk-code pre.astro-code code {
+	font-size: 0.74rem;
+}
+
+.rk-browser__gif {
+	margin: 0;
+	border: 1px solid var(--term-line);
+	border-radius: 2px;
+	background: var(--term-bg);
+	overflow: hidden;
+	display: grid;
+	grid-template-rows: auto 1fr;
+}
+
+.rk-browser__gif-bar {
+	padding: 0.4rem 0.8rem;
+	border-bottom: 1px solid rgba(70, 194, 199, 0.18);
+	color: var(--term-dim);
+	font-family: var(--rk-font-mono);
+	font-size: 0.72rem;
+	letter-spacing: 0.04em;
+}
+
+.rk-browser__gif img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-height: 220px;
+	object-fit: contain;
+	object-position: top;
+	background: #03080a;
+}
+
+/* ===== next / cta / status line ===== */
+.rk-path {
+	display: grid;
+}
+
+.rk-path__row {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: 1rem;
+	align-items: baseline;
+	padding: 1rem 0.4rem;
+	border-bottom: 1px solid var(--rk-line);
+	text-decoration: none;
+	transition: background 240ms var(--rk-ease);
+}
+
+.rk-path__row:first-child {
+	border-top: 1px solid var(--rk-line);
+}
+
+.rk-path__mark {
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	transition: color 240ms var(--rk-ease), transform 240ms var(--rk-ease);
+}
+
+.rk-path__title {
+	color: var(--rk-ink);
+	font-weight: 580;
+	letter-spacing: -0.012em;
+}
+
+.rk-path__text {
+	color: var(--rk-dim);
+	font-size: 0.9rem;
+	grid-column: 2;
+}
+
+.rk-path__go {
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	transition: color 240ms var(--rk-ease), transform 240ms var(--rk-ease);
+}
+
+.rk-path__row:hover {
+	background: var(--rk-panel);
+}
+
+.rk-path__row:hover .rk-path__mark,
+.rk-path__row:hover .rk-path__go {
+	color: #fca91c;
+}
+
+.rk-path__row:hover .rk-path__go {
+	transform: translateX(3px);
+}
+
+/* final CTA */
+.rk-cta {
+	display: grid;
+	gap: 1.4rem;
+	justify-items: start;
+	padding: clamp(1.8rem, 4vw, 3rem);
+}
+
+.rk-cta h2 {
+	font-size: clamp(1.9rem, 3.4vw, 2.8rem);
+}
+
+.rk-cta__install {
+	display: flex;
+	align-items: center;
+	gap: 0.9rem;
+	flex-wrap: wrap;
+}
+
+.rk-cta__cmd {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.7rem;
+	padding: 0.65rem 1rem;
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	background: #05090b;
+	color: var(--term-ink);
+	font-family: var(--rk-font-mono);
+	font-size: 0.86rem;
+}
+
+.rk-cta__cmd::before {
+	content: '$';
+	color: #fca91c;
+}
+
+.rk-cta__copy {
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	background: transparent;
+	color: var(--rk-dim);
+	font-family: var(--rk-font-mono);
+	font-size: 0.74rem;
+	padding: 0.4rem 0.7rem;
+	cursor: pointer;
+	transition:
+		color 240ms var(--rk-ease),
+		border-color 240ms var(--rk-ease);
+}
+
+.rk-cta__copy:hover {
+	color: var(--rk-ink);
+	border-color: var(--rk-line-strong);
+}
+
+.rk-cta__copy.is-copied {
+	color: #fca91c;
+	border-color: rgba(252, 169, 27, 0.5);
+}
+
+/* status line: the page ends the way a TUI app does */
+.rk-statusline {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 0.4rem 1rem;
+	margin-block-start: clamp(4rem, 8vw, 6rem);
+	padding: 0.7rem 0.9rem;
+	border: 1px solid var(--rk-line);
+	border-radius: 2px;
+	background: var(--rk-panel);
+	color: var(--rk-faint);
+	font-family: var(--rk-font-mono);
+	font-size: 0.74rem;
+	letter-spacing: 0.04em;
+}
+
+.rk-statusline b {
+	color: var(--rk-teal);
+	font-weight: 560;
+}
+
+.rk-statusline .rk-statusline__mode {
+	color: #fca91c;
+}
+
+.rk-statusline a {
+	text-decoration: none;
+	color: var(--rk-faint);
+}
+
+.rk-statusline a:hover {
+	color: var(--rk-ink);
+}
+
+/* ===== responsive ===== */
+@media (max-width: 980px) {
+	.rk-app__main {
+		grid-template-columns: 1fr;
+	}
+
+	.rk-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.rk-layers__grid,
+	.rk-react__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.rk-browser {
+		grid-template-columns: 1fr;
+	}
+
+	.rk-browser__list {
+		flex-direction: row;
+		overflow-x: auto;
+		overflow-y: hidden;
+		max-height: none;
+		padding: 0.4rem;
+		gap: 2px;
+	}
+
+	.rk-browser__item {
+		flex: none;
+		padding: 0.4rem 0.8rem;
+		border: 1px solid var(--rk-line);
+		border-radius: 2px;
+	}
+
+	.rk-browser__item .rk-browser__tag {
+		display: none;
+	}
+
+	.rk-browser__panel {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.rk-versus__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.rk-run {
+		grid-template-columns: 1fr;
+	}
+
+	.rk-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.rk-hero__actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.rk-term__app {
+		min-height: 0;
+	}
+
+	.rk-path__row {
+		grid-template-columns: auto 1fr;
+	}
+
+	.rk-path__go {
+		display: none;
+	}
+}
+
+/* ===== reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+	.rk-home *,
+	.rk-home *::before,
+	.rk-home *::after {
+		animation-duration: 1ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 1ms !important;
+		scroll-behavior: auto !important;
+	}
+}
