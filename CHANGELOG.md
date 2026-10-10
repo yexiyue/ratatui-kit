@@ -1,3 +1,22 @@
+## [0.11.0] - 2026-10-10
+
+### 🚀 Features
+
+- *(docs)* Rebuild site around the TUI-app visual world
+- *(pointer)* 鼠标/指针事件支持(冒泡分发、指针捕获、hover、Button)
+
+### 🐛 Bug Fixes
+
+- *(pointer)* Harden input handling and refresh docs branding
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.10.3 [skip ci]
+- *(input)* Add composed search filter example
+
+### ⚙️ Miscellaneous Tasks
+
+- *(openspec)* 同步 openspec 工作流技能与命令
 ## [0.10.3] - 2026-07-16
 
 ### 🐛 Bug Fixes
