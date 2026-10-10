@@ -8,7 +8,6 @@
 
 Build with components. Think in state. A Rust terminal UI framework built on Ratatui and Tokio.
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)
 [![crates.io](https://img.shields.io/crates/v/ratatui-kit?logo=rust&color=E43717)](https://crates.io/crates/ratatui-kit)
 [![Downloads](https://img.shields.io/crates/d/ratatui-kit?logo=rust)](https://crates.io/crates/ratatui-kit)
 [![docs.rs](https://img.shields.io/docsrs/ratatui-kit?logo=docsdotrs)](https://docs.rs/ratatui-kit)
@@ -268,7 +267,6 @@ The `textarea` feature is currently disabled during the Ratatui 0.30 migration b
 - [Built-in components](https://yexiyue.github.io/ratatui-kit/components/)
 - [Examples](https://yexiyue.github.io/ratatui-kit/examples/)
 - [Simplified Chinese docs](https://yexiyue.github.io/ratatui-kit/zh-cn/start/)
-- [DeepWiki](https://deepwiki.com/yexiyue/ratatui-kit)
 
 Selected runnable examples:
 

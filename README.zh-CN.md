@@ -8,7 +8,6 @@
 
 用 Rust 组件描述界面，用 Hooks 管理状态。构建于 Ratatui 与 Tokio 之上。
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)
 [![crates.io](https://img.shields.io/crates/v/ratatui-kit?logo=rust&color=E43717)](https://crates.io/crates/ratatui-kit)
 [![Downloads](https://img.shields.io/crates/d/ratatui-kit?logo=rust)](https://crates.io/crates/ratatui-kit)
 [![docs.rs](https://img.shields.io/docsrs/ratatui-kit?logo=docsdotrs)](https://docs.rs/ratatui-kit)
@@ -273,8 +272,6 @@ skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参�
 - [路由](https://yexiyue.github.io/ratatui-kit/zh-cn/core/routing/)
 - [内置组件](https://yexiyue.github.io/ratatui-kit/zh-cn/components/)
 - [示例](https://yexiyue.github.io/ratatui-kit/zh-cn/examples/)
-
-还有 [DeepWiki](https://deepwiki.com/yexiyue/ratatui-kit) 可对仓库直接提问。
 
 ### 精选示例
 
