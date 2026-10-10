@@ -4,6 +4,7 @@ use std::{fmt::Debug, io};
 
 mod cross_terminal;
 pub use cross_terminal::CrossTerminal;
+pub(crate) use cross_terminal::set_mouse_capture;
 
 pub trait TerminalImpl: Send {
     type Event: Clone + Debug;
@@ -16,6 +17,11 @@ pub trait TerminalImpl: Send {
     fn insert_before<F>(&mut self, height: u16, draw_fn: F) -> io::Result<()>
     where
         F: FnOnce(&mut Buffer);
+
+    // 惰性升级 any-motion 上报(悬停追踪所需)。默认 no-op;真实终端实现补开 1003h。
+    fn enable_any_motion(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 // 终端封装：纯 raw event source。
@@ -55,6 +61,11 @@ where
         F: FnOnce(&mut Buffer),
     {
         self.inner.insert_before(height, draw_fn)
+    }
+
+    // 惰性升级 any-motion 上报(悬停追踪所需),转发给底层终端实现。
+    pub fn enable_any_motion(&mut self) -> io::Result<()> {
+        self.inner.enable_any_motion()
     }
 
     // 异步等待下一个 raw 事件。`None` 表示事件流结束。

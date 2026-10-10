@@ -3,6 +3,7 @@ use std::{cell::Cell, rc::Rc};
 use crossterm::{event::Event, terminal};
 use ratatui::layout::Rect;
 
+use super::use_input::new_stamp_handle;
 use crate::{
     Hook, State, SystemContext, UseState,
     input::{EventOptions, EventPriority, EventResult},
@@ -58,7 +59,8 @@ impl Hook for UseTerminalSizeImpl {
             None,
             EventPriority::Normal,
             EventOptions::default(),
-            Rc::new(Cell::new(Rect::default())),
+            new_stamp_handle(),
+            None,
             Box::new(move |event| {
                 if let Event::Resize(width, height) = event {
                     size.set((width, height));

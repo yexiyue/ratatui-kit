@@ -209,6 +209,20 @@ layer handlers. Return `Consumed` when the global action owns the key.
 
 ---
 
+### 1.6 Pointer (mouse) delivery semantics
+
+Enable at the app entry — `element!(App).fullscreen_with(RunOptions { mouse: true, ..Default::default() })` — which executes `EnableMouseCapture` (restored on exit). Without it, pointer hooks panic in debug builds with a hint and never fire in release.
+
+Delivery order for `Event::Mouse` (see `src/input/mod.rs` `dispatch`):
+
+1. **Capture routing**: when a hit-tested pointer handler consumed a `Down(button)`, that button's subsequent `Drag`/`Up` are delivered **exclusively** to the captor, bypassing hit-testing and ordering (dragging outside the area still delivers; `Up` releases; component unmount releases automatically; buttons are independent).
+2. **Global phase**: `layer=None` handlers as usual.
+3. **Layer phase, bubble order**: `(layer z desc, priority desc, draw_seq desc, order asc)` — the `draw_seq` tie-break is mouse-only and means innermost / later-drawn (visually on top) receives first; `Ignored` propagates to ancestors/lower layers, `Consumed` truncates. Keyboard events keep `(z, priority, order)`.
+
+Hit-testing: last-frame rect stamped together with the frame number in `pre_component_draw`; a stamp whose frame ≠ current frame (component not drawn this frame) never hits. Hover state is centrally diffed on `Moved` events; enter/leave changes re-render, plain inside-moves don't (`dispatch` returns `needs_repaint=false` and the loop skips the render).
+
+The flagship composition — scrim-click-to-dismiss: register a `Layer(layer)` handler with `hit_test: false` that closes on any left `Down`; buttons inside the modal consume their clicks first (bubble order), so only unconsumed clicks (scrim / panel blank) reach it. See `examples/input/mouse.rs`.
+
 ## 2. State: `use_state` (local) vs `Atom`/`use_atom` (global, `atom` feature)
 
 Both are backed by `ReactiveHandle<T, N>` (`src/reactive_handle.rs`), both are `Copy`, and both wake the render loop on write.

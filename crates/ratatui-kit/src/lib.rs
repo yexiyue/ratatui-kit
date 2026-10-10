@@ -9,6 +9,8 @@ mod element;
 mod handler;
 mod hooks;
 mod input;
+#[cfg(test)]
+mod mouse_test;
 mod multimap;
 mod props;
 mod reactive_handle;

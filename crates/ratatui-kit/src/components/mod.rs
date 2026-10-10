@@ -14,6 +14,8 @@ pub use border::*;
 pub mod modal;
 pub use modal::*;
 // 确认弹窗组件，封装独占输入层与确认/取消键位。
+pub mod button;
+pub use button::*;
 pub mod confirm_modal;
 pub use confirm_modal::*;
 // 提示弹窗组件，封装独占输入层与关闭键位。

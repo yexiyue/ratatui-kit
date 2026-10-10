@@ -1,28 +1,34 @@
 use super::TerminalImpl;
-use crossterm::event::{self, EventStream};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, EventStream},
+    execute,
+};
 use futures::{StreamExt, stream::BoxStream};
 use ratatui::{Frame, TerminalOptions};
-use std::io::{self};
+use std::io::{self, Write};
 
 // ================== 终端核心功能实现 ==================
 
 // 跨平台终端结构体
-// input_is_terminal: 标记标准输入是否为终端设备
-// dest: 标准输出流（用于终端操作）
-// raw_mode_enabled: 原始模式启用状态
-// enabled_keyboard_enhancement: 键盘增强功能状态
-// fullscreen: 是否启用全屏模式
 pub struct CrossTerminal {
     terminal: ratatui::DefaultTerminal,
 }
 
 impl CrossTerminal {
     // 创建终端实例
-    // fullscreen: 是否启用备用屏幕（全屏模式）
     pub fn new() -> io::Result<Self> {
         Ok(Self {
             terminal: ratatui::init(),
         })
+    }
+
+    // 创建终端实例;`mouse: true` 时额外执行鼠标捕获(指针事件投递的前提)。
+    pub fn new_with_mouse(mouse: bool) -> io::Result<Self> {
+        let this = Self::new()?;
+        if mouse {
+            set_mouse_capture(true)?;
+        }
+        Ok(this)
     }
 
     // 启用/禁用原始模式
@@ -30,6 +36,24 @@ impl CrossTerminal {
         Ok(Self {
             terminal: ratatui::init_with_options(options),
         })
+    }
+
+    // 自定义 Viewport 创建终端;`mouse: true` 时额外执行鼠标捕获。
+    pub fn with_options_and_mouse(options: TerminalOptions, mouse: bool) -> io::Result<Self> {
+        let this = Self::with_options(options)?;
+        if mouse {
+            set_mouse_capture(true)?;
+        }
+        Ok(this)
+    }
+}
+
+// 执行/解除终端鼠标捕获。退出恢复由 `RestoreGuard` 经 `set_mouse_capture(false)` 完成。
+pub(crate) fn set_mouse_capture(enabled: bool) -> io::Result<()> {
+    if enabled {
+        execute!(io::stdout(), EnableMouseCapture)
+    } else {
+        execute!(io::stdout(), DisableMouseCapture)
     }
 }
 
@@ -83,5 +107,14 @@ impl TerminalImpl for CrossTerminal {
     {
         self.terminal.insert_before(height, draw_fn)?;
         Ok(())
+    }
+
+    // 惰性升级为 any-motion 上报(1003h):悬停追踪需要「无按键移动」事件。
+    // crossterm 的 EnableMouseCapture 默认只开 1002h(按键拖动期间上报移动),
+    // 1003h 由本框架在存在 hover/Move 追踪注册时按需补开,只升不降。
+    fn enable_any_motion(&mut self) -> io::Result<()> {
+        let mut out = io::stdout();
+        out.write_all(b"\x1b[?1003h")?;
+        out.flush()
     }
 }

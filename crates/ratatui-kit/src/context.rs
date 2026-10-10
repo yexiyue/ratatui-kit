@@ -159,16 +159,20 @@ impl<'a> ContextStack<'a> {
 pub struct SystemContext {
     should_exit: bool,
     auto_quit_on_ctrl_c: bool,
+    // 终端鼠标捕获是否启用(经 `RunOptions::mouse` 贯穿)。指针 handler 注册时
+    // 据此断言提示,避免「挂了 Button 却收不到点击」的哑坑。
+    mouse_enabled: bool,
     // 中央输入事件运行时。组件经 `get_context_mut::<SystemContext>().input` 登记层/handler,
     // 渲染循环经 `system_context.input.dispatch(event)` 分发。运行时单线程,无需 Send + Sync。
     pub(crate) input: crate::input::InputRuntime,
 }
 
 impl SystemContext {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new_with_mouse(mouse_enabled: bool) -> Self {
         Self {
             should_exit: false,
             auto_quit_on_ctrl_c: true,
+            mouse_enabled,
             input: crate::input::InputRuntime::default(),
         }
     }
@@ -191,5 +195,10 @@ impl SystemContext {
 
     pub(crate) fn auto_quit_on_ctrl_c(&self) -> bool {
         self.auto_quit_on_ctrl_c
+    }
+
+    // 终端鼠标捕获是否启用(见 [`crate::RunOptions::mouse`])。
+    pub(crate) fn mouse_enabled(&self) -> bool {
+        self.mouse_enabled
     }
 }

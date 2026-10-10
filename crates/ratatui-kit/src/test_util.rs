@@ -64,7 +64,7 @@ pub fn render_frames(
 ) -> Buffer {
     let mut el = el.into();
     let helper = el.helper();
-    let mut tree = Tree::new(el.props_mut(), helper);
+    let mut tree = Tree::new_with_mouse(el.props_mut(), helper, false);
 
     let mut noop = NoopTerminal;
     let mut terminal = ratatui::Terminal::new(TestBackend::new(width, height)).unwrap();

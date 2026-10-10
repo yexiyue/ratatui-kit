@@ -11,12 +11,13 @@
 use std::{cell::Cell, rc::Rc};
 
 use crossterm::event::Event;
-use ratatui::layout::Rect;
 
 use super::{Hook, Hooks};
 use crate::{
     SystemContext, UseContext,
-    input::{CurrentLayer, EventOptions, EventPriority, EventResult, EventScope, InputLayer},
+    input::{
+        CurrentLayer, EventOptions, EventPriority, EventResult, EventScope, InputLayer, Stamp,
+    },
 };
 
 mod private {
@@ -63,16 +64,22 @@ impl UseInputLayer for Hooks<'_, '_> {
     }
 }
 
-// `use_event_handler` 的 hook：跨帧持有 `Rc<Cell<Rect>>`,在 `pre_component_draw` 回填**上一帧** area
-// 供鼠标 `hit_test`。闭包本身不跨帧保存（每帧经 `register_handler` 移交 `InputRuntime`,下帧重建)。
+// `use_event_handler` 的 hook：跨帧持有 `Rc<Cell<Stamp>>`,在 `pre_component_draw` 回填**上一帧**
+// 绘制快照(区域 + 帧号 + 绘制序)供鼠标 `hit_test` 与冒泡排序。闭包本身不跨帧保存
+// （每帧经 `register_handler` 移交 `InputRuntime`,下帧重建)。
 struct UseEventHandlerImpl {
-    area: Rc<Cell<Rect>>,
+    stamp: Rc<Cell<Stamp>>,
 }
 
 impl Hook for UseEventHandlerImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.area.set(drawer.area);
+        self.stamp.set(crate::input::draw_clock_stamp(drawer.area));
     }
+}
+
+// 生成一个「本帧尚未绘制」的 stamp 句柄(帧号 0,当前帧必不匹配 → 不会误命中)。
+pub(crate) fn new_stamp_handle() -> Rc<Cell<Stamp>> {
+    Rc::new(Cell::new(Stamp::default()))
 }
 
 impl UseEventHandler for Hooks<'_, '_> {
@@ -92,12 +99,12 @@ impl UseEventHandler for Hooks<'_, '_> {
     ) where
         F: FnMut(Event) -> EventResult + 'static,
     {
-        // area 共享句柄:跨帧持有(use_hook),交给本帧的 HandlerEntry,pre_component_draw 回填。
-        let area = {
+        // stamp 共享句柄:跨帧持有(use_hook),交给本帧的 HandlerEntry,pre_component_draw 回填。
+        let stamp = {
             let hook = self.use_hook(|| UseEventHandlerImpl {
-                area: Rc::new(Cell::new(Rect::default())),
+                stamp: new_stamp_handle(),
             });
-            hook.area.clone()
+            hook.stamp.clone()
         };
 
         // 归属解析:Global → 无层;Layer(h) → 显式层;Current → context 最近 CurrentLayer,无则 root 层。
@@ -116,6 +123,6 @@ impl UseEventHandler for Hooks<'_, '_> {
         // 当帧登记 handler,守卫即用即弃。
         let mut sys = self.use_context_mut::<SystemContext>();
         sys.input
-            .register_handler(layer, priority, options, area, Box::new(f));
+            .register_handler(layer, priority, options, stamp, None, Box::new(f));
     }
 }

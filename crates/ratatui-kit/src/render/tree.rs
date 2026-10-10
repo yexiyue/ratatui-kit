@@ -8,17 +8,24 @@ use crate::{
     ElementKey,
     component::{ComponentHelperExt, InstantiatedComponent},
     context::{ContextStack, SystemContext},
-    element::ElementRepr,
+    element::{ElementRepr, RunOptions},
     props::AnyProps,
     terminal::{CrossTerminal, Terminal, TerminalImpl, UpdaterTerminal},
 };
 
 use super::ComponentDrawer;
 
-struct RestoreGuard;
+// 退出时恢复终端状态:启用过鼠标捕获则先解除捕获,再走 ratatui 的常规恢复。
+// 解除失败(如 stdout 已不可用)不阻断后续 restore,仅忽略错误。
+struct RestoreGuard {
+    mouse: bool,
+}
 
 impl Drop for RestoreGuard {
     fn drop(&mut self) {
+        if self.mouse {
+            let _ = crate::terminal::set_mouse_capture(false);
+        }
         ratatui::restore();
     }
 }
@@ -35,7 +42,11 @@ pub struct Tree<'a> {
 }
 
 impl<'a> Tree<'a> {
-    pub(crate) fn new(mut props: AnyProps<'a>, helper: Box<dyn ComponentHelperExt>) -> Self {
+    pub(crate) fn new_with_mouse(
+        mut props: AnyProps<'a>,
+        helper: Box<dyn ComponentHelperExt>,
+        mouse: bool,
+    ) -> Self {
         Tree {
             root_component: InstantiatedComponent::new(
                 ElementKey::user("_root_tree_"),
@@ -43,7 +54,7 @@ impl<'a> Tree<'a> {
                 helper,
             ),
             props,
-            system_context: SystemContext::new(),
+            system_context: SystemContext::new_with_mouse(mouse),
         }
     }
 
@@ -63,7 +74,16 @@ impl<'a> Tree<'a> {
         self.root_component.draw(drawer);
     }
 
-    fn render(&mut self, terminal: &mut Terminal) -> io::Result<()> {
+    // 测试专用:驱动事件分发(mouse_test harness)。
+    #[cfg(test)]
+    pub(crate) fn system_context_mut(&mut self) -> &mut SystemContext {
+        &mut self.system_context
+    }
+
+    fn render<T: TerminalImpl<Event = crossterm::event::Event>>(
+        &mut self,
+        terminal: &mut Terminal<T>,
+    ) -> io::Result<()> {
         self.update_once(terminal);
 
         terminal.draw(|frame| {
@@ -75,9 +95,24 @@ impl<'a> Tree<'a> {
         Ok(())
     }
 
-    async fn render_loop(&mut self, terminal: &mut Terminal) -> io::Result<()> {
+    async fn render_loop<T: TerminalImpl<Event = crossterm::event::Event>>(
+        &mut self,
+        terminal: &mut Terminal<T>,
+    ) -> io::Result<()> {
+        let mut skip_render = false;
         loop {
-            self.render(terminal)?;
+            // 惰性升级 any-motion 上报:存在 hover/Move 追踪注册时补开 1003h(只升不降)。
+            // 门控 mouse_enabled:未启用捕获时不得改动终端模式(行为与现状完全一致)。
+            if self.system_context.mouse_enabled()
+                && self.system_context.input.needs_any_motion_upgrade()
+            {
+                terminal.enable_any_motion()?;
+                self.system_context.input.mark_any_motion_enabled();
+            }
+            if !skip_render {
+                self.render(terminal)?;
+            }
+            skip_render = false;
             if self.system_context.should_exit() {
                 break;
             }
@@ -94,9 +129,14 @@ impl<'a> Tree<'a> {
                     if should_quit_on_ctrl_c(&self.system_context, &event) {
                         break;
                     }
-                    self.system_context.input.dispatch(event);
-                    // dispatch 后无条件 continue:纯副作用/退出型 handler 不写 State 不唤醒,
-                    // 仍需回到循环顶 render + 复查 should_exit,否则会在 select 永久阻塞。
+                    let repaint = self.system_context.input.dispatch(event);
+                    if repaint || self.system_context.should_exit() {
+                        continue;
+                    }
+                    // Moved 无消费且 hover 无变化:跳过本轮重绘直接回 select。
+                    // handler 若写 State,`root_component.wait()` 的 waker 会立即拉起重绘,
+                    // 不依赖每事件无条件重绘(observer 型 handler 不得产生副作用的契约由此强化)。
+                    skip_render = true;
                     continue;
                 }
                 // 事件流结束。
@@ -110,10 +150,11 @@ impl<'a> Tree<'a> {
 pub(crate) async fn render_loop<E: ElementRepr>(
     mut element: E,
     mut terminal: Terminal,
+    run: RunOptions,
 ) -> io::Result<()> {
     let helper = element.helper();
-    let mut tree = Tree::new(element.props_mut(), helper);
-    let _restore_guard = RestoreGuard;
+    let mut tree = Tree::new_with_mouse(element.props_mut(), helper, run.mouse);
+    let _restore_guard = RestoreGuard { mouse: run.mouse };
 
     tree.render_loop(&mut terminal).await
 }
@@ -130,14 +171,14 @@ mod tests {
     #[test]
     fn ctrl_c_quits_by_default() {
         assert!(should_quit_on_ctrl_c(
-            &SystemContext::new(),
+            &SystemContext::new_with_mouse(false),
             &ctrl_c_event()
         ));
     }
 
     #[test]
     fn ctrl_c_is_dispatched_when_auto_quit_is_disabled() {
-        let mut system_context = SystemContext::new();
+        let mut system_context = SystemContext::new_with_mouse(false);
         system_context.set_auto_quit_on_ctrl_c(false);
 
         assert!(!should_quit_on_ctrl_c(&system_context, &ctrl_c_event()));
@@ -147,6 +188,137 @@ mod tests {
     fn regular_key_does_not_quit() {
         let event = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE));
 
-        assert!(!should_quit_on_ctrl_c(&SystemContext::new(), &event));
+        assert!(!should_quit_on_ctrl_c(
+            &SystemContext::new_with_mouse(false),
+            &event
+        ));
+    }
+    // ---- 渲染循环级测试:脚本化终端按序吐事件,统计 draw 次数 ----
+
+    use crate::{
+        AnyElement, Hooks, UseEventHandler,
+        components::Text,
+        input::{EventOptions, EventPriority, EventResult, EventScope},
+        terminal::TerminalImpl,
+    };
+    use crossterm::event::{MouseEvent, MouseEventKind};
+    use futures::{StreamExt, stream::BoxStream};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    struct ScriptedTerminal {
+        events: Vec<Event>,
+        draws: Arc<AtomicUsize>,
+    }
+
+    impl TerminalImpl for ScriptedTerminal {
+        type Event = Event;
+
+        fn event_stream(&mut self) -> io::Result<BoxStream<'static, Self::Event>> {
+            Ok(futures::stream::iter(std::mem::take(&mut self.events)).boxed())
+        }
+
+        fn received_ctrl_c(event: Self::Event) -> bool {
+            CrossTerminal::received_ctrl_c(event)
+        }
+
+        fn draw<F>(&mut self, _f: F) -> io::Result<()>
+        where
+            F: FnOnce(&mut ratatui::Frame),
+        {
+            self.draws.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+
+        fn insert_before<F>(&mut self, _height: u16, _draw_fn: F) -> io::Result<()>
+        where
+            F: FnOnce(&mut ratatui::buffer::Buffer),
+        {
+            Ok(())
+        }
+    }
+
+    fn moved(col: u16, row: u16) -> Event {
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: col,
+            row,
+            modifiers: KeyModifiers::NONE,
+        })
+    }
+
+    // 消费 Moved 的组件:每个 Moved 都应触发一次重绘。
+    #[crate::component]
+    fn ConsumeMoved(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        hooks.use_event_handler_with_options(
+            EventScope::Current,
+            EventPriority::Normal,
+            EventOptions { hit_test: false },
+            |event| {
+                if matches!(
+                    event,
+                    Event::Mouse(crossterm::event::MouseEvent {
+                        kind: MouseEventKind::Moved,
+                        ..
+                    })
+                ) {
+                    EventResult::Consumed
+                } else {
+                    EventResult::Ignored
+                }
+            },
+        );
+        crate::element!(Text(text: "x"))
+    }
+
+    #[tokio::test]
+    async fn moved_without_consumer_skips_re_render() {
+        let draws = Arc::new(AtomicUsize::new(0));
+        let mut terminal = Terminal::new(ScriptedTerminal {
+            events: vec![moved(1, 1), moved(2, 2), ctrl_c_event()],
+            draws: draws.clone(),
+        })
+        .unwrap();
+
+        let mut el = crate::element!(Text(text: "x"));
+        let helper = el.helper();
+        let mut tree = Tree::new_with_mouse(el.props_mut(), helper, false);
+        tree.render_loop(&mut terminal).await.unwrap();
+
+        // 无人消费、无 hover 变化的 Moved 不触发重绘:只有初始帧画了一次。
+        assert_eq!(draws.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn moved_with_consumer_re_renders() {
+        let draws = Arc::new(AtomicUsize::new(0));
+        let mut terminal = Terminal::new(ScriptedTerminal {
+            events: vec![moved(1, 1), moved(2, 2), ctrl_c_event()],
+            draws: draws.clone(),
+        })
+        .unwrap();
+
+        let mut el = crate::element!(ConsumeMoved);
+        let helper = el.helper();
+        let mut tree = Tree::new_with_mouse(el.props_mut(), helper, false);
+        tree.render_loop(&mut terminal).await.unwrap();
+
+        // 初始帧 + 两个被消费的 Moved 各一次重绘。
+        assert_eq!(draws.load(Ordering::Relaxed), 3);
+    }
+
+    #[test]
+    fn run_options_default_disables_mouse() {
+        assert!(!crate::RunOptions::default().mouse);
+    }
+
+    #[test]
+    fn tree_with_mouse_configures_system_context() {
+        let mut el = crate::element!(Text(text: "x"));
+        let helper = el.helper();
+        let tree = Tree::new_with_mouse(el.props_mut(), helper, true);
+        assert!(tree.system_context.mouse_enabled());
     }
 }

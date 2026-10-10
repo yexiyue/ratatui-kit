@@ -55,6 +55,10 @@ name = "search_filter"
 path = "examples/input/search_filter.rs"
 
 [[example]]
+name = "mouse"
+path = "examples/input/mouse.rs"
+
+[[example]]
 name = "input"
 path = "examples/components/input.rs"
 
