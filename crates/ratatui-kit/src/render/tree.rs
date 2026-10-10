@@ -101,6 +101,10 @@ impl<'a> Tree<'a> {
     ) -> io::Result<()> {
         let mut skip_render = false;
         loop {
+            if !skip_render {
+                self.render(terminal)?;
+            }
+            // 首帧 update 完成后再检查注册,确保无需额外键盘/鼠标事件就能开始 hover。
             // 惰性升级 any-motion 上报:存在 hover/Move 追踪注册时补开 1003h(只升不降)。
             // 门控 mouse_enabled:未启用捕获时不得改动终端模式(行为与现状完全一致)。
             if self.system_context.mouse_enabled()
@@ -108,9 +112,6 @@ impl<'a> Tree<'a> {
             {
                 terminal.enable_any_motion()?;
                 self.system_context.input.mark_any_motion_enabled();
-            }
-            if !skip_render {
-                self.render(terminal)?;
             }
             skip_render = false;
             if self.system_context.should_exit() {
@@ -211,6 +212,7 @@ mod tests {
     struct ScriptedTerminal {
         events: Vec<Event>,
         draws: Arc<AtomicUsize>,
+        motion_upgrades: Arc<AtomicUsize>,
     }
 
     impl TerminalImpl for ScriptedTerminal {
@@ -222,6 +224,11 @@ mod tests {
 
         fn received_ctrl_c(event: Self::Event) -> bool {
             CrossTerminal::received_ctrl_c(event)
+        }
+
+        fn enable_any_motion(&mut self) -> io::Result<()> {
+            self.motion_upgrades.fetch_add(1, Ordering::Relaxed);
+            Ok(())
         }
 
         fn draw<F>(&mut self, _f: F) -> io::Result<()>
@@ -279,6 +286,7 @@ mod tests {
         let mut terminal = Terminal::new(ScriptedTerminal {
             events: vec![moved(1, 1), moved(2, 2), ctrl_c_event()],
             draws: draws.clone(),
+            motion_upgrades: Arc::default(),
         })
         .unwrap();
 
@@ -297,6 +305,7 @@ mod tests {
         let mut terminal = Terminal::new(ScriptedTerminal {
             events: vec![moved(1, 1), moved(2, 2), ctrl_c_event()],
             draws: draws.clone(),
+            motion_upgrades: Arc::default(),
         })
         .unwrap();
 
@@ -312,6 +321,29 @@ mod tests {
     #[test]
     fn run_options_default_disables_mouse() {
         assert!(!crate::RunOptions::default().mouse);
+    }
+
+    #[crate::component]
+    fn HoverOnMount(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        use crate::UseHover;
+        let _ = hooks.use_hover();
+        crate::element!(Text(text: "hover"))
+    }
+
+    #[tokio::test]
+    async fn hover_on_mount_enables_motion_before_first_event() {
+        let motion_upgrades = Arc::new(AtomicUsize::new(0));
+        let mut terminal = Terminal::new(ScriptedTerminal {
+            events: vec![ctrl_c_event()],
+            draws: Arc::default(),
+            motion_upgrades: motion_upgrades.clone(),
+        })
+        .unwrap();
+        let mut el = crate::element!(HoverOnMount);
+        let helper = el.helper();
+        let mut tree = Tree::new_with_mouse(el.props_mut(), helper, true);
+        tree.render_loop(&mut terminal).await.unwrap();
+        assert_eq!(motion_upgrades.load(Ordering::Relaxed), 1);
     }
 
     #[test]

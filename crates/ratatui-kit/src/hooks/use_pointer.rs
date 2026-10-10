@@ -79,8 +79,14 @@ pub struct PointerEvent {
 
 /// 按键集合过滤(位标志式组合,如 `MouseButtons::LEFT.union(MouseButtons::RIGHT)`)。
 /// 默认仅左键。
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MouseButtons(u8);
+
+impl Default for MouseButtons {
+    fn default() -> Self {
+        Self::LEFT
+    }
+}
 
 impl MouseButtons {
     /// 左键(默认值)。
@@ -389,9 +395,10 @@ impl UseHover for Hooks<'_, '_> {
             .use_hook(UseHoverImpl::new_pointer_hook)
             .as_base()
             .identity();
+        let layer = current_layer_id(self);
         let mut sys = self.use_context_mut::<SystemContext>();
         debug_assert_mouse_enabled(&sys);
-        sys.input.track_hover(token, stamp);
+        sys.input.track_hover(layer, token, stamp);
         sys.input.hover_contains(token)
     }
 }
@@ -899,6 +906,20 @@ mod tests {
     }
 
     // 按键过滤:默认 LEFT,右键 Down 不投递
+    #[test]
+    fn pointer_default_options_receive_left_click_only() {
+        let log = SharedLog(TestLog::default());
+        let mut m = Mounted::mount(crate::element!(PointerArea(log: log.clone())), true);
+        m.dispatch(MouseEventKind::Down(MouseButton::Right), 2, 1);
+        m.dispatch(MouseEventKind::Up(MouseButton::Right), 2, 1);
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), 2, 1);
+        m.dispatch(MouseEventKind::Up(MouseButton::Left), 2, 1);
+        assert_eq!(
+            *log.0.borrow(),
+            log_of(&["Down(Left)", "Up(Left)", "Click { button: Left, count: 1 }"])
+        );
+    }
+
     #[test]
     fn pointer_buttons_filter() {
         let log = SharedLog(TestLog::default());

@@ -33,14 +33,15 @@
 
 ```text
 loop {
-  render();
+  if !skip_render { render(); }
+  if mouse && motion_requested { enable_any_motion(); }
   if should_exit break;
   select(component.wait(), terminal.next_event()).await;
   if event { auto_quit && ctrl_c ? break : input.dispatch(event); continue; }
 }
 ```
 
-`render()` 先自顶向下 `update`（跑组件函数体、跑 hooks、协调子树），再 `terminal.draw` 自顶向下 `draw`。然后 `select` 在「组件树有变化」与「终端有事件」之间阻塞，任一就绪即重渲染。
+`render()` 先自顶向下 `update`（跑组件函数体、跑 hooks、协调子树），再 `terminal.draw` 自顶向下 `draw`。然后 `select` 在「组件树有变化」与「终端有事件」之间阻塞。普通事件后重绘；无人消费且 hover 集合不变的 `Moved` 可跳过重绘，继续等待事件或状态唤醒。
 
 「组件树有变化」由 `poll_change` 聚合：组件 / 子节点 / hooks 三路任一 `Ready` 即唤醒。响应式状态（`use_state` 的 `State<T>`、全局 `AtomState<T>`，均基于 `generational-box`）在写入时唤醒存好的 `Waker`，打破 `select` 阻塞触发下一帧。
 
@@ -115,11 +116,22 @@ loop {
 事件系统从「广播订阅」(每个 `use_events` 各自订阅、所有 handler 平等收到同一事件)重写为「单 raw 源 + 中央 `InputRuntime` 分发」(`input/mod.rs`)。`Terminal` 退化为纯 raw source（`next_event`,删 `events()`/`wait()`/订阅者)；`render_loop`（`tree.rs`)取一个事件 → Ctrl+C 且 `SystemContext::auto_quit_on_ctrl_c()` 为真时直接退出 → 否则 `system_context.input.dispatch(event)`。应用层需自定义 Ctrl+C 时，每帧通过 `set_auto_quit_on_ctrl_c(false)` 关闭默认退出，并用 Global handler 优先处理该事件。
 
 **正确做法**：理解三个不变量——
-- **每帧重建**：`update_once` 开头 `input.begin_frame()` 清空层/handler 并铸造 root 层,组件 update 期间经 `use_input_layer`/`use_event_handler` 重新登记。无跨帧持久状态 → 关闭的弹窗/卸载的组件下一帧自动退出,无泄漏、无 id 串号。`begin_frame` 必须在 `ContextStack::root` 借走 `&mut system_context` **之前**调。
+- **每帧重建注册表**：`update_once` 开头 `input.begin_frame()` 清空层/handler 并铸造 root 层,组件 update 期间经 `use_input_layer`/`use_event_handler` 重新登记。捕获 token、hover 集合与移动模式请求跨帧保留；层/handler 不跨帧复用，关闭的弹窗/卸载的组件下一帧自动退出。`begin_frame` 必须在 `ContextStack::root` 借走 `&mut system_context` **之前**调。
 - **dispatch 在非借用期**：发生在 render（update+draw)完整返回后,此时 `ContextStack` 已 drop,闭包写 `State` 经 `try_write` 必成功 + Drop 唤醒 waker。事件分发与重绘解耦：重绘唤醒仍走 `use_state` 的 `poll_change`(与事件无关),故把 handler 从 poll_change 抽到中央分发器不破坏重绘。
-- **dispatch 后无条件 continue**：复查 `should_exit`;纯副作用/退出型 handler 不写 State 不唤醒,否则 `select` 永久阻塞、exit 失效。退出经 `State<bool>` + `use_exit`(闭包 'static,捕获不到 `SystemContext`)。
+- **dispatch 后 continue 并决定是否重绘**：复查 `should_exit`;未消费且 hover 不变的 Moved 才跳过重绘。退出经 `State<bool>` + `use_exit`(闭包 'static,捕获不到 `SystemContext`)。
 
-**分层有序投递**：从层栈顶遇首个 `blocks_lower` 截断求活跃集;Phase 1 跑 `Global`(可 `Consumed` 截断、`Resize` 返 `Ignored` 不截断),Phase 2 层内按 `(z-order desc, priority desc, order asc)`——**z-order 第一键、不跨层比 priority**(否则下层 high 抢消费上层浮层)。
+**分层有序投递**：从层栈顶遇首个 `blocks_lower` 截断求活跃集；先更新 hover 集合，已有捕获的 Drag/Up 独占直送。其余事件 Phase 1 跑 `Global`(可 `Consumed` 截断、`Resize` 返 `Ignored` 不截断),Phase 2 层内按 `(z-order desc, priority desc, order asc)`；鼠标在 priority 后增加 `draw_seq desc` 再 `order asc`，键盘排序不变——**z-order 第一键、不跨层比 priority**(否则下层 high 抢消费上层浮层)。
+
+### 鼠标模式在首帧登记后升级
+
+crossterm 0.29 的 `EnableMouseCapture` 本身包含 `1003h`，不能用于按需开启 any-motion 的初始化。框架初始 Command 仅请求按压/拖动及坐标编码模式，再由 hover/track_move 请求启用 `1003h`。
+
+**正确做法**：
+- update/draw 后、首次等待输入前检查移动模式请求，否则首帧 hover 需要额外事件才能开始。
+- 初始捕获与退出恢复配对；Windows native fallback 委托 crossterm，ANSI 路径使用受控序列。
+- 序列测试验证初始化不包含 `1003h`，循环测试验证首次事件前完成升级。
+
+**相关文件**：`crates/ratatui-kit/src/terminal/cross_terminal.rs`、`crates/ratatui-kit/src/render/tree.rs`
 
 **不要做**：恢复 `Terminal` 的 `events()`/`wait()` 广播;在 update/draw 借用期 dispatch;把 z-order 排在 priority 之后。
 

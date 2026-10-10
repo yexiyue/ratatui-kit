@@ -1,40 +1,158 @@
 ---
-import { Code } from 'astro:components';
-import { RK_VERSION } from '../consts';
-import '../styles/home.css';
-
-const rawBaseUrl = import.meta.env.BASE_URL;
-const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl : `${rawBaseUrl}/`;
-const recording = (name: string) => `${baseUrl}recordings/${name}.gif`;
-const repoUrl = 'https://github.com/yexiyue/ratatui-kit';
-
-const codeThemes = { light: 'github-light-default', dark: 'github-dark-default' };
-
-// Real code, both sides of the collapse: the imperative plain-ratatui counter
-// vs the declarative ratatui-kit core (from the quick-start docs).
-const rawCode = `fn main() -> std::io::Result<()> {
-    let mut terminal = ratatui::init();
-    let mut count = 0_u64;
-    let mut last = Instant::now();
-    loop {
-        terminal.draw(|f| ui(f, count))?;
-        if last.elapsed() >= Duration::from_secs(1) {
-            count += 1;
-            last = Instant::now();
-        }
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(k) = event::read()? {
-                if k.code == KeyCode::Char('q') {
-                    break;
-                }
-            }
-        }
+import { Code } from "astro:components";
+import { RK_VERSION } from "../consts";
+import "../styles/home.css";
+interface Props {
+  locale?: "en" | "zh-cn";
+}
+const zh = Astro.props.locale === "zh-cn";
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+const docs = `${base}${zh ? "zh-cn/" : ""}`;
+const repo = "https://github.com/yexiyue/ratatui-kit";
+const t = zh
+  ? {
+      eyebrow: "RATATUI 之上的 RUST 组件框架",
+      title: ["终端界面，", "从容构建。"],
+      intro:
+        "在 Ratatui 之上，用组件组织界面，用 Hooks 管理状态，构建更清晰的终端应用。",
+      start: "开始构建",
+      source: "查看源码",
+      below: "基于 Ratatui · 由 Tokio 驱动 · MIT 开源",
+      demoLabel: "01 / 实际运行",
+      demoTitle: "在终端里，做更多。",
+      demoText:
+        "从任务管理到鼠标交互，每个画面都来自仓库中可运行的 Rust 示例。",
+      play: "播放录屏",
+      pause: "暂停录屏",
+      recording: "真实终端录屏",
+      tutorial: "阅读示例教程",
+      codeLabel: "02 / 组件模型",
+      codeTitle: "写下界面。\n让状态驱动它。",
+      codeText:
+        "熟悉的组件、Props 与 Hooks，配合 Rust 的类型系统。保留 Ratatui 的绘制能力，把重复的运行时工作交给框架。",
+      codeLink: "了解组件与 Hooks",
+      chapterLabel: "03 / 应用基础",
+      chapterTitle: "从一个组件，到完整应用。",
+      installLabel: "开始 / 安装",
+      installTitle: "你的下一个终端应用，\n从这里开始。",
+      installText: "默认不启用额外特性。按需开启路由、输入、表格与全局状态。",
+      copy: "复制",
+      copied: "已复制",
+      failed: "复制失败，请手动选择命令",
+      all: "浏览全部示例",
     }
-    ratatui::restore();
-    Ok(())
-}`;
-
-const kitCode = `#[component]
+  : {
+      eyebrow: "A COMPONENT FRAMEWORK BUILT ON RATATUI",
+      title: ["Terminal UI.", "Composed."],
+      intro:
+        "Components and hooks on top of Ratatui. Give your terminal application a clear structure.",
+      start: "Start building",
+      source: "Explore the source",
+      below: "Built on Ratatui · Powered by Tokio · Open source, MIT",
+      demoLabel: "01 / IN THE TERMINAL",
+      demoTitle: "Small surface. Real possibilities.",
+      demoText:
+        "Task management, mouse interaction, and data views. Real Rust examples, recorded straight from the terminal.",
+      play: "Play recording",
+      pause: "Pause recording",
+      recording: "Actual terminal recording",
+      tutorial: "Read the walkthrough",
+      codeLabel: "02 / THE COMPONENT MODEL",
+      codeTitle: "Describe the UI.\nMake it reactive.",
+      codeText:
+        "Components, props, and hooks meet the Rust type system. Keep Ratatui’s drawing power while the framework handles component lifetimes and reactive rendering.",
+      codeLink: "Explore components and hooks",
+      chapterLabel: "03 / APPLICATION FOUNDATIONS",
+      chapterTitle: "From a component to an application.",
+      installLabel: "START / INSTALL",
+      installTitle: "Your next terminal app\nstarts here.",
+      installText:
+        "No extra features by default. Opt into routing, input, tables, and shared state when you need them.",
+      copy: "Copy",
+      copied: "Copied",
+      failed: "Copy failed. Select the command manually.",
+      all: "Explore all examples",
+    };
+const demos = [
+  {
+    id: "todo-app",
+    title: zh ? "任务管理" : "Task management",
+    name: "todo_app",
+    page: "apps/todo-app/",
+    text: zh
+      ? "组件、筛选与响应式状态，组合成完整的任务应用。"
+      : "Components, filters, and reactive state in one complete application.",
+  },
+  {
+    id: "mouse",
+    title: zh ? "鼠标交互" : "Mouse interaction",
+    name: "mouse",
+    page: "core/pointer-events/",
+    text: zh
+      ? "命中测试、悬停、按下与捕获，让鼠标交互拥有明确边界。"
+      : "Hit testing, hover, press, and capture with explicit interaction boundaries.",
+  },
+  {
+    id: "table",
+    title: zh ? "数据表格" : "Data tables",
+    name: "table",
+    page: "components/table/",
+    text: zh
+      ? "在终端中呈现与浏览结构化数据。"
+      : "Present and navigate structured data in the terminal.",
+  },
+  {
+    id: "router",
+    title: zh ? "多页路由" : "Routing",
+    name: "router",
+    page: "tutorials/router/",
+    text: zh
+      ? "用路由组织页面，让应用导航保持清晰。"
+      : "Give multi-page applications a clear navigation structure.",
+  },
+];
+const foundations = zh
+  ? [
+      [
+        "01",
+        "状态，有自己的生命周期。",
+        "本地 Hooks、异步任务与共享 Atom，为不同作用域选择合适的状态。",
+        "core/hooks/",
+      ],
+      [
+        "02",
+        "输入，有明确的边界。",
+        "集中式事件路由、输入层与指针 Hooks，让弹窗、键盘和鼠标协同工作。",
+        "core/pointer-events/",
+      ],
+      [
+        "03",
+        "风格，贯穿整个应用。",
+        "共享 Palette、组件主题与局部覆盖，让界面保持一致，也保留定制空间。",
+        "core/theming/",
+      ],
+    ]
+  : [
+      [
+        "01",
+        "State with a place to live.",
+        "Local hooks, async tasks, and shared atoms. Choose state that fits its lifetime.",
+        "core/hooks/",
+      ],
+      [
+        "02",
+        "Input with clear boundaries.",
+        "Central event routing, input layers, and pointer hooks coordinate keyboard and mouse interaction.",
+        "core/pointer-events/",
+      ],
+      [
+        "03",
+        "One visual language.",
+        "Shared palettes, component themes, and local overrides keep the interface consistent and adaptable.",
+        "core/theming/",
+      ],
+    ];
+const code = `#[component]
 fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut count = hooks.use_state(|| 0_u64);
 
@@ -45,678 +163,202 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         }
     });
 
-    element!(
-        Border(border_style: Style::new().yellow()) {
-            Text(text: Line::from(format!("Counter: {:02}", count.get())))
-        }
-    )
+    element!(Border {
+        Text(text: Line::from(format!("Count: {}", count.get())))
+    })
 }`;
-
-const rawLoc = rawCode.split('\n').length;
-const kitLoc = kitCode.split('\n').length;
-
-const runSteps = [
-	{
-		label: '01 · add the dependency',
-		cmd: 'cargo add ratatui-kit tokio',
-		text: 'No features are enabled by default — turn on router, atom, input, tree as you need them.',
-	},
-	{
-		label: '02 · write the component',
-		cmd: 'src/main.rs',
-		text: 'use_state holds state, use_future runs async, element! declares the tree. Instances persist across frames.',
-	},
-	{
-		label: '03 · run it',
-		cmd: 'cargo run',
-		text: 'The terminal goes fullscreen, the counter ticks every second, q quits — and the terminal is restored.',
-	},
-];
-
-const modules = [
-	{
-		token: 'element!',
-		title: 'Declarative syntax',
-		text: 'A JSX-style proc-macro. if / for / match are first-class inside child blocks, { expr } embeds any Rust expression, and widget() bridges native ratatui widgets.',
-	},
-	{
-		token: 'use_state · use_future',
-		title: 'Hooks & state',
-		text: 'use_state, use_future, use_effect and custom hooks, organized by call order. State handles are Copy, support count += 1, and release when the component unmounts.',
-	},
-	{
-		token: 'use_input_layer',
-		title: 'Input-layer mutex',
-		text: 'Events route to the active layer instead of broadcasting to every component. Open a modal or an edit mode, and the background yields the keyboard.',
-	},
-	{
-		token: 'Waker',
-		title: 'Reactive rendering',
-		text: 'State writes wake the render loop, so the framework repaints on real change — never on a timer, never by hand.',
-	},
-	{
-		token: 'Palette · ThemeOverride',
-		title: 'Theming',
-		text: 'One shared Palette is the color source every component derives from. Swap it to re-theme the whole tree, or drive it from an Atom at runtime.',
-	},
-	{
-		token: 'RouterProvider · Atom',
-		title: 'Routing & global state',
-		text: 'A router with a history stack manages pages; atoms manage business state shared across them.',
-	},
-];
-
-// Real code from examples/input/input_mutex.rs (framework-level input mutex).
-const layerCode = `// Request an input layer when entering edit mode
-let edit_layer = hooks.use_input_layer(editing.get(), true);
-
-// The handler only receives key events while this layer is active
-hooks.use_event_handler(
-    EventScope::Layer(edit_layer),
-    EventPriority::High,
-    move |event| {
-        let Event::Key(key) = event else {
-            return EventResult::Ignored;
-        };
-        match key.code {
-            KeyCode::Enter => editing.set(false),
-            KeyCode::Char(c) => draft.write().push(c),
-            _ => {}
-        }
-        // The background list never sees these keys
-        EventResult::Consumed
-    },
-);`;
-
-// All built-in components for the browser; snippets are real usage from each
-// component's docs page.
-const components = [
-	{
-		name: 'View · Border · Text',
-		desc: 'Flex containers, bordered grouping and paragraph rendering — the primitives that slice a component tree into terminal regions.',
-		gif: null,
-		href: 'components/layout-primitives/',
-		example: 'hello_world',
-		code: `View(flex_direction: Direction::Vertical, gap: 1) {
-    Text(text: "header")
-    View(height: Constraint::Fill(1)) {
-        Text(text: "body")
-    }
-    Text(text: "footer")
-}`,
-	},
-	{
-		name: 'ScrollView',
-		desc: 'Content beyond the viewport renders into a larger buffer first, then displays by offset — j/k, paging and a scrollbar included.',
-		gif: 'scrollview',
-		href: 'components/scroll-view/',
-		example: 'scrollview',
-		code: `ScrollView(
-    flex_direction: Direction::Vertical,
-    block: Block::bordered(),
-) {
-    for (i, row) in rows.iter().enumerate() {
-        View(key: i, height: Constraint::Length(1)) {
-            Text(text: row)
-        }
-    }
-}`,
-	},
-	{
-		name: 'WrappedText',
-		desc: 'Hard-wraps long text at a given width, then writes the real line count back into layout height so ScrollView computes the scroll range correctly.',
-		gif: 'wrapped-text',
-		href: 'components/wrapped-text/',
-		example: 'wrapped_text',
-		code: `ScrollView(scroll_view_state: scroll_state, block: Block::bordered()) {
-    WrappedText(
-        text: BODY,
-        wrap_width: 72,
-        style: Style::new().white(),
-    )
-}`,
-	},
-	{
-		name: 'Input',
-		desc: 'Single-line input display over tui_input state; writing, submitting and exiting stay with the page handler.',
-		gif: 'input',
-		href: 'components/input/',
-		example: 'input',
-		code: `Border(height: Constraint::Length(3)) {
-    Input(
-        input: input.read().clone(),
-        placeholder: "Type and press Enter".to_string(),
-        cursor_style: Style::new().bg(Color::Yellow),
-    )
-}`,
-	},
-	{
-		name: 'SearchInput',
-		desc: 'Search box with an edit mode: press s to enter input and open an exclusive layer — activation, submission, validation and mutex wrapped.',
-		gif: 'search-input',
-		href: 'components/search-input/',
-		example: 'search_input',
-		code: `SearchInput(
-    value: query.read().to_string(),
-    placeholder: "Press s to search".to_string(),
-    on_change: move |next: String| query.set(next),
-    on_submit: move |value: String| {
-        submitted.set(value);
-        true
-    },
-)`,
-	},
-	{
-		name: 'Modal',
-		desc: 'Low-level overlay: draws the backdrop, positions content, and provides the current input layer to its subtree.',
-		gif: 'modal',
-		href: 'components/modal/',
-		example: 'modal',
-		code: `Modal(
-    open: open.get(),
-    width: Constraint::Length(68),
-    height: Constraint::Length(12),
-) {
-    Border(top_title: Line::from("Details").centered()) {
-        Text(text: Line::from("Modal content"))
-    }
-}`,
-	},
-	{
-		name: 'ConfirmModal',
-		desc: 'Confirmation dialog with an exclusive input layer: confirm/cancel, button focus and mutex, controlled by open.',
-		gif: 'confirm-modal',
-		href: 'components/confirm-modal/',
-		example: 'confirm_modal',
-		code: `ConfirmModal(
-    open: confirm_open.get(),
-    title: Line::from("Delete release?"),
-    content: format!("Remove {selected_label}?"),
-    confirm_text: "Delete".to_string(),
-    on_confirm: move |_: ()| confirm_open.set(false),
-    on_cancel: move |_: ()| confirm_open.set(false),
-)`,
-	},
-	{
-		name: 'AlertModal',
-		desc: 'Notice dialog without buttons: shows a message, fires on_close, and intercepts lower-layer input meanwhile.',
-		gif: 'alert-modal',
-		href: 'components/alert-modal/',
-		example: 'alert_modal',
-		code: `AlertModal(
-    open: alert_open.get(),
-    title: Line::from("Workspace is current"),
-    message: format!("{selected_label} is synced."),
-    on_close: move |_: ()| alert_open.set(false),
-)`,
-	},
-	{
-		name: 'ShortcutInfoModal',
-		desc: 'Shortcut help dialog grouped by section; overflowing content scrolls while the modal keeps the input mutex.',
-		gif: 'shortcut-info-modal',
-		href: 'components/shortcut-info-modal/',
-		example: 'shortcut_info_modal',
-		code: `ShortcutInfoModal(
-    open: shortcuts_open.get(),
-    title: Line::from("Shortcut reference"),
-    sections: vec![ShortcutInfoSection::new(
-        "Navigation",
-        [("Down", "j"), ("Up", "k")],
-    )],
-    on_close: move |_: ()| shortcuts_open.set(false),
-)`,
-	},
-	{
-		name: 'Select',
-		desc: 'Single-select list with an internal ListState: j/k, arrows, Home/End and Enter become navigation and a select callback.',
-		gif: 'select',
-		href: 'components/select/',
-		example: 'select',
-		code: `Select<&'static str>(
-    items: items,
-    default_index: Some(1),
-    highlight_symbol: "> ",
-    empty_message: "No environments",
-    on_select: move |item: &'static str| {
-        selected.set(item);
-    },
-)`,
-	},
-	{
-		name: 'MultiSelect',
-		desc: 'Two-level interaction: Space toggles the draft selection (on_change), Enter commits it (on_select).',
-		gif: 'multi-select',
-		href: 'components/multi-select/',
-		example: 'multi_select',
-		code: `MultiSelect<&'static str>(
-    items: items,
-    highlight_symbol: "> ",
-    on_change: move |items: Vec<&'static str>| {
-        selected_count.set(items.len());
-    },
-    on_select: move |items: Vec<&'static str>| {
-        submitted.set(items.len());
-    },
-)`,
-	},
-	{
-		name: 'TreeSelect',
-		desc: 'Hierarchical selection (tree feature) over tui-tree-widget: collapse/expand, path-style selection and input mutex.',
-		gif: 'tree-select',
-		href: 'components/tree-select/',
-		example: 'tree_select',
-		code: `TreeSelect<&'static str>(
-    active: true,
-    items: demo_items(),
-    default_selection: vec!["components", "select"],
-    node_open_symbol: "- ",
-    node_closed_symbol: "+ ",
-    on_select: move |id: &'static str| {
-        submitted.set(id);
-    },
-)`,
-	},
-	{
-		name: 'VirtualList',
-		desc: 'Long lists (virtual-list feature): only the visible window renders — tens of thousands of rows with custom row rendering.',
-		gif: 'virtual-list',
-		href: 'components/virtual-list/',
-		example: 'virtual_list',
-		code: `VirtualList<Line<'static>>(
-    item_count: 10_000,
-    default_index: Some(42),
-    render_item: |ctx: &ListBuildContext| {
-        let style = if ctx.is_selected {
-            Style::new().black().on_green()
-        } else {
-            Style::new()
-        };
-        (Line::styled(format!("row {:05}", ctx.index + 1), style), 1u16)
-    },
-)`,
-	},
-	{
-		name: 'VirtualMultiSelect',
-		desc: 'Composition for multi-selecting a long list: VirtualList keeps the cursor and window, business code keeps the HashSet.',
-		gif: 'virtual-multi-select',
-		href: 'components/virtual-multi-select/',
-		example: 'virtual_multi_select',
-		code: `VirtualList<Line<'static>>(
-    state: list_state,
-    item_count: item_count,
-    render_item: move |ctx: &ListBuildContext| {
-        let mark = if selected.contains(&ctx.index) { "[x]" } else { "[ ]" };
-        (Line::styled(format!("{mark} Row {:05}", ctx.index + 1), Style::default()), 1u16)
-    },
-)`,
-	},
-];
-
-const pathItems = [
-	{
-		title: 'Get it running',
-		href: 'start/quick-start/',
-		text: 'hello world and a counter in five minutes',
-	},
-	{
-		title: 'Understand the core model',
-		href: 'core/component-model/',
-		text: 'element, component, hooks, context and the render loop',
-	},
-	{
-		title: 'Handle real input',
-		href: 'tutorials/input-mutex/',
-		text: 'event ownership between modals, lists and edit modes',
-	},
-	{
-		title: 'Extend the framework',
-		href: 'advanced/custom-hook/',
-		text: 'providers, hooks and widgets of your own',
-	},
-];
 ---
 
-<div class="rk-home" data-rk-home>
-	<!--
-		ratatui-kit homepage — direction contract (seed 296d2b21, index 3, code-led)
-		THESIS: the site is itself a TUI app: product and page share one material — hairline panes, mono chrome, amber only where something is live.
-		OWN-WORLD: deep ink-teal ground deepening one tone per act; square hairline panes with mono boxed-title tabs; Space Grotesk display over JetBrains Mono chrome; teal is structure, amber is active state; terminal windows stay dark in both themes; the page ends on a vim-style status line.
-		STORY: the visitor watches a terminal app run, takes over its keys, and feels the framework's promise demonstrated by the page itself; two code panes show the boilerplate collapse; a dense module grid maps the mechanism; a file-browser catalog walks the components; a status line routes into the docs.
-		FIRST VIEWPORT: left-aligned manifesto H1 over a full-width live todo-app terminal (selection row teal, faithful to todo_app.rs; amber reserved for the live hint, primary CTA and modal focus), two square CTAs, keybinds in the terminal's own status line.
-		FORM: TUI-native panels, position 3 of 7 grounded directions.
-		FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md.
-	-->
-	<div class="rk-shell">
-		<section class="rk-hero">
-			<h1>The React model, in your terminal.</h1>
-			<p class="rk-hero__lead">
-				Components, hooks, input layers, routing and global state — built on Ratatui
-				and Tokio. You describe the UI; the runtime owns the loop.
-			</p>
-			<div class="rk-hero__actions">
-				<a class="rk-btn rk-btn--amber" href={`${baseUrl}start/quick-start/`}>
-					<span>quick start</span>
-					<span class="rk-btn__arrow" aria-hidden="true">→</span>
-				</a>
-				<a class="rk-btn rk-btn--line" href={repoUrl} target="_blank" rel="noreferrer">
-					<span>github</span>
-					<span class="rk-btn__arrow" aria-hidden="true">↗</span>
-				</a>
-			</div>
-
-			<figure class="rk-term" data-rk-term>
-				<div class="rk-term__bar">
-					<span class="rk-term__bar-id">ratatui-kit · todo_app.rs</span>
-					<span class="rk-term__bar-status" data-rk-term-status>tasks 5 · all</span>
-				</div>
-
-				<div
-					class="rk-term__app"
-					data-rk-term-app
-					tabindex="0"
-					role="application"
-					aria-label="Live todo app demo. Keys: j and k move, space toggles, f filters, d deletes, a adds a task, q quits."
-				>
-					<div class="rk-app">
-						<div class="rk-pane">
-							<span class="rk-pane__tab">search</span>
-							<div class="rk-search__field">
-								<span data-rk-search-slot></span>
-								<span data-rk-search-prompt>Press a to add a task</span>
-								<span class="rk-caret" data-rk-caret aria-hidden="true" hidden></span>
-							</div>
-						</div>
-
-						<div class="rk-app__main">
-							<div class="rk-pane">
-								<span class="rk-pane__tab">tasks / <b data-rk-filter>all</b></span>
-								<ul class="rk-tasks__list" data-rk-list role="listbox" aria-label="tasks"
-									data-initial="Review runtime~0|Record todo app~0|Write docs~0|Check input layers~1|Plan next slice~0"
-								></ul>
-								<div class="rk-tasks__empty" data-rk-empty hidden>No tasks in this filter</div>
-							</div>
-
-							<div class="rk-app__side">
-								<div class="rk-pane">
-									<span class="rk-pane__tab">state</span>
-									<div class="rk-state__rows">
-										<div>open: <b data-rk-open>4</b></div>
-										<div>done: <b data-rk-done>1</b></div>
-										<div>selected: <span data-rk-selected>Review runtime</span></div>
-									</div>
-								</div>
-								<div class="rk-pane">
-									<span class="rk-pane__tab">event</span>
-									<p class="rk-event__text" data-rk-event>ready</p>
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<div class="rk-modal" data-rk-modal hidden>
-						<div class="rk-modal__box">
-							<p class="rk-modal__title">Delete task?</p>
-							<p class="rk-modal__text" data-rk-modal-text></p>
-							<div class="rk-modal__btns">
-								<button type="button" class="rk-modal__btn" data-rk-modal-del aria-selected="true">Delete</button>
-								<button type="button" class="rk-modal__btn" data-rk-modal-keep aria-selected="false">Keep</button>
-							</div>
-						</div>
-					</div>
-
-					<div class="rk-exit" data-rk-exit hidden>
-						<p class="rk-exit__title">process exited · terminal restored</p>
-						<p>press <kbd>enter</kbd> to restart todo_app</p>
-					</div>
-				</div>
-
-				<figcaption class="rk-term__status">
-					<span>j/k move · space toggle · f filter · d delete · a add · q quit</span>
-					<span class="rk-term__hint">this terminal is live — click it, then j / k</span>
-				</figcaption>
-			</figure>
-		</section>
-
-		<section class="rk-section">
-			<div class="rk-panel">
-				<span class="rk-panel__tab">quick start</span>
-				<header class="rk-versus__head">
-					<h2>The same counter, without the ceremony</h2>
-					<p>
-						On the left, plain Ratatui: you own the terminal, the loop, the timer and the
-						exit. On the right, ratatui-kit: state and UI — everything else is the
-						runtime's job.
-					</p>
-					<p class="rk-versus__note">
-						<span>plain ratatui · <b>{rawLoc} loc</b></span>
-						<span>ratatui-kit · <b>{kitLoc} loc</b></span>
-					</p>
-				</header>
-
-				<div class="rk-versus__grid">
-					<figure class="rk-code">
-						<span class="rk-pane__tab">main.rs · plain ratatui</span>
-						<Code code={rawCode} lang="rust" themes={codeThemes} />
-					</figure>
-					<figure class="rk-code">
-						<span class="rk-pane__tab">counter.rs · ratatui-kit</span>
-						<Code code={kitCode} lang="rust" themes={codeThemes} />
-					</figure>
-				</div>
-
-				<div class="rk-run">
-					{runSteps.map((step) => (
-						<div class="rk-run__step">
-							<span class="rk-step__label">{step.label}</span>
-							<span class="rk-step__cmd">{step.cmd}</span>
-							<p>{step.text}</p>
-						</div>
-					))}
-				</div>
-			</div>
-		</section>
-
-		<section class="rk-section">
-			<header>
-				<h2>The model you already know, wired for the terminal</h2>
-				<p>
-					ratatui-kit doesn't replace Ratatui — it adds the component, state and event
-					layers a growing terminal app needs.
-				</p>
-			</header>
-			<div class="rk-grid">
-				{modules.map((module) => (
-					<article class="rk-module">
-						<span class="rk-module__token">{module.token}</span>
-						<h3>{module.title}</h3>
-						<p>{module.text}</p>
-					</article>
-				))}
-			</div>
-		</section>
-
-		<section class="rk-section rk-layers__grid">
-			<header>
-				<h2>Events route by layer, not by broadcast</h2>
-				<p>
-					When a modal opens or editing starts, the framework hands the keyboard to that
-					layer — background components stop seeing keys entirely.
-				</p>
-				<a class="rk-link" href={`${baseUrl}core/input-layers/`}>
-					read the input-layer reference →
-				</a>
-			</header>
-
-			<div class="rk-layers__demo">
-				<div class="rk-depth">
-					<div class="rk-depth__rail">
-						<div class="rk-depth__ticks">
-							<span class="rk-depth__tick"></span>
-							<span class="rk-depth__tick rk-depth__tick--active"></span>
-							<span class="rk-depth__tick"></span>
-						</div>
-					</div>
-					<div class="rk-depth__stack">
-						<div class="rk-depth__layer">
-							<span class="rk-depth__name">input layer 1 — search</span>
-							<span class="rk-depth__desc">requested by SearchInput while editing; closed here</span>
-						</div>
-						<div class="rk-depth__layer rk-depth__layer--active">
-							<span class="rk-depth__name">input layer 2 — confirm modal</span>
-							<span class="rk-depth__desc">exclusive: the background list never sees these keys</span>
-						</div>
-						<div class="rk-depth__layer">
-							<span class="rk-depth__name">root scope — task list</span>
-							<span class="rk-depth__desc">j/k navigation, f filter, d delete</span>
-						</div>
-						<p class="rk-depth__keys">key events ─▶ <b>layer 2 · modal</b> — background receives nothing</p>
-					</div>
-				</div>
-
-				<figure class="rk-code">
-					<span class="rk-pane__tab">input_mutex.rs</span>
-					<Code code={layerCode} lang="rust" themes={codeThemes} />
-				</figure>
-			</div>
-		</section>
-
-		<section class="rk-section rk-react__grid">
-			<header>
-				<h2>State writes wake the render loop</h2>
-				<p>
-					One assignment and every dependent re-renders — no redraw calls, no timers.
-					This button is the whole idea:
-				</p>
-			</header>
-
-			<div class="rk-panel rk-tree">
-				<span class="rk-panel__tab">counter component</span>
-				<pre class="rk-tree__lines" aria-live="polite"><span class="rk-tree__root">Counter</span>
-├─ Border ───────── count: <b data-rk-count>07</b>
-└─ Text ─────────── count: <b data-rk-count>07</b></pre>
-				<button type="button" class="rk-btn rk-btn--line rk-tree__btn" data-rk-ripple-btn>
-					<span>count += 1</span>
-				</button>
-			</div>
-		</section>
-
-		<section class="rk-section">
-			<header>
-				<h2>Most of what you need is already built in</h2>
-				<p>
-					{components.length} business-neutral components — layout, input, overlays,
-					selection, virtual lists — each with a runnable example and a real recording.
-					Click through the list, or focus it and press j / k.
-				</p>
-			</header>
-
-			<div class="rk-browser" data-rk-browser>
-				<div class="rk-browser__list" role="tablist" aria-label="components">
-					{components.map((component, index) => (
-						<button
-							type="button"
-							class="rk-browser__item"
-							role="tab"
-							id={`rk-cmp-tab-${index}`}
-							aria-controls={`rk-cmp-panel-${index}`}
-							aria-selected={index === 0 ? 'true' : 'false'}
-						>
-							<span class="rk-browser__mark" aria-hidden="true">&gt;</span>
-							<span>{component.name}</span>
-							<span class="rk-browser__tag">{component.gif ? 'rec' : '—'}</span>
-						</button>
-					))}
-				</div>
-
-				<div class="rk-browser__stage">
-					{components.map((component, index) => (
-						<div
-							class={`rk-browser__panel${index === 0 ? ' is-active' : ''}${component.gif ? '' : ' rk-browser__panel--single'}`}
-							role="tabpanel"
-							id={`rk-cmp-panel-${index}`}
-							aria-labelledby={`rk-cmp-tab-${index}`}
-						>
-							<div class="rk-browser__head">
-								<p class="rk-browser__desc">{component.desc}</p>
-								<a class="rk-link rk-browser__doclink" href={`${baseUrl}${component.href}`}>
-									view docs →
-								</a>
-							</div>
-							<figure class="rk-code">
-								<span class="rk-pane__tab">{component.example}.rs</span>
-								<Code code={component.code} lang="rust" themes={codeThemes} />
-							</figure>
-							{component.gif && (
-								<figure class="rk-browser__gif">
-									<span class="rk-browser__gif-bar">cargo run --example {component.example}</span>
-									<img
-										src={recording(component.gif)}
-										alt={`Recording of the ${component.name} component`}
-										loading="lazy"
-										decoding="async"
-									/>
-								</figure>
-							)}
-						</div>
-					))}
-				</div>
-			</div>
-		</section>
-
-		<section class="rk-section">
-			<header>
-				<h2>Start with a counter that moves</h2>
-				<p>
-					Then layer on async state, input layers and routing. The homepage's job ends
-					here — the docs take over.
-				</p>
-			</header>
-
-			<div class="rk-path">
-				{pathItems.map((item) => (
-					<a class="rk-path__row" href={`${baseUrl}${item.href}`}>
-						<span class="rk-path__mark" aria-hidden="true">›</span>
-						<span>
-							<span class="rk-path__title">{item.title}</span>
-						</span>
-						<span class="rk-path__go" aria-hidden="true">→</span>
-						<span class="rk-path__text">{item.text}</span>
-					</a>
-				))}
-			</div>
-
-			<div class="rk-panel rk-cta">
-				<span class="rk-panel__tab rk-panel__tab--amber">get started</span>
-				<div class="rk-cta__install">
-					<span class="rk-cta__cmd">cargo add ratatui-kit</span>
-					<button type="button" class="rk-cta__copy" data-rk-copy data-cmd="cargo add ratatui-kit" data-rest="copied">copy</button>
-				</div>
-				<div class="rk-hero__actions">
-					<a class="rk-btn rk-btn--amber" href={`${baseUrl}start/quick-start/`}>
-						<span>quick start</span>
-						<span class="rk-btn__arrow" aria-hidden="true">→</span>
-					</a>
-					<a class="rk-btn rk-btn--line" href={`${baseUrl}examples/`}>
-						<span>browse examples</span>
-						<span class="rk-btn__arrow" aria-hidden="true">→</span>
-					</a>
-				</div>
-			</div>
-
-			<footer class="rk-statusline">
-				<span><b>ratatui-kit</b> v{RK_VERSION} · MIT</span>
-				<span>
-					<span class="rk-statusline__mode">normal</span>
-					{' · '}
-					<a href={`${baseUrl}start/`}>docs</a>
-					{' · '}
-					<a href={repoUrl} target="_blank" rel="noreferrer">github</a>
-				</span>
-			</footer>
-		</section>
-	</div>
+<div class="rk-home">
+  <section class="rk-hero rk-shell" aria-labelledby="rk-title">
+    <div class="rk-hero-copy">
+      <p class="rk-eyebrow">{t.eyebrow}</p>
+      <h1 id="rk-title">{t.title[0]}<br /><span>{t.title[1]}</span></h1>
+      <p class="rk-intro">{t.intro}</p>
+      <div class="rk-actions">
+        <a class="rk-primary" href={`${docs}start/quick-start/`}
+          >{t.start}<span aria-hidden="true">↗</span></a
+        ><a class="rk-text-link" href={repo}
+          >{t.source}<span aria-hidden="true">↗</span></a
+        >
+      </div>
+      <p class="rk-meta">{t.below}</p>
+    </div>
+    <figure class="rk-brand-art">
+      <img
+        src={`${base}brand/mascot-assembler.webp`}
+        alt={zh
+          ? "像素风终端构建者：深青色工装的鼠角色正在组合终端组件框架"
+          : "A pixel-art rat assembler in teal workwear arranging components inside a terminal frame"}
+        width="960"
+        height="960"
+        fetchpriority="high"
+      /><figcaption>
+        {zh ? "组件 / 状态 / 布局" : "COMPONENTS / STATE / LAYOUT"}
+        <span>v{RK_VERSION}</span>
+      </figcaption>
+    </figure>
+  </section>
+  <section class="rk-section rk-shell" aria-labelledby="rk-demo-title">
+    <div class="rk-section-head">
+      <div>
+        <p class="rk-eyebrow">{t.demoLabel}</p><h2 id="rk-demo-title">
+          {t.demoTitle}
+        </h2>
+      </div><p>{t.demoText}</p>
+    </div>
+    <div
+      class="rk-demo-tabs"
+      role="tablist"
+      aria-label={zh ? "终端示例" : "Terminal examples"}
+    >
+      {
+        demos.map((demo, i) => (
+          <button
+            id={`tab-${demo.id}`}
+            role="tab"
+            aria-selected={i === 0 ? "true" : "false"}
+            aria-controls={`panel-${demo.id}`}
+            tabindex={i === 0 ? 0 : -1}
+          >
+            {demo.title}
+          </button>
+        ))
+      }
+    </div>
+    {
+      demos.map((demo, i) => (
+        <div
+          id={`panel-${demo.id}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${demo.id}`}
+          hidden={i !== 0}
+          tabindex="0"
+          class="rk-demo-panel"
+        >
+          <div class="rk-terminal">
+            <>
+              <div class="rk-terminal-bar">
+                <>
+                  <span>{demo.name}.rs</span>
+                  <span>{t.recording}</span>
+                </>
+              </div>
+              <img
+                src={`${base}brand/${demo.id}-poster.webp`}
+                data-src={`${base}recordings/${demo.id}.gif`}
+                data-poster={`${base}brand/${demo.id}-poster.webp`}
+                alt={`${demo.title}: ${demo.text}`}
+                loading="lazy"
+              />
+            </>
+          </div>
+          <div class="rk-demo-info">
+            <>
+              <button
+                class="rk-play"
+                type="button"
+                data-play={t.play}
+                data-pause={t.pause}
+                aria-pressed="false"
+              >
+                {t.play}
+              </button>
+              <p>{demo.text}</p>
+              <code>cargo run --example {demo.name}</code>
+              <a
+                class="rk-text-link"
+                href={`${docs}${{ "todo-app": "apps/todo-app/", mouse: "core/pointer-events/", table: "components/table/", router: "tutorials/router/" }[demo.id]}`}
+              >
+                {t.tutorial}
+                <span aria-hidden="true">↗</span>
+              </a>
+            </>
+          </div>
+        </div>
+      ))
+    }
+    <a class="rk-all-examples rk-text-link" href={`${docs}examples/`}
+      >{t.all}<span aria-hidden="true">↗</span></a
+    >
+  </section>
+  <section
+    class="rk-code-section rk-shell rk-section"
+    aria-labelledby="rk-code-title"
+  >
+    <div>
+      <p class="rk-eyebrow">{t.codeLabel}</p><h2
+        id="rk-code-title"
+        class="rk-lines"
+      >
+        {t.codeTitle}
+      </h2><p class="rk-description">{t.codeText}</p><a
+        class="rk-text-link"
+        href={`${docs}core/hooks/`}
+        >{t.codeLink}<span aria-hidden="true">↗</span></a
+      >
+    </div><div class="rk-code">
+      <div class="rk-terminal-bar">
+        <span>counter.rs</span><span
+          >{zh ? "组件片段" : "Component excerpt"}</span
+        >
+      </div><Code code={code} lang="rust" theme="github-dark-default" />
+    </div>
+  </section>
+  <section class="rk-shell rk-section" aria-labelledby="rk-foundation-title">
+    <p class="rk-eyebrow">{t.chapterLabel}</p><h2 id="rk-foundation-title">
+      {t.chapterTitle}
+    </h2><div class="rk-foundations">
+      {
+        foundations.map(([number, title, text, link]) => (
+          <a href={`${docs}${link}`}>
+            <>
+              <span class="rk-number">{number}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+              <span class="rk-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+  <section
+    class="rk-install rk-shell rk-section"
+    aria-labelledby="rk-install-title"
+  >
+    <div>
+      <p class="rk-eyebrow">{t.installLabel}</p><h2
+        id="rk-install-title"
+        class="rk-lines"
+      >
+        {t.installTitle}
+      </h2><p class="rk-description">{t.installText}</p>
+    </div><div>
+      <div class="rk-install-command">
+        <code>cargo add ratatui-kit</code><button
+          type="button"
+          data-copy="cargo add ratatui-kit"
+          data-copied={t.copied}
+          data-failed={t.failed}>{t.copy}</button
+        >
+      </div><p class="rk-copy-status" role="status" aria-live="polite"></p><a
+        class="rk-primary"
+        href={`${docs}start/quick-start/`}
+        >{t.start}<span aria-hidden="true">↗</span></a
+      >
+    </div>
+  </section>
+  <footer class="rk-footer rk-shell">
+    <span
+      >RATATUI KIT / {
+        zh ? "终端界面，从容构建。" : "TERMINAL UI. COMPOSED."
+      }</span
+    ><a href={`${repo}/blob/main/LICENSE`}>MIT LICENSE ↗</a>
+  </footer>
 </div>
-
 <script>
-	import '../scripts/home.ts';
+  import "../scripts/home";
 </script>

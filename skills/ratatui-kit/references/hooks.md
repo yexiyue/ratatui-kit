@@ -269,51 +269,10 @@ All hooks are obtained by calling a method on `Hooks` (`#[component] fn Foo(mut 
 
 ## Pointer hooks: use_click / use_hover / use_drag / use_pointer
 
-- **Purpose**: semantic mouse/pointer interactions. `use_click` synthesizes `Click { count, .. }` from Down+Up on the same target (double/triple click counting within a ~300ms window); `use_hover()` returns whether the pointer is currently inside the component area; `use_drag` delivers Start/Move/End phases with implicit pointer capture (dragging outside the area still delivers); `use_pointer` exposes the full `PointerEvent` stream with user-controlled `EventResult`.
-- **Feature**: core (no feature gate), but **requires mouse capture enabled at the app entry** — `element!(App).fullscreen_with(RunOptions { mouse: true, ..Default::default() })`. Registering a pointer hook without capture panics in debug builds with a hint; in release it silently never fires.
-- **Signatures** (`src/hooks/use_pointer.rs`):
-  ```rust
-  fn use_click<F>(&mut self, f: F) where F: FnMut(Click) + 'static;
-  fn use_hover(&mut self) -> bool;
-  fn use_drag<F>(&mut self, f: F) where F: FnMut(DragUpdate) + 'static;
-  fn use_pointer<F>(&mut self, options: PointerOptions, f: F)
-      where F: FnMut(PointerEvent) -> EventResult + 'static;
-  ```
-- **Usage**:
-  ```rust
-  // click + double click
-  hooks.use_click(move |c| match c.count { 1 => open(&item), 2 => open_dir(&item), _ => {} });
-
-  // hover highlight
-  let hovered = hooks.use_hover();
-  let style = if hovered { hover_style } else { base_style };
-
-  // drag (implicit capture: events keep arriving after leaving the area)
-  hooks.use_drag(move |d| match d.phase {
-      DragPhase::Start => grabbing.set(true),
-      DragPhase::Move  => sidebar.set_width(d.to.x),
-      DragPhase::End   => grabbing.set(false),
-  });
-
-  // full stream, user controls bubbling via the returned EventResult
-  hooks.use_pointer(
-      PointerOptions { buttons: MouseButtons::LEFT.union(MouseButtons::RIGHT), track_move: true },
-      move |ev| match ev.kind {
-          PointerKind::ScrollDown => { scroll(3); EventResult::Consumed }
-          _ => EventResult::Ignored,
-      },
-  );
-  ```
-- **Semantics / pitfalls**:
-  - Mouse events are delivered in **bubble order** (innermost / later-drawn sibling first; `Ignored` propagates to ancestors, `Consumed` stops). Keyboard ordering is unchanged.
-  - Hit areas are last-frame rects; a component not drawn this frame cannot be hit.
-  - `use_click` and Button's `on_press` consume the event by default (no bubbling). For pass-through behavior use `use_pointer` and return `Ignored`.
-  - Consuming a `Down` engages implicit pointer capture for that button: subsequent `Drag`/`Up` go exclusively to the captor even outside its area; `Up` releases.
-  - `track_move: true` (or any `use_hover` registration) makes the framework request any-motion reporting (DECSET 1003, upgrade-only). Inside-area moves that change nothing skip re-render.
-  - Cross-target Down/Up does not synthesize a click (press on A, release on B → no click).
-- **Related**: `Button` component (`components/button.rs`) composes `use_pointer` + `use_hover`.
-
----
+Core APIs; explicitly enable `RunOptions { mouse: true }` at the entry. Read
+[pointer-events.md](pointer-events.md) for signatures, filtering, capture,
+coordinate semantics, and modal composition. Reference implementation:
+`examples/input/mouse.rs`.
 
 ## use_insert_before
 

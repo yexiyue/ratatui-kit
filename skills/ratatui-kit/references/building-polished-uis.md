@@ -25,7 +25,7 @@ The main library ships with **zero features enabled** by default; opt in as need
 [dependencies]
 # Enable `input` for Input/SearchInput; `tree` for TreeSelect; `virtual-list` for VirtualList;
 # `router` for routing; `atom` for global Atom. Use `full` to turn everything on.
-ratatui-kit = { version = "0.10", features = ["full"] }
+ratatui-kit = { version = "0.11", features = ["full"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 

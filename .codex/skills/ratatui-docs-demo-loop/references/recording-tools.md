@@ -100,6 +100,21 @@ Sleep 500ms
 
 ## Practical Fallbacks
 
+### Mouse-driven examples
+
+VHS keyboard input alone does not exercise pointer handlers. For `mouse`, build
+first with `cargo build --example mouse`, then run `vhs docs/tapes/mouse.tape`.
+The tape launches `docs/scripts/mouse-demo.py`: a PTY runs the real binary,
+inherits the recording terminal size, and receives timed SGR press, release,
+drag and movement reports. Its actual output is relayed to VHS.
+
+Keep compilation outside this capture: a fixed sleep may otherwise type the
+next command into an unfinished build and expose shell output in the recording.
+Verify the button count, divider movement, click count, modal and hover states
+with screenshots. When changing layout, update the script's cell coordinates
+and inspect the resulting states; a successful VHS exit alone does not prove
+that the mouse events hit their intended targets.
+
 If recording a full-screen TUI is flaky in CI or a headless shell, still leave useful test output:
 
 - a tape file

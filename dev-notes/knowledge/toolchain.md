@@ -63,6 +63,18 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 
 **相关文件**：`docs/package.json`、`docs/src/components/HomePage.astro`、`docs/astro.config.mjs`
 
+### docs 首页与品牌资产共用单一来源
+
+中英文首页共用 `HomePage.astro`；中文组件只传入 locale。品牌主标志仍为原始 SVG，像素终端构建者用于宣传画面，强调 Ratatui 之上的组件封装层。真实示例 GIF 默认显示运行后的静态封面，由用户主动播放，切换示例会停止上一段。
+
+**正确做法**：
+- 修改首页时同步两种语言的 copy，并独立维护 Cargo 名称、录屏文件名与教程路径（如 `todo_app` / `todo-app.gif` / `apps/todo-app/`）。
+- 用 `node docs/scripts/brand-assets.mjs` 从选定源图、SVG 与 GIF 导出网页资产；检查封面展示运行后的界面。
+- 品牌说明与生成提示词保存在 `assets/brand/`。调整封面后确认 Open Graph、README 和官网一致。
+- 验证明暗主题、320px/390px 与桌面、键盘 tabs、录屏播放暂停、复制反馈，以及 `cd docs && pnpm build`。
+
+**相关文件**：`docs/src/components/HomePage.astro`、`docs/src/scripts/home.ts`、`docs/scripts/brand-assets.mjs`、`assets/brand/README.md`
+
 ### docs Pages 部署对 Node / pnpm 版本敏感（withastro/action）
 
 `.github/workflows/pages.yml` 用 `withastro/action@v3` + `package-manager: pnpm@latest`。升级 astro 6 / pnpm 后暴露两个连环坑，且 **Pages 部署是独立于 CI(Rust) 的 workflow，CI 绿不代表部署绿**（#6/#7/#8 都是 CI 成功、Deploy 失败）：

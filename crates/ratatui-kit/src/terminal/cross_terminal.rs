@@ -1,11 +1,35 @@
 use super::TerminalImpl;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, EventStream},
+    Command,
+    event::{self, DisableMouseCapture, EventStream},
     execute,
 };
 use futures::{StreamExt, stream::BoxStream};
 use ratatui::{Frame, TerminalOptions};
-use std::io::{self, Write};
+use std::{
+    fmt,
+    io::{self, Write},
+};
+
+// crossterm 的 EnableMouseCapture 同时开启 1003h。这里仅请求按压和拖动上报,
+// 无按键移动由 enable_any_motion 在存在 hover/Move 追踪时单独开启。
+struct EnableButtonMouseCapture;
+
+impl Command for EnableButtonMouseCapture {
+    fn write_ansi(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        f.write_str("\x1b[?1000h\x1b[?1002h\x1b[?1015h\x1b[?1006h")
+    }
+
+    #[cfg(windows)]
+    fn execute_winapi(&self) -> io::Result<()> {
+        event::EnableMouseCapture.execute_winapi()
+    }
+
+    #[cfg(windows)]
+    fn is_ansi_code_supported(&self) -> bool {
+        event::EnableMouseCapture.is_ansi_code_supported()
+    }
+}
 
 // ================== 终端核心功能实现 ==================
 
@@ -51,7 +75,7 @@ impl CrossTerminal {
 // 执行/解除终端鼠标捕获。退出恢复由 `RestoreGuard` 经 `set_mouse_capture(false)` 完成。
 pub(crate) fn set_mouse_capture(enabled: bool) -> io::Result<()> {
     if enabled {
-        execute!(io::stdout(), EnableMouseCapture)
+        execute!(io::stdout(), EnableButtonMouseCapture)
     } else {
         execute!(io::stdout(), DisableMouseCapture)
     }
@@ -110,11 +134,25 @@ impl TerminalImpl for CrossTerminal {
     }
 
     // 惰性升级为 any-motion 上报(1003h):悬停追踪需要「无按键移动」事件。
-    // crossterm 的 EnableMouseCapture 默认只开 1002h(按键拖动期间上报移动),
-    // 1003h 由本框架在存在 hover/Move 追踪注册时按需补开,只升不降。
+    // 初始捕获仅请求按键/拖动,1003h 在存在 hover/Move 追踪时按需补开,只升不降。
     fn enable_any_motion(&mut self) -> io::Result<()> {
         let mut out = io::stdout();
         out.write_all(b"\x1b[?1003h")?;
         out.flush()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initial_capture_reports_buttons_and_drags_without_all_motion() {
+        let mut ansi = String::new();
+        EnableButtonMouseCapture.write_ansi(&mut ansi).unwrap();
+        assert!(ansi.contains("\x1b[?1000h"));
+        assert!(ansi.contains("\x1b[?1002h"));
+        assert!(ansi.contains("\x1b[?1006h"));
+        assert!(!ansi.contains("\x1b[?1003h"));
     }
 }

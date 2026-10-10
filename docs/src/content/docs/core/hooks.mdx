@@ -309,3 +309,7 @@ Implement the lower-level `Hook` trait only when the capability needs its own li
 - It needs to release external resources in `on_drop`.
 
 The standard low-level custom-hook shape is `Sealed trait + UseXxxImpl + Hooks::use_hook`. Start with compositional hooks for ordinary business logic; drop to `Hook` only when existing hooks cannot express the lifecycle.
+
+## Pointer hooks
+
+Use `use_click`, `use_hover`, `use_drag`, and `use_pointer` for mouse interactions. Enable capture explicitly at the entry point; see [Pointer Events](/ratatui-kit/core/pointer-events/).

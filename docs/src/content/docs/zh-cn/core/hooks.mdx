@@ -309,3 +309,7 @@ fn use_command_palette(hooks: &mut Hooks, commands: &'static [Command]) -> Comma
 - 需要在 `on_drop` 中释放外部资源。
 
 底层自定义 hook 的标准形态是 `Sealed trait + UseXxxImpl + Hooks::use_hook`。普通业务逻辑先用组合型 hook；只有现有 hooks 表达不了生命周期时，再落到 `Hook` trait。
+
+## 指针 Hook
+
+点击、悬停、拖拽和自定义鼠标事件使用 `use_click`、`use_hover`、`use_drag`、`use_pointer`。入口必须显式启用捕获，具体用法见[Pointer Events](/ratatui-kit/zh-cn/core/pointer-events/).

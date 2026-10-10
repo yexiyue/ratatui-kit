@@ -1,0 +1,103 @@
+---
+title: Pointer Events
+description: Enable mouse input, choose click, hover and drag hooks, and compose them with input layers.
+---
+
+The `mouse` example combines a toolbar, a draggable divider, a release-to-click zone, hover feedback, and a modal. Pressing a Button changes the counter immediately; clicking the separate click zone updates its single/double/triple count after release.
+
+![Real mouse interactions](/ratatui-kit/recordings/mouse.gif)
+
+```bash
+cargo run --example mouse
+```
+
+Drag the divider with the left button. Open the modal with the toolbar; click its button to keep it open, or click an unhandled area to dismiss it. `Esc` closes the modal; `q` quits even while it is open. The recording uses `docs/tapes/mouse.tape` and `docs/scripts/mouse-demo.py` to send real SGR mouse reports into a PTY running the example.
+
+```bash
+cargo build --example mouse
+vhs docs/tapes/mouse.tape
+```
+
+## Enable at the entry point
+
+Mouse input is core functionality and needs no feature flag. Terminal capture is an explicit runtime choice:
+
+```rust title="examples/input/mouse.rs"
+#[tokio::main]
+async fn main() {
+    element!(App)
+        .fullscreen_with(RunOptions { mouse: true })
+        .await
+        .expect("Failed to run the application");
+}
+```
+
+`fullscreen()` keeps mouse capture off. For an inline viewport, use `render_loop_with(terminal_options, RunOptions { mouse: true })`. The framework restores mouse modes on exit. Depending on the terminal, holding Shift allows native selection while capture is active.
+
+Registering a pointer hook without enabling capture triggers a diagnostic assertion in debug builds. In release builds, ordinary terminal input will not deliver pointer reports unless capture is enabled.
+
+## Choose the smallest API
+
+| Need | API | Trigger |
+| --- | --- | --- |
+| A visible action | [Button](/ratatui-kit/components/button/) | Left-button Down |
+| Release inside the same component | `use_click` | Down + Up; any mouse button |
+| Visual feedback inside a region | `use_hover() -> bool` | Movement into/out of the drawn area |
+| Resize or drag | `use_drag` | Left-button Start / Move / End |
+| Custom filtering or propagation | `use_pointer` | `PointerEvent`, callback returns `EventResult` |
+
+Call hooks unconditionally and in a stable order. To enable or disable an action, guard its callback or mount/unmount a child component; do not conditionally call the hook in the same component.
+
+## Clicks and consecutive clicks
+
+```rust title="examples/input/mouse.rs"
+let mut clicks = hooks.use_state(|| 0u8);
+hooks.use_click(move |click| clicks.set(click.count));
+```
+
+`Click` contains `count`, `button`, `position`, and `modifiers`. Count starts at one, increases to two/three for nearby clicks within a 300ms window, and caps at three. Each completed click invokes the callback immediately: a double click produces count one followed by count two. Releasing outside the component does not synthesize a click. `use_click` consumes the matching press/release events; for custom propagation use `use_pointer`.
+
+## Hover
+
+```rust
+let hovered = hooks.use_hover();
+let style = if hovered { hover_style } else { base_style };
+```
+
+Hover follows the active input layers. A blocking modal excludes background hover trackers. The runtime requests all movement reports only after a hover or `track_move` registration appears; once enabled, that mode remains on until exit. Movement inside an unchanged hover area can skip redraw. A terminal without movement reporting can still handle presses and dragging.
+
+## Drag with capture
+
+```rust title="examples/input/mouse.rs"
+hooks.use_drag(move |d| {
+    if d.phase == DragPhase::Move {
+        let delta = i32::from(d.to.x) - i32::from(d.from.x);
+        split.set((i32::from(split.get()) + delta).clamp(10, 60) as u16);
+    }
+});
+```
+
+`DragUpdate::from` is the previous event position, not the gesture's original start; `to` is the current position. Both use absolute terminal-cell coordinates. Applying the delta avoids confusing a container's local width with a terminal column.
+
+A consumed Down captures that button. Subsequent Drag/Up events go exclusively to the same handler even outside its area, before global or layered handlers. Up releases capture; unmounting or deactivating the captor's layer invalidates it. Buttons are captured independently.
+
+## Custom pointer events
+
+```rust
+hooks.use_pointer(PointerOptions::default(), move |event| {
+    match event.kind {
+        PointerKind::Down(MouseButton::Left) => EventResult::Consumed,
+        _ => EventResult::Ignored,
+    }
+});
+```
+
+`PointerOptions::default()` selects the left button and disables movement tracking. Combine `MouseButtons::LEFT.union(MouseButtons::RIGHT)` for multiple buttons; set `track_move: true` to receive `Enter`, `Move`, and `Leave`. Scroll events are not filtered by the button set. `PointerEvent` contains `kind`, `position`, `modifiers`, and the component's last drawn `area`. Synthetic Click is emitted after Up if a matching press can be paired; consuming Down ensures capture keeps the release with this handler.
+
+## Propagation and modals
+
+Global handlers run first unless an existing capture routes a Drag/Up directly. Within active layers, layer order comes before priority. Equal-priority mouse handlers run in reverse draw order: inner components and later-drawn siblings first. `Consumed` stops delivery; `Ignored` allows the remaining chain to continue. Keyboard handlers retain registration order.
+
+In the example, the root declares `use_input_layer(open, true)` and passes the same handle to `Modal(layer: Some(layer))`. A low-priority `Layer(layer)` handler closes on an unhandled left Down. Buttons inside consume Down before that closer. Panel whitespace is deliberately unhandled, so it dismisses the modal too. See [Input Layers](/ratatui-kit/core/input-layers/) for keyboard isolation.
+
+Hit testing uses the last drawn component rectangle and rejects stale frame stamps. It currently does not intersect that rectangle with visual clipping. Nested ScrollViews do not pass a wheel event outward when the inner view reaches its edge. Pointer input does not establish keyboard focus, and Button does not provide keyboard activation.

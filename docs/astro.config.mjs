@@ -55,6 +55,12 @@ export default defineConfig({
 				src: './src/assets/logo.svg',
 			},
 			favicon: '/favicon.svg',
+			head: [
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://yexiyue.github.io/ratatui-kit/social-preview.png' } },
+				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://yexiyue.github.io/ratatui-kit/social-preview.png' } },
+			],
 			customCss: ['./src/styles/brand.css'],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/yexiyue/ratatui-kit' }],
 			sidebar: [
@@ -90,6 +96,7 @@ export default defineConfig({
 						'core/control-flow',
 						'core/hooks',
 						'core/input-layers',
+						'core/pointer-events',
 						'core/state',
 						'core/theming',
 						'core/routing',
@@ -105,6 +112,7 @@ export default defineConfig({
 						'components/wrapped-text',
 						'components/input',
 						'components/search-input',
+						'components/button',
 						'components/modal',
 						'components/confirm-modal',
 						'components/alert-modal',

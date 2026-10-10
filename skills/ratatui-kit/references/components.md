@@ -744,3 +744,14 @@ You may also hand-write a `Component` and call `drawer.render_widget(...)` / `dr
 ---
 
 Source paths: components directory `crates/ratatui-kit/src/components/` (exports and feature gating in `mod.rs`); layout-field type definitions in `crates/ratatui-kit-macros/src/with_layout_style.rs`; feature definitions in `crates/ratatui-kit/Cargo.toml`; idiomatic usage in `examples/`.
+
+## Button (core)
+
+Mouse-driven action: left Down invokes `Handler<'static, ()>` and consumes the
+press; no built-in keyboard activation. Props: `label: String`, `on_press`,
+`variant: ButtonVariant` (Primary/Secondary/Danger), `disabled: bool`,
+`width: Option<u16>` (label display width + 4), `style: Option<Style>`. Height
+is 3 rows. `ButtonTheme` slots: primary/secondary/danger/disabled styles and
+`hover_modifier`. Disabled passes through input and suppresses visible hover.
+Enable capture even when the mounted Button is disabled: its hooks remain
+registered to preserve call order. See [pointer-events.md](pointer-events.md).

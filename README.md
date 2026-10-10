@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="docs/src/assets/logo.svg" width="120" alt="Ratatui Kit logo" />
+<img src="docs/public/social-preview.png" width="100%" alt="Ratatui Kit: Terminal UI. Composed." />
 
 # Ratatui Kit
 
-**Build component-driven terminal UIs in Rust with React-style components, hooks, props, routing, input layers, theming, and global state. Powered by Ratatui and Tokio.**
+**Terminal UI. Composed.**
+
+Build with components. Think in state. A Rust terminal UI framework built on Ratatui and Tokio.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)
 [![crates.io](https://img.shields.io/crates/v/ratatui-kit?logo=rust&color=E43717)](https://crates.io/crates/ratatui-kit)
@@ -26,17 +28,24 @@
 
 ## Overview
 
-Ratatui Kit is a component framework for terminal UIs built on top of [Ratatui](https://github.com/ratatui/ratatui). It brings familiar frontend ideas - components, props, hooks, context, routing, and scoped global state - into Rust terminal applications without hiding the underlying Ratatui drawing model.
+Ratatui Kit adds components, props, hooks, routing, input layers, and theming to Rust terminal applications. Ratatui draws the interface. Tokio drives async work. The framework manages component lifetimes, retained state, and reactive rendering.
 
-If you know React, the mental model should feel familiar:
+- **Describe the interface** with `#[component]` and `element!`. Compose layouts and embed native Ratatui widgets.
+- **Organize state** with hooks for local state, futures, and effects. Opt into atoms for shared state.
+- **Build the application** with routes, isolated input layers, and palettes that coordinate the whole interface.
 
-- `element!` gives you JSX-like declarative UI syntax.
-- `#[component]` turns a function into a reusable component.
-- `use_state`, `use_future`, `use_async_state`, `use_effect`, and `use_context` organize state and side effects.
-- `RouterProvider`, `Outlet`, and `routes!` model multi-page terminal apps.
-- `Atom` and `use_atom` provide process-wide reactive state behind the `atom` feature.
+The pixel terminal assembler reflects Ratatui’s terminal culture and this framework’s component layer. See the [brand assets](assets/brand/README.md) for the character source and usage guidelines.
 
-Ratatui gives you the terminal canvas and widgets. Ratatui Kit adds component identity, state retention, reconciliation, input routing, and async-aware rendering.
+### See it running
+
+The website includes real terminal recordings with playback controls. Clone this repository to run the same examples locally:
+
+| Example | Run command | Walkthrough |
+| --- | --- | --- |
+| Task management | `cargo run --example todo_app` | [Task management](https://yexiyue.github.io/ratatui-kit/apps/todo-app/) |
+| Mouse interaction | `cargo run --example mouse` | [Mouse interaction](https://yexiyue.github.io/ratatui-kit/core/pointer-events/) |
+| Data tables | `cargo run --example table` | [Data tables](https://yexiyue.github.io/ratatui-kit/components/table/) |
+| Routing | `cargo run --example router` | [Routing](https://yexiyue.github.io/ratatui-kit/tutorials/router/) |
 
 <details>
 <summary>Table of contents</summary>
@@ -197,6 +206,7 @@ README keeps the API overview intentionally compact. See the [documentation site
 | `ScrollView` | Scrollable viewport | core |
 | `ContextProvider` | Scoped context injection | core |
 | `PaletteProvider`, `ThemeOverride` | Theme injection — global palette and per-component overrides | core |
+| `Button` | Mouse action button (left Down) | core |
 | `Input`, `SearchInput` | Single-line input and search input | `input` |
 | `TreeSelect` | Tree selection | `tree` |
 | `Table` | Data-driven table with cell-grid borders, wrapping, responsive columns, footer rows, and row/column highlighting | `table` |
@@ -214,6 +224,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `use_memo`, `use_effect` | Memoized derived values and side effects | core |
 | `use_context` | Read values from the nearest context provider | core |
 | `use_palette`, `use_component_theme` | Read the current palette or a resolved component theme | core |
+| `use_click` / `use_hover` / `use_drag` / `use_pointer` | Click, hover, drag, pointer events | core |
 | `use_event_handler` | Register scoped input handlers | core |
 | `use_input_layer` | Create a same-frame input layer handle | core |
 | `use_insert_before`, `use_terminal_size` | Insert content before render and read terminal size | core |
@@ -338,3 +349,5 @@ This repository uses lefthook for local pre-commit checks.
 ## License
 
 Ratatui Kit is released under the [MIT License](https://github.com/yexiyue/ratatui-kit/blob/main/LICENSE).
+
+Mouse interactions: `cargo run --example mouse`. Enable capture with `fullscreen_with(RunOptions { mouse: true })`. See [Pointer Events](https://yexiyue.github.io/ratatui-kit/core/pointer-events/).

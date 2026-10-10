@@ -86,7 +86,9 @@ Avoid writing a marketing landing page as a tutorial. The tutorial should feel l
 
 ### 5. Wire homepage only when useful
 
-If the user asks for a homepage slice, reference the real runtime artifact from the selected example. The homepage may be visually ambitious, but the first viewport should still show actual product behavior.
+If the user asks for a homepage slice, reference the real runtime artifact from the selected example. Keep actual product behavior prominent. For a user-requested brand hero, place real runtime examples immediately after the hero instead of substituting decorative mockups for them.
+
+Read `references/homepage-brand.md` when changing the bilingual homepage, its playback controls, or brand assets.
 
 ### 6. Validate and report
 

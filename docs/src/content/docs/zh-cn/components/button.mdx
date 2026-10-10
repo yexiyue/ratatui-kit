@@ -1,0 +1,46 @@
+---
+title: Button
+description: 带主题、悬停反馈和禁用状态的鼠标操作按钮。
+---
+
+`Button` 在左键 **Down** 时调用 `on_press` 并消费按下事件。它属于核心组件，无需 feature；入口须通过 `fullscreen_with(RunOptions { mouse: true })` 开启捕获。
+
+![按钮与弹窗交互](/ratatui-kit/recordings/mouse.gif)
+
+```bash
+cargo run --example mouse
+```
+
+```rust title="examples/input/mouse.rs"
+Button(
+    label: "Reset",
+    variant: ButtonVariant::Secondary,
+    disabled: count.get() == 0,
+    on_press: move |()| count.set(0),
+)
+```
+
+回调接收 `()`，遵循既有 `Handler<'static, ()>` 契约：捕获值须满足 `Send + Sync + 'static`，可直接捕获 `State` handle。
+
+## Props
+
+| Prop | 类型 | 默认值 / 行为 |
+| --- | --- | --- |
+| `label` | `String` | 空字符串 |
+| `on_press` | `Handler<'static, ()>` | 空操作；左键 Down 触发一次，Up 不重复 |
+| `variant` | `ButtonVariant` | `Primary`，还支持 `Secondary`、`Danger` |
+| `disabled` | `bool` | `false`；禁用回调与可见悬停，事件放行 |
+| `width` | `Option<u16>` | 标签显示宽度 + 4 格，包含边框 |
+| `style` | `Option<Style>` | 在变体上 patch；禁用样式优先 |
+
+高度固定三行。`width` 是格数，不是 `Constraint`，定位可在外层组合 `View`。禁用按钮保留布局和稳定 Hook 顺序，不阻拦下层内容的点击。
+
+## 主题
+
+`ButtonTheme` 从最近的 `Palette` 派生，包含 `primary_style`、`secondary_style`、`danger_style`、`disabled_style`、`hover_modifier`。可用 `ThemeOverride::<ButtonTheme>` 整体覆盖，或用 `style` 修改单个按钮。悬停附加主题修饰，默认为加粗。启用按钮用解析后的背景色绘制边框与标签，不把矩形铺成整块背景。
+
+## 交互边界
+
+Button 不内置键盘焦点或 Enter/Space 激活。应用应单独注册快捷键，调用同一业务动作。释放后激活或双击行为可在自定义组件中组合 `use_click`。弹窗中的禁用按钮会放行点击，可能继续触发遮罩关闭；若不希望如此，可在面板 handler 中消费。
+
+传播、捕获、拖拽和弹窗组合见[指针事件](/ratatui-kit/zh-cn/core/pointer-events/)。

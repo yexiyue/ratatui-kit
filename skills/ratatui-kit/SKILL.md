@@ -16,7 +16,7 @@ license: MIT
 metadata:
   author: yexiyue
   framework: ratatui-kit
-  version: "1.0.1"
+  version: "1.0.2"
 ---
 
 # ratatui-kit — Building Terminal UIs in Rust
@@ -64,8 +64,8 @@ When asked to build, scaffold, or extend a ratatui-kit UI, work in this order:
    `flex_direction`, `gap`, …) on the **root element you return**, not on the call
    site of a function component.
 
-4. **Wire input and lifecycle.** Register keyboard/mouse handlers with
-   `use_event_handler` (always the same shape — see below). Get the quit callback
+4. **Wire input and lifecycle.** Register keyboard handlers with
+   `use_event_handler`; use semantic pointer hooks for mouse interactions. Get the quit callback
    from `use_exit`. Ctrl+C exits through the framework by default; applications
    that need cancellation or double-press exit can explicitly route it through
    the central event dispatcher.
@@ -84,7 +84,8 @@ For anything beyond the essentials on this page, open the matching reference:
 | Which component to use, its exact props/types | `references/components.md` |
 | Hook signatures, `State`/`AtomState` methods & operators | `references/hooks.md` |
 | `element!` grammar, `#[component]`, `#[derive(Props)]`, `routes!`, adapters | `references/syntax-and-macros.md` |
-| Keyboard/mouse events, input layers, state, routing | `references/events-state-routing.md` |
+| Click / hover / drag, pointer capture, Button, mouse setup | `references/pointer-events.md` |
+| Keyboard events, input layers, state, routing | `references/events-state-routing.md` |
 | App skeleton, layout & visual polish, interactive patterns, pitfalls | `references/building-polished-uis.md` |
 | Every `Palette`/`*Theme` field, custom `ComponentTheme`, preset themes | `references/theming.md` |
 
@@ -97,7 +98,7 @@ runtime is required — the docs and examples use Tokio.
 
 ```toml
 [dependencies]
-ratatui-kit = { version = "0.10", features = ["full"] }
+ratatui-kit = { version = "0.11", features = ["full"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 
@@ -118,7 +119,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 Core components need **no feature**: `View`, `Border`, `Center`, `Fragment`,
 `Text`, `WrappedText`, `Positioned`, `Modal`, `ConfirmModal`, `AlertModal`,
-`ShortcutInfoModal`, `Select`, `MultiSelect`, `ScrollView`, `ContextProvider`.
+`ShortcutInfoModal`, `Button`, `Select`, `MultiSelect`, `ScrollView`, `ContextProvider`.
 
 > The `textarea` feature is currently offline (its dependency has no Ratatui 0.30
 > build). Don't reference `TextArea`.
@@ -311,6 +312,13 @@ reacting) use an **input layer**. Prefer the built-in `ConfirmModal` / `AlertMod
 callback. Roll your own layer only for custom modal interactions; see
 `references/events-state-routing.md` for `use_input_layer` and the layering rules.
 
+**Mouse interactions.** Enable capture explicitly at the app entry with
+`fullscreen_with(RunOptions { mouse: true })`. Use `Button` for left-button Down
+activation, `use_click` for release-inside activation, and `use_hover` / `use_drag`
+for region feedback and resizing. These are core APIs with no feature gate;
+Button has no built-in keyboard focus/activation. Read
+`references/pointer-events.md` before building a pointer interaction.
+
 **Custom Ctrl+C behavior.** The default remains immediate framework exit. To
 implement agent cancellation, confirmation, or double-press exit, call
 `SystemContext::set_auto_quit_on_ctrl_c(false)` from the root component and
@@ -468,7 +476,7 @@ cargo run                             # run it; or `cargo run --example <name>` 
 
 Most first-compile failures are trivial and the compiler names them precisely — a
 missing `mut` on a mutated `State` handle, a wrong prop name, or an un-enabled
-feature. The repo has a few focused unit tests (router matching, reactive operators)
-but no broad coverage, so don't lean on `cargo test` for correctness — a clean
-compile plus the right idioms is the bar. If you scaffolded a binary, a successful
+feature. The repo has runtime, component, pointer-interaction, and macro UI tests.
+For framework changes, run the repository's all-feature test matrix in addition
+to compiling the application. If you scaffolded a binary, a successful
 `cargo run` that draws the expected first frame confirms the wiring.

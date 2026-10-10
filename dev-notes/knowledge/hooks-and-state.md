@@ -31,7 +31,19 @@
 
 ### 内置 Hook 清单
 
-`use_state` `use_future` `use_event_handler`/`use_input_layer` `use_context` `use_memo` `use_effect` `use_async_state` `use_insert_before` `use_size` `use_exit` `use_on_drop`；特性门控的 `use_router`/`use_navigate`（`router`，同一文件内）、`use_atom`（`atom`）。`use_navigate` 定义在 `use_router.rs` 内，不是单独文件。
+`use_state` `use_future` `use_click`/`use_hover`/`use_drag`/`use_pointer` `use_event_handler`/`use_input_layer` `use_context` `use_memo` `use_effect` `use_async_state` `use_insert_before` `use_size` `use_exit` `use_on_drop`；特性门控的 `use_router`/`use_navigate`（`router`，同一文件内）、`use_atom`（`atom`）。`use_navigate` 定义在 `use_router.rs` 内，不是单独文件。
+
+### 指针 Hook 与终端捕获
+
+指针能力是核心 API，不挂 `input` feature；`RunOptions { mouse: true }` 才开启终端捕获。Button 在左键 Down 触发，`use_click` 在同组件内释放后触发，两者语义不同。
+
+**正确做法**：
+- `MouseButtons::default()` 必须是 LEFT，不能派生位图零值，否则默认 `PointerOptions` 静默过滤全部按键。
+- `use_drag` 的 `from` 是上一事件位置，`to` 是当前终端绝对坐标；修改本地宽度时应用差值，避免 margin/offset 造成跳动。
+- 外部状态有可选 fallback 时，每帧无条件初始化 local Hook，再用 `props.state.unwrap_or(local)` 选择；不要把 Hook 藏进 `unwrap_or_else`。
+- hover 追踪记录输入层并过滤活跃层；hover diff 在 Global 消费前执行，避免全局消费者让悬停状态停留。
+
+**相关文件**：`crates/ratatui-kit/src/hooks/use_pointer.rs`、`crates/ratatui-kit/src/input/mod.rs`、`examples/input/mouse.rs`、`skills/ratatui-kit/references/pointer-events.md`
 
 **相关文件**：`crates/ratatui-kit/src/hooks/`
 

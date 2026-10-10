@@ -1,0 +1,103 @@
+---
+title: 指针事件
+description: 显式开启鼠标输入，组合点击、悬停、拖拽和输入层。
+---
+
+`mouse` 示例把工具栏、可拖动分隔条、释放点击区域、悬停反馈和弹窗放在同一界面。Button 在按下时立即更新计数；独立点击区域则在释放后显示单击、双击、三击计数。
+
+![真实鼠标交互](/ratatui-kit/recordings/mouse.gif)
+
+```bash
+cargo run --example mouse
+```
+
+左键拖动分隔条，点击工具栏打开弹窗。弹窗内按钮消费点击并保持弹窗打开；未处理的空白区域会关闭弹窗。`Esc` 关闭弹窗，`q` 在弹窗打开时也能退出。录制通过 `docs/tapes/mouse.tape` 与 `docs/scripts/mouse-demo.py` 向运行真实示例的 PTY 发送 SGR 鼠标报告。
+
+```bash
+cargo build --example mouse
+vhs docs/tapes/mouse.tape
+```
+
+## 在入口显式开启
+
+指针 API 属于核心能力，无需 feature；终端捕获由运行选项控制：
+
+```rust title="examples/input/mouse.rs"
+#[tokio::main]
+async fn main() {
+    element!(App)
+        .fullscreen_with(RunOptions { mouse: true })
+        .await
+        .expect("Failed to run the application");
+}
+```
+
+`fullscreen()` 默认不开鼠标。内嵌视口可用 `render_loop_with(terminal_options, RunOptions { mouse: true })`。框架退出时恢复鼠标模式。部分终端可按住 Shift 进行原生拖选。
+
+未开启捕获就注册指针 Hook，debug 构建会断言并提示入口用法；release 构建中，普通终端在未开启捕获时不会投递鼠标报告。
+
+## 按交互选择 API
+
+| 场景 | API | 触发时机 |
+| --- | --- | --- |
+| 可见操作按钮 | [Button](/ratatui-kit/zh-cn/components/button/) | 左键 Down |
+| 按下并在同一组件内释放 | `use_click` | Down + Up，支持所有鼠标按键 |
+| 区域内视觉反馈 | `use_hover() -> bool` | 移入或移出绘制区域 |
+| 拖动或调整尺寸 | `use_drag` | 左键 Start / Move / End |
+| 自定义过滤、传播 | `use_pointer` | `PointerEvent`，回调返回 `EventResult` |
+
+所有 Hook 都必须无条件、按固定顺序调用。启停交互可在回调中判断，或挂载/卸载子组件，不要在同一组件中条件调用 Hook。
+
+## 点击与连击
+
+```rust title="examples/input/mouse.rs"
+let mut clicks = hooks.use_state(|| 0u8);
+hooks.use_click(move |click| clicks.set(click.count));
+```
+
+`Click` 包含 `count`、`button`、`position`、`modifiers`。计数从一开始，300ms 窗口内邻近位置连续点击递增到二、三，上限三。每次完成点击都立即回调：双击先收到一，再收到二。在区域外释放不合成点击。`use_click` 消费配对的按下/释放；需要自行控制传播时用 `use_pointer`。
+
+## 悬停
+
+```rust
+let hovered = hooks.use_hover();
+let style = if hovered { hover_style } else { base_style };
+```
+
+悬停遵守活跃输入层，阻断型弹窗排除背景追踪。首次注册 hover 或 `track_move` 后，框架才请求全量移动上报；启用后保持到退出。区域内移动而悬停集合不变时可跳过重绘。终端不支持移动上报时，按下和拖拽仍可工作。
+
+## 拖拽与捕获
+
+```rust title="examples/input/mouse.rs"
+hooks.use_drag(move |d| {
+    if d.phase == DragPhase::Move {
+        let delta = i32::from(d.to.x) - i32::from(d.from.x);
+        split.set((i32::from(split.get()) + delta).clamp(10, 60) as u16);
+    }
+});
+```
+
+`DragUpdate::from` 是上一事件的位置，不是整个手势的初始点；`to` 是当前点。两者都是终端单元格绝对坐标，用差值修改宽度可避免容器 margin 引起的偏移。
+
+消费 Down 会捕获该按键；后续 Drag/Up 即使在区域外也独占投递给同一 handler，先于 Global 和层内链。Up 释放捕获；组件卸载或所在层失活也会使捕获失效。各按键独立捕获。
+
+## 自定义事件
+
+```rust
+hooks.use_pointer(PointerOptions::default(), move |event| {
+    match event.kind {
+        PointerKind::Down(MouseButton::Left) => EventResult::Consumed,
+        _ => EventResult::Ignored,
+    }
+});
+```
+
+默认选项仅选择左键、不开移动追踪。多个按键可用 `MouseButtons::LEFT.union(MouseButtons::RIGHT)`，`track_move: true` 开启 `Enter` / `Move` / `Leave`。滚轮不受按键集合过滤。`PointerEvent` 包含 `kind`、`position`、`modifiers` 和最近绘制的 `area`。能够配对按下时，Up 后还会合成 Click；消费 Down 可通过捕获保证释放送回当前 handler。
+
+## 传播与弹窗
+
+除已捕获的 Drag/Up 外，Global handler 先执行。活跃层中层级优先于 priority；同优先级鼠标 handler 按绘制序倒排，内层、后画的兄弟先收到。`Consumed` 截断，`Ignored` 继续传播。键盘仍按注册序投递。
+
+示例在根组件调用 `use_input_layer(open, true)`，把同一 handle 传给 `Modal(layer: Some(layer))`。Low 优先级的 `Layer(layer)` handler 收到未消费的左键 Down 后关闭弹窗。内部 Button 先消费点击；面板空白刻意放行，因此也会关闭。键盘隔离见[输入层](/ratatui-kit/zh-cn/core/input-layers/)。
+
+命中使用最近绘制的组件矩形，并排除旧帧区域。目前矩形不与视觉裁剪求交；嵌套 ScrollView 到边缘时不向外传递滚轮。指针交互不建立键盘焦点，Button 也不内置键盘激活。

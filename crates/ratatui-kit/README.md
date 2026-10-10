@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/yexiyue/ratatui-kit/main/docs/public/icon-512.png" width="120" alt="Ratatui Kit logo" />
+<img src="https://raw.githubusercontent.com/yexiyue/ratatui-kit/main/docs/public/social-preview.png" width="100%" alt="Ratatui Kit: Terminal UI. Composed." />
 
 # Ratatui Kit
 
-**Build component-driven terminal UIs in Rust with React-style components, hooks, props, routing, input layers, theming, and global state. Powered by Ratatui and Tokio.**
+**Terminal UI. Composed.**
+
+Build with components. Think in state. A Rust terminal UI framework built on Ratatui and Tokio.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)
 [![crates.io](https://img.shields.io/crates/v/ratatui-kit?logo=rust&color=E43717)](https://crates.io/crates/ratatui-kit)
@@ -17,8 +19,8 @@
 **[Quick Start](https://yexiyue.github.io/ratatui-kit/start/quick-start/)** ·
 **[Components](https://yexiyue.github.io/ratatui-kit/components/)** ·
 **[Examples](https://yexiyue.github.io/ratatui-kit/examples/)** ·
-**[GitHub](https://github.com/yexiyue/ratatui-kit)** ·
-**[Ecosystem](https://github.com/yexiyue/awesome-ratatui-kit)**
+**[Ecosystem](https://github.com/yexiyue/awesome-ratatui-kit)** ·
+**[简体中文](https://github.com/yexiyue/ratatui-kit/blob/main/README.zh-CN.md)**
 
 </div>
 
@@ -26,17 +28,39 @@
 
 ## Overview
 
-Ratatui Kit is a component framework for terminal UIs built on top of [Ratatui](https://github.com/ratatui/ratatui). It brings familiar frontend ideas - components, props, hooks, context, routing, theming, and scoped global state - into Rust terminal applications without hiding the underlying Ratatui drawing model.
+Ratatui Kit adds components, props, hooks, routing, input layers, and theming to Rust terminal applications. Ratatui draws the interface. Tokio drives async work. The framework manages component lifetimes, retained state, and reactive rendering.
 
-If you know React, the mental model should feel familiar:
+- **Describe the interface** with `#[component]` and `element!`. Compose layouts and embed native Ratatui widgets.
+- **Organize state** with hooks for local state, futures, and effects. Opt into atoms for shared state.
+- **Build the application** with routes, isolated input layers, and palettes that coordinate the whole interface.
 
-- `element!` gives you JSX-like declarative UI syntax.
-- `#[component]` turns a function into a reusable component.
-- `use_state`, `use_future`, `use_async_state`, `use_effect`, and `use_context` organize state and side effects.
-- `RouterProvider`, `Outlet`, and `routes!` model multi-page terminal apps.
-- `Atom` and `use_atom` provide process-wide reactive state behind the `atom` feature.
+The pixel terminal assembler reflects Ratatui’s terminal culture and this framework’s component layer. See the [brand assets](https://github.com/yexiyue/ratatui-kit/blob/main/assets/brand/README.md) for the character source and usage guidelines.
 
-Ratatui gives you the terminal canvas and widgets. Ratatui Kit adds component identity, state retention, reconciliation, input routing, theming, and async-aware rendering.
+### See it running
+
+The website includes real terminal recordings with playback controls. Clone this repository to run the same examples locally:
+
+| Example | Run command | Walkthrough |
+| --- | --- | --- |
+| Task management | `cargo run --example todo_app` | [Task management](https://yexiyue.github.io/ratatui-kit/apps/todo-app/) |
+| Mouse interaction | `cargo run --example mouse` | [Mouse interaction](https://yexiyue.github.io/ratatui-kit/core/pointer-events/) |
+| Data tables | `cargo run --example table` | [Data tables](https://yexiyue.github.io/ratatui-kit/components/table/) |
+| Routing | `cargo run --example router` | [Routing](https://yexiyue.github.io/ratatui-kit/tutorials/router/) |
+
+<details>
+<summary>Table of contents</summary>
+
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Built-in components and hooks](#built-in-components-and-hooks)
+- [Feature flags](#feature-flags)
+- [Documentation and examples](#documentation-and-examples)
+- [Ecosystem](#ecosystem)
+- [Design goals](#design-goals)
+- [Contributing](#contributing)
+- [License](#license)
+
+</details>
 
 ---
 
@@ -146,42 +170,29 @@ fn Counter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
 }
 ```
 
-## Theming
+Run the example from this repository:
 
-Every built-in component reads its colors from a shared `Palette`; there is no hardcoded color. Tune the palette in one place and the whole tree re-colors:
-
-```rust,no_run
-use ratatui_kit::prelude::*;
-use ratatui_kit::ratatui::style::Color;
-
-let mut palette = Palette::default();
-palette.accent = Color::Rgb(94, 175, 255);
-
-// every component inside derives its styles from `palette`
-let _themed = element!(PaletteProvider(palette: palette) {
-    Text(text: "themed by the shared palette")
-});
+```bash
+cargo run --example counter
 ```
-
-Per-call style props are `Option<Style>` (`None` = theme, `Some(s)` = patch over the theme, `Some(Style::reset())` = clear). Re-style one component type with `ThemeOverride::<BorderTheme>(theme: ...)`, and drive the palette from an `Atom<Palette>` to switch themes at runtime. See the [Theming guide](https://yexiyue.github.io/ratatui-kit/core/theming/).
 
 ---
 
 ## AI-assisted development
 
-Ratatui Kit ships an **AI agent skill** — a packaged knowledge base that teaches your AI coding assistant the framework's real components, props, and hooks, the `element!` macro, input layers, theming, and the router — so you can ask it to *"build me a terminal todo app"* and get code that **compiles and follows the framework's idioms**, instead of guessed APIs.
+Ratatui Kit ships an **AI agent skill** — a packaged knowledge base that teaches your AI coding assistant the framework's real components, props, and hooks, the `element!` macro, input layers, and the router — so you can ask it to *"build me a terminal todo app"* and get code that **compiles and follows the framework's idioms**, instead of guessed APIs.
 
 ```bash
 npx skills add yexiyue/ratatui-kit --skill ratatui-kit
 ```
 
-The skill lives in [`skills/ratatui-kit/`](https://github.com/yexiyue/ratatui-kit/tree/main/skills/ratatui-kit) and your assistant consults it automatically. Pair it with the general-purpose `rust-best-practices` and `rust-async-patterns` skills for Rust-level correctness. See [**AI-assisted development**](https://yexiyue.github.io/ratatui-kit/start/ai-skill/) for the full guide.
+The skill lives in [`skills/ratatui-kit/`](skills/ratatui-kit/) and your assistant consults it automatically. Pair it with the general-purpose `rust-best-practices` and `rust-async-patterns` skills for Rust-level correctness. See [**AI-assisted development**](https://yexiyue.github.io/ratatui-kit/start/ai-skill/) for the full guide.
 
 ---
 
 ## Built-in components and hooks
 
-This overview is intentionally compact. See the [documentation site](https://yexiyue.github.io/ratatui-kit/) and [docs.rs](https://docs.rs/ratatui-kit) for signatures and deeper examples.
+README keeps the API overview intentionally compact. See the [documentation site](https://yexiyue.github.io/ratatui-kit/) and [docs.rs](https://docs.rs/ratatui-kit) for signatures and deeper examples.
 
 ### Components
 
@@ -195,6 +206,7 @@ This overview is intentionally compact. See the [documentation site](https://yex
 | `ScrollView` | Scrollable viewport | core |
 | `ContextProvider` | Scoped context injection | core |
 | `PaletteProvider`, `ThemeOverride` | Theme injection — global palette and per-component overrides | core |
+| `Button` | Mouse action button (left Down) | core |
 | `Input`, `SearchInput` | Single-line input and search input | `input` |
 | `TreeSelect` | Tree selection | `tree` |
 | `Table` | Data-driven table with cell-grid borders, wrapping, responsive columns, footer rows, and row/column highlighting | `table` |
@@ -212,6 +224,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `use_memo`, `use_effect` | Memoized derived values and side effects | core |
 | `use_context` | Read values from the nearest context provider | core |
 | `use_palette`, `use_component_theme` | Read the current palette or a resolved component theme | core |
+| `use_click` / `use_hover` / `use_drag` / `use_pointer` | Click, hover, drag, pointer events | core |
 | `use_event_handler` | Register scoped input handlers | core |
 | `use_input_layer` | Create a same-frame input layer handle | core |
 | `use_insert_before`, `use_terminal_size` | Insert content before render and read terminal size | core |
@@ -239,7 +252,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `serde` | `Serialize` / `Deserialize` for `Palette` | `serde`, `ratatui/serde` |
 | `full` | All optional features above | - |
 
-The theming protocol (`Palette`, `ComponentTheme`, `PaletteProvider`, `ThemeOverride`, and every `FooTheme`) is always-on and needs no feature flag. The `textarea` feature is currently disabled during the Ratatui 0.30 migration because `tui-textarea` does not yet provide a compatible release.
+The `textarea` feature is currently disabled during the Ratatui 0.30 migration because `tui-textarea` does not yet provide a compatible release.
 
 ---
 
@@ -255,18 +268,54 @@ The theming protocol (`Palette`, `ComponentTheme`, `PaletteProvider`, `ThemeOver
 - [Built-in components](https://yexiyue.github.io/ratatui-kit/components/)
 - [Examples](https://yexiyue.github.io/ratatui-kit/examples/)
 - [Simplified Chinese docs](https://yexiyue.github.io/ratatui-kit/zh-cn/start/)
+- [DeepWiki](https://deepwiki.com/yexiyue/ratatui-kit)
 
-The [GitHub repository](https://github.com/yexiyue/ratatui-kit) carries runnable examples — clone it and `cargo run --example <name>` (e.g. `counter`, `atom_state`, `router`, `modal`, `table`, `theme`, `todo_app`); the workspace enables `full`.
+Selected runnable examples:
+
+```bash
+cargo run --example counter        # local state + async updates
+cargo run --example atom_state     # global atom state
+cargo run --example router         # RouterProvider and nested Outlet
+cargo run --example modal          # modal input isolation
+cargo run --example table          # data table with wrapping + highlights
+cargo run --example todo_app       # full workflow: state, input, routing, modals
+```
+
+<details>
+<summary>All examples (<code>cargo run --example &lt;name&gt;</code>)</summary>
+
+```text
+hello_world          counter              async_state          atom_state
+router               control_flow         input_mutex          input
+search_input         scrollview           wrapped_text         modal
+confirm_modal        alert_modal          shortcut_info_modal  select
+multi_select         tree_select          table                 virtual_list
+virtual_multi_select custom_widget        custom_hook           custom_provider
+todo_app
+```
+
+Some examples require optional features such as `input`, `tree`, `table`, `virtual-list`, or `router`. Running examples from this repository uses the workspace configuration and enables `full`.
+
+</details>
 
 ---
 
 ## Ecosystem
 
-Beyond the built-in components, ratatui-kit has a growing ecosystem of third-party component crates, published independently as `ratatui-kit-<name>`. They depend only on the stable [Extension API](https://github.com/yexiyue/ratatui-kit/blob/main/EXTENSION_API.md) and do **not** need to be merged into this repo, so the core stays small.
+Beyond the built-in components, ratatui-kit has a growing ecosystem of third-party
+component crates, published independently as `ratatui-kit-<name>`. They depend only on the
+stable [Extension API](./EXTENSION_API.md) and do **not** need to be merged into this repo,
+so the core stays small.
 
-- **Find components** — search the [`ratatui-kit` keyword](https://crates.io/keywords/ratatui-kit) on crates.io, or browse [awesome-ratatui-kit](https://github.com/yexiyue/awesome-ratatui-kit).
-- **Write your own** — scaffold from the [component template](https://github.com/yexiyue/ratatui-kit-component-template) (`cargo generate yexiyue/ratatui-kit-component-template`) and follow the [Component Guide](https://github.com/yexiyue/ratatui-kit/blob/main/COMPONENT_GUIDE.md).
-- **Official extensions** live in [ratatui-kit-contrib](https://github.com/yexiyue/ratatui-kit-contrib) (e.g. `ratatui-kit-markdown` — Markdown / code-block / diff / blockquote / divider).
+- **Find components** — search the [`ratatui-kit` keyword](https://crates.io/keywords/ratatui-kit)
+  on crates.io, or browse [awesome-ratatui-kit](https://github.com/yexiyue/awesome-ratatui-kit).
+- **Write your own** — scaffold from the
+  [component template](https://github.com/yexiyue/ratatui-kit-component-template)
+  (`cargo generate yexiyue/ratatui-kit-component-template`) and follow the
+  [Component Guide](./COMPONENT_GUIDE.md).
+- **Official extensions** live in
+  [ratatui-kit-contrib](https://github.com/yexiyue/ratatui-kit-contrib) (e.g.
+  `ratatui-kit-markdown` — Markdown / code-block / diff / blockquote / divider).
 
 ## Design goals
 
@@ -282,8 +331,23 @@ Ratatui Kit is inspired by React, [iocraft](https://github.com/ccbrown/iocraft),
 
 ## Contributing
 
-Issues and pull requests are welcome on [GitHub](https://github.com/yexiyue/ratatui-kit). Before sending a PR, run the CI validation matrix (`cargo fmt --all --check`, `cargo clippy --all-targets --all-features --workspace -- -D warnings`, `cargo test --locked --all-features --workspace --lib --tests --examples`).
+Issues and pull requests are welcome.
+
+Before sending a PR, run the same validation matrix used by CI:
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-targets --all-features --workspace -- -D warnings
+cargo test --locked --all-features --workspace --lib --tests --examples
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-features --workspace --examples
+```
+
+This repository uses lefthook for local pre-commit checks.
+
+---
 
 ## License
 
 Ratatui Kit is released under the [MIT License](https://github.com/yexiyue/ratatui-kit/blob/main/LICENSE).
+
+Mouse interactions: `cargo run --example mouse`. Enable capture with `fullscreen_with(RunOptions { mouse: true })`. See [Pointer Events](https://yexiyue.github.io/ratatui-kit/core/pointer-events/).

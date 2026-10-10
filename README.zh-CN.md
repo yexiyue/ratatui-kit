@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="docs/src/assets/logo.svg" width="120" alt="Ratatui Kit logo" />
+<img src="docs/public/social-preview.png" width="100%" alt="Ratatui Kit: Terminal UI. Composed." />
 
 # Ratatui Kit
 
-**Build component-driven terminal UIs in Rust — React-style components, hooks, props, router & global state. Powered by Ratatui.**
+**终端界面，从容构建。**
 
-用 React 式的组件、Hooks、Props、路由、输入层、主题与全局状态，在终端里构建声明式、响应式、异步的 TUI —— 构建于 Ratatui 与 Tokio 之上。
+用 Rust 组件描述界面，用 Hooks 管理状态。构建于 Ratatui 与 Tokio 之上。
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yexiyue/ratatui-kit)
 [![crates.io](https://img.shields.io/crates/v/ratatui-kit?logo=rust&color=E43717)](https://crates.io/crates/ratatui-kit)
@@ -28,11 +28,24 @@
 
 ## 简介
 
-**Ratatui Kit** 是一个基于 [Ratatui](https://github.com/ratatui/ratatui) 的 Rust 终端 UI 组件化框架。它把 React 生态里那套成熟的心智模型——组件、Props、Hooks、Context、路由、全局状态——带到终端，让你像写前端一样写复杂 TUI。
+Ratatui Kit 为 Rust 终端应用提供组件、Props、Hooks、路由、输入层与主题。Ratatui 负责绘制，Tokio 驱动异步任务，框架管理组件生命周期、状态保留与响应式渲染。
 
-如果你熟悉 React，你会立刻有宾至如归的感觉：`element!` 之于 JSX、`#[component]` 之于函数组件、`use_state` 之于 `useState`、`use_future` 之于 effect + async。底层渲染与布局由 [Ratatui](https://github.com/ratatui/ratatui) 提供，异步运行时由 [Tokio](https://github.com/tokio-rs/tokio) 提供，响应式状态由 [generational-box](https://crates.io/crates/generational-box) 支撑。
+- **描述界面**：用 `#[component]` 定义组件，用 `element!` 组合布局与原生 Ratatui widget。
+- **组织状态**：通过 Hooks 管理本地状态、异步任务与副作用；按需用 Atom 共享状态。
+- **构建应用**：用路由组织页面，以输入层隔离弹窗与后台快捷键，通过 Palette 统一视觉。
 
-> Ratatui 给你画布与 widget；Ratatui Kit 给你组件、状态与协调（reconciliation），让复杂 TUI 像写 React 一样可维护。它是 Ratatui 之上的**组件化与响应式增强层**，而非替代。
+品牌形象采用像素终端构建者，呼应 Ratatui 的终端文化与本框架的组件封装。角色源图与使用约定见[品牌资产](assets/brand/README.md)。
+
+### 看看实际运行效果
+
+官网提供可播放、可暂停的真实终端录屏。下载仓库后可以运行相同的示例：
+
+| 示例 | 运行命令 | 文档 |
+| --- | --- | --- |
+| 任务应用 | `cargo run --example todo_app` | [任务应用](https://yexiyue.github.io/ratatui-kit/zh-cn/apps/todo-app/) |
+| 鼠标交互 | `cargo run --example mouse` | [鼠标交互](https://yexiyue.github.io/ratatui-kit/zh-cn/core/pointer-events/) |
+| 数据表格 | `cargo run --example table` | [数据表格](https://yexiyue.github.io/ratatui-kit/zh-cn/components/table/) |
+| 多页路由 | `cargo run --example router` | [多页路由](https://yexiyue.github.io/ratatui-kit/zh-cn/tutorials/router/) |
 
 <details>
 <summary>目录</summary>
@@ -198,6 +211,7 @@ skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参�
 | `ScrollView` | 可滚动视图 | 核心 |
 | `ContextProvider` | Context 注入 | 核心 |
 | `PaletteProvider` / `ThemeOverride` | 主题注入 —— 全局调色板与组件级覆盖 | 核心 |
+| `Button` | 鼠标操作按钮（左键 Down 触发） | 核心 |
 | `Input` / `SearchInput` | 文本输入 / 搜索框 | `input` |
 | `TreeSelect` | 树形选择 | `tree` |
 | `Table` | 数据驱动表格，支持单元格网格边框、换行、响应式列、页脚和行/列高亮 | `table` |
@@ -215,6 +229,7 @@ skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参�
 | `use_memo` / `use_effect` | 派生记忆值 / 副作用 | 核心 |
 | `use_context` | 向上查找 Context | 核心 |
 | `use_palette` / `use_component_theme` | 读取当前 Palette / 解析后的组件主题 | 核心 |
+| `use_click` / `use_hover` / `use_drag` / `use_pointer` | 点击、悬停、拖拽与自定义指针事件 | 核心 |
 | `use_event_handler` | 注册输入事件处理器 | 核心 |
 | `use_insert_before` / `use_size` | 在渲染区之前插入内容 / 读取尺寸 | 核心 |
 | `use_exit` / `use_on_drop` | 退出应用 / 卸载回调 | 核心 |
@@ -268,6 +283,7 @@ cargo run --example counter        # 计数器：最小响应式状态 + 异步�
 cargo run --example router         # 路由与嵌套 Outlet
 cargo run --example atom_state     # 全局 Atom 状态
 cargo run --example modal          # 弹窗与键盘独占
+cargo run --example mouse          # 按钮、点击、悬停、拖拽与弹窗
 cargo run --example table          # 数据表格：换行、边框与高亮
 cargo run --example todo_app       # 综合：组件、状态、输入与路由的完整应用
 ```
@@ -336,3 +352,5 @@ Ratatui Kit 的设计直接借鉴了 React，以及 Rust 生态里的 [iocraft](
 ## 许可证
 
 本项目以 [MIT](LICENSE) 许可证发布。
+
+鼠标示例：`cargo run --example mouse`。入口通过 `fullscreen_with(RunOptions { mouse: true })` 显式开启捕获。参见[指针事件](https://yexiyue.github.io/ratatui-kit/zh-cn/core/pointer-events/)。

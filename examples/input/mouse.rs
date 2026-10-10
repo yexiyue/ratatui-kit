@@ -5,11 +5,12 @@
 //! 按住 Shift 可临时走终端本地选择。`q` 退出。
 
 use ratatui_kit::{
-    crossterm::event::{Event, KeyCode, MouseButton, MouseEventKind},
+    crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind},
     prelude::*,
     ratatui::{
         layout::{Constraint, Direction, Flex, Margin},
         style::{Color, Style},
+        text::Line,
     },
 };
 
@@ -29,11 +30,13 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut exit = hooks.use_exit();
 
     // 键盘:q 退出。
-    hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
+    hooks.use_event_handler(EventScope::Global, EventPriority::Normal, move |event| {
         if let Event::Key(key) = event
             && key.code == KeyCode::Char('q')
+            && key.kind == KeyEventKind::Press
         {
             exit();
+            return EventResult::Consumed;
         }
         EventResult::Ignored
     });
@@ -47,6 +50,10 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         EventPriority::Low,
         EventOptions { hit_test: false },
         move |event| {
+            if matches!(event, Event::Key(key) if key.kind == KeyEventKind::Press && key.code == KeyCode::Esc) {
+                modal_open_for_close.set(false);
+                return EventResult::Consumed;
+            }
             if let Event::Mouse(m) = event
                 && m.kind == MouseEventKind::Down(MouseButton::Left)
             {
@@ -73,13 +80,14 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         Toolbar(count: count, modal_open: modal_open)
         View(height: Constraint::Length(1))
         SplitPane(split: split, at: split_now)
+        ClickZone
         View(height: Constraint::Fill(1))
         HoverZone
         Modal(
             open: modal_open_now,
             layer: Some(layer),
             width: Constraint::Percentage(50),
-            height: Constraint::Length(8),
+            height: Constraint::Length(10),
         ) {
             ModalPanel(count: count)
         }
@@ -96,10 +104,10 @@ struct ToolbarProps {
 #[component]
 fn Toolbar(props: &ToolbarProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     // 外部 state 与本组件正交:传外部 state 复用,不传则内部自建(与 Select/Table 一致)。
-    let count = props.count.unwrap_or_else(|| hooks.use_state(|| 0usize));
-    let modal_open = props
-        .modal_open
-        .unwrap_or_else(|| hooks.use_state(|| false));
+    let local_count = hooks.use_state(|| 0usize);
+    let local_modal_open = hooks.use_state(|| false);
+    let count = props.count.unwrap_or(local_count);
+    let modal_open = props.modal_open.unwrap_or(local_modal_open);
     let count_now = count.get();
     let mut count_for_inc = count;
     let mut count_for_dec = count;
@@ -141,9 +149,10 @@ struct SplitPaneProps {
 
 #[component]
 fn SplitPane(props: &SplitPaneProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let split = props.split.unwrap_or_else(|| hooks.use_state(|| 30u16));
+    let local_split = hooks.use_state(|| 30u16);
+    let split = props.split.unwrap_or(local_split);
     let at = props.at.clamp(10, 60);
-    element!(View(flex_direction: Direction::Horizontal) {
+    element!(View(flex_direction: Direction::Horizontal, height: Constraint::Length(6)) {
         View(width: Constraint::Length(at), justify_content: Flex::Center) {
             Text(text: "left pane".to_string())
         }
@@ -163,19 +172,31 @@ struct DividerProps {
 #[component]
 fn Divider(props: &DividerProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let hovered = hooks.use_hover();
-    let mut split = props.split.unwrap_or_else(|| hooks.use_state(|| 30u16));
+    let local_split = hooks.use_state(|| 30u16);
+    let mut split = props.split.unwrap_or(local_split);
     let style = if hovered {
         Style::new().fg(Color::Yellow)
     } else {
         Style::new().fg(Color::Gray)
     };
     hooks.use_drag(move |d| {
-        if (10..=60).contains(&d.to.x) {
-            split.set(d.to.x);
+        if d.phase == DragPhase::Move {
+            let delta = i32::from(d.to.x) - i32::from(d.from.x);
+            split.set((i32::from(split.get()) + delta).clamp(10, 60) as u16);
         }
     });
     element!(View(width: Constraint::Length(1)) {
         Text(text: "│".to_string(), style: Some(style))
+    })
+}
+
+// Down+Up 在本区域内才合成点击;显示连击计数,与 Button 的 Down 语义对照。
+#[component]
+fn ClickZone(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut clicks = hooks.use_state(|| 0u8);
+    hooks.use_click(move |click| clicks.set(click.count));
+    element!(Border(height: Constraint::Length(3), top_title: Line::from(" release to click ")) {
+        Text(text: format!("click count = {} (single / double / triple)", clicks.get()))
     })
 }
 
@@ -186,17 +207,17 @@ fn HoverZone(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let (label, style) = if hovered {
         (
             "  << pointer inside >>  ",
-            Style::new().bg(Color::Blue).fg(Color::White),
+            Style::new().bg(Color::Blue).fg(Color::Black),
         )
     } else {
         ("   hover me with mouse   ", Style::new().fg(Color::Blue))
     };
-    element!(View(width: Constraint::Length(26), justify_content: Flex::Center) {
+    element!(View(width: Constraint::Length(26), height: Constraint::Length(1), justify_content: Flex::Center) {
         Text(text: label.to_string(), style: Some(style))
     })
 }
 
-// 弹窗面板:Close 按钮消费点击;面板空白处不消费 → 冒泡到遮罩关闭。
+// 弹窗面板:按钮消费点击;面板空白处不消费 → 冒泡到遮罩关闭。
 #[derive(Default, Props)]
 struct ModalPanelProps {
     count: Option<State<usize>>,
@@ -204,13 +225,20 @@ struct ModalPanelProps {
 
 #[component]
 fn ModalPanel(props: &ModalPanelProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let count = props.count.unwrap_or_else(|| hooks.use_state(|| 0usize));
+    let local_count = hooks.use_state(|| 0usize);
+    let count = props.count.unwrap_or(local_count);
     let mut count_for_inc = count;
-    element!(View(justify_content: Flex::Center, margin: Margin::new(2, 1)) {
-        Text(text: format!("count = {}", count.get()))
+    element!(Border(top_title: Line::from(" modal: Esc closes ")) {
+      View(justify_content: Flex::Start, margin: Margin::new(1, 0)) {
+        View(height: Constraint::Length(1)) {
+            Text(text: format!("count = {}", count.get()))
+        }
         Button(label: "+1 here".to_string(), on_press: move |()| {
             count_for_inc.set(count_for_inc.get() + 1)
         })
-        Text(text: "(click outside or panel blank to dismiss)".to_string())
+        View(height: Constraint::Length(2)) {
+            Text(text: "click blank to dismiss\nq quits, Esc closes")
+        }
+      }
     })
 }

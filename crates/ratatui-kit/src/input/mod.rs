@@ -169,7 +169,7 @@ pub(crate) struct InputRuntime {
     // 组件卸载（当前帧无对应 handler）时自动失效。
     gestures: [Option<PointerToken>; 3],
     // 本帧 hover 追踪登记（由 `use_hover` 重建）。
-    hover_trackers: Vec<(PointerToken, StampHandle)>,
+    hover_trackers: Vec<(LayerId, PointerToken, StampHandle)>,
     // 悬停集合：指针当前所在的 tracker token 集（跨帧持久,由 Moved 增量维护）。
     hover_inside: HashSet<PointerToken>,
     // any-motion(1003h) 棘轮:存在过 hover/Move 追踪即置位,由渲染循环惰性执行升级。
@@ -281,9 +281,9 @@ impl InputRuntime {
     }
 
     // 登记 hover 追踪（`use_hover` 每帧调用）。同时置 any-motion 请求棘轮。
-    pub(crate) fn track_hover(&mut self, token: PointerToken, stamp: StampHandle) {
+    pub(crate) fn track_hover(&mut self, layer: LayerId, token: PointerToken, stamp: StampHandle) {
         self.motion_requested = true;
-        self.hover_trackers.push((token, stamp));
+        self.hover_trackers.push((layer, token, stamp));
     }
 
     // 指针当前是否悬停在该 token 组件区域内。
@@ -344,6 +344,29 @@ impl InputRuntime {
 
         let is_mouse = matches!(event, Event::Mouse(_));
         let frame = draw_clock_frame();
+
+        // hover 与消费无关:Global 提前截断也必须更新进入/离开状态。
+        let hover_changed = if is_mouse
+            && let Event::Mouse(m) = &event
+            && matches!(m.kind, MouseEventKind::Moved)
+        {
+            let new_inside: HashSet<PointerToken> = self
+                .hover_trackers
+                .iter()
+                .filter(|(layer, _, stamp)| {
+                    let s = stamp.get();
+                    active.contains_key(layer)
+                        && s.frame == frame
+                        && rect_contains(s.area, m.column, m.row)
+                })
+                .map(|(_, token, _)| *token)
+                .collect();
+            let changed = new_inside != self.hover_inside;
+            self.hover_inside = new_inside;
+            changed
+        } else {
+            false
+        };
 
         // Phase 0：指针捕获路由。捕获是对捕获者的投递承诺,先于 Global/层内链。
         if is_mouse
@@ -426,23 +449,8 @@ impl InputRuntime {
             self.gestures[button_index(button)] = handlers[i].pointer;
         }
 
-        // hover 集合增量维护 + Moved 重绘抑制。
-        if is_mouse
-            && let Event::Mouse(m) = &event
-            && matches!(m.kind, MouseEventKind::Moved)
-        {
-            let new_inside: HashSet<PointerToken> = self
-                .hover_trackers
-                .iter()
-                .filter(|(_, stamp)| {
-                    let s = stamp.get();
-                    s.frame == frame && rect_contains(s.area, m.column, m.row)
-                })
-                .map(|(token, _)| *token)
-                .collect();
-            let changed = new_inside != self.hover_inside;
-            self.hover_inside = new_inside;
-            return consumed || changed;
+        if matches!(event, Event::Mouse(m) if matches!(m.kind, MouseEventKind::Moved)) {
+            return consumed || hover_changed;
         }
 
         // handlers 由外层 dispatch 归还(见 dispatch 说明);下一帧 begin_frame 后由组件重建。
@@ -1238,7 +1246,7 @@ mod tests {
         rt.begin_frame();
         let token = mint_pointer_token();
         let tracker_area = stamp(Rect::new(0, 0, 10, 10));
-        rt.track_hover(token, tracker_area);
+        rt.track_hover(rt.root_layer(), token, tracker_area);
 
         let repaint = rt.dispatch(mouse(MouseEventKind::Moved, 5, 5));
         assert!(repaint); // enter → 变化
@@ -1256,6 +1264,58 @@ mod tests {
         let repaint = rt.dispatch(mouse(MouseEventKind::Moved, 7, 7));
         assert!(!repaint);
         assert!(rt.hover_contains(token));
+    }
+
+    // 模态层阻断背景 hover;模态关闭后背景恢复。
+    #[test]
+    fn blocking_modal_layer_clears_background_hover() {
+        let mut rt = InputRuntime::default();
+        let background = mint_pointer_token();
+        let modal = mint_pointer_token();
+        let area = Rect::new(0, 0, 10, 10);
+        rt.begin_frame();
+        rt.track_hover(rt.root_layer(), background, stamp(area));
+        rt.dispatch(mouse(MouseEventKind::Moved, 5, 5));
+        assert!(rt.hover_contains(background));
+
+        rt.begin_frame();
+        rt.track_hover(rt.root_layer(), background, stamp(area));
+        let layer = rt.push_layer(true, true);
+        rt.track_hover(layer.id, modal, stamp(area));
+        assert!(rt.dispatch(mouse(MouseEventKind::Moved, 5, 5)));
+        assert!(!rt.hover_contains(background));
+        assert!(rt.hover_contains(modal));
+
+        rt.begin_frame();
+        rt.track_hover(rt.root_layer(), background, stamp(area));
+        let layer = rt.push_layer(false, true);
+        rt.track_hover(layer.id, modal, stamp(area));
+        assert!(rt.dispatch(mouse(MouseEventKind::Moved, 5, 5)));
+        assert!(rt.hover_contains(background));
+        assert!(!rt.hover_contains(modal));
+    }
+
+    #[test]
+    fn global_consumer_does_not_prevent_hover_updates() {
+        let mut rt = InputRuntime::default();
+        rt.begin_frame();
+        let token = mint_pointer_token();
+        rt.track_hover(rt.root_layer(), token, stamp(Rect::new(0, 0, 10, 10)));
+        let log: Log = Default::default();
+        register(
+            &mut rt,
+            None,
+            opts(false),
+            stamp(Rect::default()),
+            None,
+            &log,
+            "global",
+            EventResult::Consumed,
+        );
+        assert!(rt.dispatch(mouse(MouseEventKind::Moved, 5, 5)));
+        assert!(rt.hover_contains(token));
+        assert!(rt.dispatch(mouse(MouseEventKind::Moved, 50, 50)));
+        assert!(!rt.hover_contains(token));
     }
 
     // ⑲ 无 hover 追踪、无人消费的 Moved → 跳过重绘
@@ -1293,7 +1353,7 @@ mod tests {
         rt.begin_frame();
         assert!(!rt.needs_any_motion_upgrade());
         let token = mint_pointer_token();
-        rt.track_hover(token, stamp(Rect::new(0, 0, 10, 10)));
+        rt.track_hover(rt.root_layer(), token, stamp(Rect::new(0, 0, 10, 10)));
         assert!(rt.needs_any_motion_upgrade());
         rt.mark_any_motion_enabled();
         assert!(!rt.needs_any_motion_upgrade());
