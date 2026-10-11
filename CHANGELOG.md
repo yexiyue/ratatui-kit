@@ -1,3 +1,13 @@
+## [0.12.0] - 2026-10-11
+
+### 🚀 Features
+
+- [**breaking**] 完善鼠标交互、统一滚动布局与接入文档
+
+### 📚 Documentation
+
+- *(changelog)* Update for ratatui-kit-v0.11.0 [skip ci]
+- Remove DeepWiki from READMEs
 ## [0.11.0] - 2026-10-10
 
 ### 🚀 Features
