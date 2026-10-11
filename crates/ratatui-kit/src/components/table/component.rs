@@ -1,12 +1,18 @@
 use crate::components::theme::resolve_style;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{layout::Constraint, style::Style, widgets::Block};
+use ratatui::{
+    layout::{Constraint, Rect},
+    style::{Modifier, Style},
+    widgets::Block,
+};
 use ratatui_kit::{
-    Component, ComponentDrawer, ComponentTheme, ComponentUpdater, Handler, Hooks, Palette, Props,
-    State, UseEffect, UseEventHandler, UseState,
+    Component, ComponentDrawer, ComponentTheme, ComponentUpdater, Handler, Hooks, Palette,
+    PointerKind, PointerOptions, Props, State, UseEffect, UseEventHandler, UseState,
+    hooks::use_pointer::{pointer_enabled, use_pointer_with_layout_sync},
     input::{EventPriority, EventResult, EventScope},
     with_layout_style,
 };
+use std::{cell::RefCell, rc::Rc};
 use unicode_width::UnicodeWidthStr;
 
 use super::{
@@ -32,6 +38,8 @@ pub struct TableTheme {
     pub row_style: Style,
     /// 选中行高亮样式。
     pub highlight_style: Style,
+    /// 悬停行样式(指针位于该行上;选中行仍用 `highlight_style`)。
+    pub hover_style: Style,
     /// 选中列样式(默认留空)。
     pub column_highlight_style: Style,
     /// 选中行列交叉单元格样式(默认留空)。
@@ -49,6 +57,10 @@ impl ComponentTheme for TableTheme {
             footer_style: Style::new().fg(palette.accent),
             row_style: Style::new().fg(palette.fg),
             highlight_style: Style::new().fg(palette.on_accent).bg(palette.selection),
+            hover_style: Style::new()
+                .bg(palette.surface)
+                .fg(palette.fg)
+                .add_modifier(Modifier::BOLD),
             column_highlight_style: Style::new(),
             cell_highlight_style: Style::new(),
             border_style: Style::new().fg(palette.border),
@@ -84,6 +96,8 @@ where
     pub footer_style: Option<Style>,
     pub row_style: Option<Style>,
     pub highlight_style: Option<Style>,
+    /// 悬停行样式覆盖(选中行仍用 `highlight_style`)。
+    pub hover_style: Option<Style>,
     /// Applied to every cell of the column referenced by `TableState::selected_column`.
     pub column_highlight_style: Option<Style>,
     /// Applied to the intersection of the selected row and the selected column.
@@ -122,6 +136,7 @@ where
             footer_style: None,
             row_style: None,
             highlight_style: None,
+            hover_style: None,
             column_highlight_style: None,
             cell_highlight_style: None,
             highlight_symbol: Some("▶ "),
@@ -158,6 +173,7 @@ where
     footer_style: Style,
     row_style: Style,
     highlight_style: Style,
+    hover_style: Style,
     column_highlight_style: Style,
     cell_highlight_style: Style,
     highlight_symbol: Option<&'static str>,
@@ -171,6 +187,10 @@ where
     header_separator: bool,
     footer_separator: bool,
     row_separator: bool,
+    /// 上一帧正文行的命中矩形(鼠标悬停/点击映射;update 里注册的指针回调读取)。
+    row_hits: Rc<RefCell<Vec<(Rect, usize)>>>,
+    /// 悬停行(仅视觉;由指针回调写入,渲染时读取)。
+    hover: Option<State<Option<usize>>>,
 }
 
 impl<T> Table<T>
@@ -193,6 +213,7 @@ where
             footer_style: Style::default(),
             row_style: Style::default(),
             highlight_style: Style::default(),
+            hover_style: Style::default(),
             column_highlight_style: Style::default(),
             cell_highlight_style: Style::default(),
             highlight_symbol: props.highlight_symbol,
@@ -206,6 +227,9 @@ where
             header_separator: props.header_separator,
             footer_separator: props.footer_separator,
             row_separator: props.row_separator,
+            // 每帧重建,但 update 会用 hook 里的稳定实例覆盖。
+            row_hits: Rc::default(),
+            hover: None,
         }
     }
 
@@ -250,6 +274,7 @@ where
         &self,
         selected: Option<usize>,
         selected_column: Option<usize>,
+        hover: Option<usize>,
         visible_columns: &[TableColumn],
         visible_indices: &[usize],
         widths: &[u16],
@@ -263,6 +288,7 @@ where
             cells: header_cells,
             style: self.header_style,
             selected: false,
+            row_index: None,
         });
 
         if self.header_separator {
@@ -278,14 +304,18 @@ where
                 .unwrap_or_default();
             let mut cells = render_body_cells(cells, visible_columns, widths, self.wrap_mode);
             self.apply_column_highlight(&mut cells, visible_indices, selected_column, is_selected);
+            let hovered = hover == Some(index) && !is_selected;
             rendered_rows.push(RenderedRow {
                 cells,
                 style: if is_selected {
                     self.row_style.patch(self.highlight_style)
+                } else if hovered {
+                    self.row_style.patch(self.hover_style)
                 } else {
                     self.row_style
                 },
                 selected: is_selected,
+                row_index: Some(index),
             });
             if self.row_separator && index + 1 < self.rows.len() {
                 rendered_rows.push(RenderedRow::separator(self.horizontal_line_style));
@@ -303,6 +333,7 @@ where
                 cells: footer_cells,
                 style: self.footer_style,
                 selected: false,
+                row_index: None,
             });
         }
 
@@ -380,58 +411,138 @@ where
         let active = props.active;
         let column_navigation = props.column_navigation;
         let rows = props.rows.clone();
-        let mut on_select = props.on_select.take();
-        hooks.use_event_handler(EventScope::Current, EventPriority::Normal, move |event| {
-            if !active || row_count == 0 {
-                return EventResult::Ignored;
-            }
+        // 键盘与鼠标两个闭包共享同一个回调(Handler 不 Clone,经 Rc<RefCell> 转发)。
+        let on_select = Rc::new(RefCell::new(props.on_select.take()));
+        // 悬停行(仅视觉)与命中表:命中表由 draw 每帧回填,指针回调读取。
+        let mut hover = hooks.use_state(|| None::<usize>);
+        if !active || row_count == 0 {
+            *hover.write_no_update() = None;
+        }
+        let row_hits = hooks.use_hook(|| TableRowHits(Rc::default())).0.clone();
 
-            let Event::Key(key) = event else {
-                return EventResult::Ignored;
-            };
-            if key.kind != KeyEventKind::Press {
-                return EventResult::Ignored;
-            }
+        hooks.use_event_handler(EventScope::Current, EventPriority::Normal, {
+            let on_select = Rc::clone(&on_select);
+            move |event| {
+                if !active || row_count == 0 {
+                    return EventResult::Ignored;
+                }
 
-            match key.code {
-                KeyCode::Char('j') | KeyCode::Down => {
-                    state.write().next(row_count);
-                    EventResult::Consumed
+                let Event::Key(key) = event else {
+                    return EventResult::Ignored;
+                };
+                if key.kind != KeyEventKind::Press {
+                    return EventResult::Ignored;
                 }
-                KeyCode::Char('k') | KeyCode::Up => {
-                    state.write().previous(row_count);
-                    EventResult::Consumed
-                }
-                KeyCode::Char('h') | KeyCode::Left if column_navigation => {
-                    state.write().previous_column(column_count);
-                    EventResult::Consumed
-                }
-                KeyCode::Char('l') | KeyCode::Right if column_navigation => {
-                    state.write().next_column(column_count);
-                    EventResult::Consumed
-                }
-                KeyCode::Home => {
-                    state.write().select_first(row_count);
-                    EventResult::Consumed
-                }
-                KeyCode::End => {
-                    state.write().select_last(row_count);
-                    EventResult::Consumed
-                }
-                KeyCode::Enter => {
-                    if let Some(index) = state.read().selected()
-                        && let Some(row) = rows.get(index)
-                    {
-                        on_select(row.clone());
+
+                match key.code {
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        state.write().next(row_count);
+                        EventResult::Consumed
                     }
-                    EventResult::Consumed
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        state.write().previous(row_count);
+                        EventResult::Consumed
+                    }
+                    KeyCode::Char('h') | KeyCode::Left if column_navigation => {
+                        state.write().previous_column(column_count);
+                        EventResult::Consumed
+                    }
+                    KeyCode::Char('l') | KeyCode::Right if column_navigation => {
+                        state.write().next_column(column_count);
+                        EventResult::Consumed
+                    }
+                    KeyCode::Home => {
+                        state.write().select_first(row_count);
+                        EventResult::Consumed
+                    }
+                    KeyCode::End => {
+                        state.write().select_last(row_count);
+                        EventResult::Consumed
+                    }
+                    KeyCode::Enter => {
+                        if let Some(index) = state.read().selected()
+                            && let Some(row) = rows.get(index)
+                        {
+                            (on_select.borrow_mut())(row.clone());
+                        }
+                        EventResult::Consumed
+                    }
+                    _ => EventResult::Ignored,
                 }
-                _ => EventResult::Ignored,
             }
         });
 
+        // 鼠标:悬停高亮该行、滚轮移动选中(j/k 同义)、点击行 = 选中并确认(Enter 同义)。
+        // 行→y 的映射用 draw 回填的命中区间(换行增高、分隔线、表头偏移都已算好)。
+        if pointer_enabled(&hooks) {
+            use_pointer_with_layout_sync(
+                &mut hooks,
+                PointerOptions {
+                    track_move: true,
+                    ..Default::default()
+                },
+                {
+                    let on_select = Rc::clone(&on_select);
+                    let rows = props.rows.clone();
+                    let row_hits = Rc::clone(&row_hits);
+                    move |ev| {
+                        if !active || row_count == 0 {
+                            return EventResult::Ignored;
+                        }
+                        let hit_row = |position| {
+                            row_hits
+                                .borrow()
+                                .iter()
+                                .find(|(area, _)| area.contains(position))
+                                .map(|&(_, index)| index)
+                        };
+                        match ev.kind {
+                            PointerKind::Enter | PointerKind::Move => {
+                                let next = hit_row(ev.position).filter(|index| *index < row_count);
+                                if hover.get() != next {
+                                    hover.set(next);
+                                    EventResult::Consumed
+                                } else {
+                                    EventResult::Ignored
+                                }
+                            }
+                            PointerKind::Leave => {
+                                if hover.get().is_some() {
+                                    hover.set(None);
+                                }
+                                EventResult::Ignored
+                            }
+                            PointerKind::ScrollUp => {
+                                state.write().previous(row_count);
+                                EventResult::Consumed
+                            }
+                            PointerKind::ScrollDown => {
+                                state.write().next(row_count);
+                                EventResult::Consumed
+                            }
+                            PointerKind::Click { .. } => {
+                                if let Some(index) = hit_row(ev.position) {
+                                    if let Some(row) = rows.get(index) {
+                                        state.write().select(Some(index));
+                                        (on_select.borrow_mut())(row.clone());
+                                    }
+                                    EventResult::Consumed
+                                } else {
+                                    EventResult::Ignored
+                                }
+                            }
+                            _ => EventResult::Ignored,
+                        }
+                    }
+                },
+            );
+        }
+
         updater.set_layout_style(layout_style);
         *self = Self::from_props(props, state);
+        // 指针交互的跨帧句柄:命中表用 hook 里的稳定 Rc(from_props 每帧新建会与指针回调失联)。
+        self.row_hits = Rc::clone(&row_hits);
+        self.hover = Some(hover);
 
         // 主题解析:每个 slot 铺底,对应 props 的 Option<Style> 在上 patch(None → 用主题)。
         // use_component_theme 返回 owned 值、读后即弃守卫,不与 &mut updater 冲突。
@@ -440,6 +551,7 @@ where
         self.footer_style = resolve_style(theme.footer_style, props.footer_style);
         self.row_style = resolve_style(theme.row_style, props.row_style);
         self.highlight_style = resolve_style(theme.highlight_style, props.highlight_style);
+        self.hover_style = resolve_style(theme.hover_style, props.hover_style);
         self.column_highlight_style =
             resolve_style(theme.column_highlight_style, props.column_highlight_style);
         self.cell_highlight_style =
@@ -456,6 +568,7 @@ where
 
         let selected = state.read().selected();
         let selected_column = state.read().selected_column();
+        let hover = self.hover.and_then(|hover| hover.get());
         let visible_columns = visible_columns(&self.columns, drawer.area.width);
         if visible_columns.is_empty() {
             return;
@@ -489,12 +602,13 @@ where
         let rendered_rows = self.render_rows(
             selected,
             selected_column,
+            hover,
             &visible_columns,
             &visible_indices,
             &widths,
         );
 
-        render_table(RenderTable {
+        let row_hits = render_table(RenderTable {
             area,
             buf: drawer.buffer_mut(),
             rows: &rendered_rows,
@@ -506,8 +620,15 @@ where
             highlight_symbol: self.highlight_symbol,
             gutter,
         });
+        // 回填正文行命中区间,供 update 里注册的指针回调做悬停/点击映射。
+        *self.row_hits.borrow_mut() = row_hits;
     }
 }
+
+/// Table 的指针命中表持有者(经 `use_hook` 跨帧保活;`Component` 每帧由 from_props 重建)。
+struct TableRowHits(Rc<RefCell<Vec<(Rect, usize)>>>);
+
+impl ratatui_kit::Hook for TableRowHits {}
 
 fn estimate_table_height<T>(props: &TableProps<T>, area_width: Option<u16>) -> u16
 where
@@ -537,7 +658,14 @@ where
     }
 
     let table = Table::<T>::build(props, None);
-    let rows = table.render_rows(None, None, &visible_columns, &visible_indices, &widths);
+    let rows = table.render_rows(
+        None,
+        None,
+        None,
+        &visible_columns,
+        &visible_indices,
+        &widths,
+    );
 
     rendered_rows_height(&rows, props.border_mode)
         .saturating_add(block_vertical_border(props.block.as_ref()))
@@ -694,5 +822,89 @@ mod tests {
         };
 
         assert_eq!(props.layout_style().height, Constraint::Length(3));
+    }
+}
+
+#[cfg(test)]
+mod mouse_tests {
+    use super::*;
+    use crate::AnyElement;
+    use crate::mouse_test::Mounted;
+    use crossterm::event::{KeyCode, MouseButton, MouseEventKind};
+    use ratatui::style::Modifier;
+    use ratatui_kit_macros::{Props, component};
+    use std::sync::{Arc, Mutex};
+
+    type Log = Arc<Mutex<Vec<String>>>;
+
+    #[derive(Clone, Default, Props)]
+    struct HarnessProps {
+        log: Log,
+    }
+
+    fn columns() -> Vec<TableColumn> {
+        vec![TableColumn::new("Name", Constraint::Length(20))]
+    }
+
+    #[component]
+    fn Harness(props: &HarnessProps, _hooks: crate::Hooks) -> impl Into<AnyElement<'static>> {
+        let log = props.log.clone();
+        let rows = vec!["row0".to_string(), "row1".to_string(), "row2".to_string()];
+        // 显式类型绑定让 Arc 的 unsize 强制在赋值处完成(宏的 .into() 不做 Option 内层的 unsize)。
+        let render_row: RenderTableRow<String> =
+            Arc::new(move |row: &String, _selected: bool| vec![TableCell::new(row.clone())]);
+        crate::element!(Table<String>(
+            columns: columns(),
+            rows: rows,
+            default_index: Some(0),
+            render_row: Some(render_row),
+            on_select: move |row: String| log.lock().unwrap().push(row),
+        ))
+    }
+
+    // 点击行 = 选中并确认;悬停高亮该行。
+    #[test]
+    fn clicking_row_selects_and_hovering_highlights() {
+        let log: Log = Default::default();
+        let mut m = Mounted::mount(crate::element!(Harness(log: log.clone())), true);
+
+        // 定位 row1 文本坐标(命中区间由渲染回填,含表头/分隔线偏移)。
+        let (x, y) = crate::mouse_test::find_text(&m.buffer(), "row1").expect("row1 已渲染");
+
+        m.dispatch(MouseEventKind::Moved, x, y);
+        assert!(
+            m.buffer()[(x, y)]
+                .style()
+                .add_modifier
+                .contains(Modifier::BOLD),
+            "悬停行应为 BOLD"
+        );
+
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), x, y);
+        m.dispatch(MouseEventKind::Up(MouseButton::Left), x, y);
+        assert_eq!(*log.lock().unwrap(), vec!["row1".to_string()]);
+    }
+
+    // 滚轮移动选中(与 j/k 同义)。
+    #[test]
+    fn wheel_moves_selection() {
+        let log: Log = Default::default();
+        let mut m = Mounted::mount(crate::element!(Harness(log: log.clone())), true);
+
+        let (_, y) = crate::mouse_test::find_text(&m.buffer(), "row0").expect("row0 已渲染");
+        m.dispatch(MouseEventKind::ScrollDown, 5, y);
+        m.dispatch_key(KeyCode::Enter);
+        assert_eq!(*log.lock().unwrap(), vec!["row1".to_string()]);
+    }
+    #[test]
+    fn clicking_outer_border_or_unused_width_does_not_confirm() {
+        let log: Log = Default::default();
+        let mut m = Mounted::mount(crate::element!(Harness(log: log.clone())), true);
+        let (_, y) = crate::mouse_test::find_text(&m.buffer(), "row1").unwrap();
+        for x in [0, 39] {
+            m.dispatch(MouseEventKind::Down(MouseButton::Left), x, y);
+            m.dispatch(MouseEventKind::Up(MouseButton::Left), x, y);
+        }
+        assert!(log.lock().unwrap().is_empty());
     }
 }

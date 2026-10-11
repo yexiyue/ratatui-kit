@@ -85,19 +85,22 @@ pub trait Component: Any + Unpin {
         layout_style: &LayoutStyle,
         drawer: &mut ComponentDrawer<'_, '_>,
     ) -> Vec<ratatui::prelude::Rect> {
+        if children.iter().next().is_none() {
+            return Vec::new();
+        }
         let layout = layout_style
             .get_layout()
-            .constraints(children.get_constraints(layout_style.flex_direction));
+            .constraints(children.constraints(layout_style.flex_direction));
 
         let areas = layout.split(drawer.area);
 
-        let mut children_areas: Vec<ratatui::prelude::Rect> = vec![];
+        let mut children_areas = Vec::with_capacity(areas.len());
 
         let rev_direction = match layout_style.flex_direction {
             Direction::Horizontal => Direction::Vertical,
             Direction::Vertical => Direction::Horizontal,
         };
-        for (area, constraint) in areas.iter().zip(children.get_constraints(rev_direction)) {
+        for (area, constraint) in areas.iter().zip(children.constraints(rev_direction)) {
             let area = Layout::new(rev_direction, [constraint]).split(*area)[0];
             children_areas.push(area);
         }

@@ -3,6 +3,7 @@
 //! 按 `s` 进入搜索输入态；输入态打开独占 input layer，背景列表的 `j/k` 不会再移动选中项。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -24,7 +25,7 @@ const COMMANDS: [&str; 6] = [
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -101,7 +102,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 gap: 1,
                 border_style: Style::new().fg(Color::Blue),
                 top_title: Line::from(" search input ").fg(Color::Blue).bold().centered(),
-                bottom_title: Line::from(" s search | j/k move | Enter submit | Esc cancel | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" s search | j/k move | click to focus & seek | Enter submit | Esc cancel | q quit ").dark_gray().centered(),
             ) {
                 SearchInput(
                     width: Constraint::Fill(1),

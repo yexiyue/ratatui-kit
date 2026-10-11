@@ -4,6 +4,7 @@
 //! `Home/End` 选首/末行,`b` 切换滚动条盖不盖边框。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -112,7 +113,7 @@ const DOC_ROWS: [DocRow; 32] = [
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -132,8 +133,9 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
         EventPriority::Normal,
         EventOptions { hit_test: true },
         move |event| {
+            // 滚轮交给 ScrollView 组件的指针/滚动处理器(按命中消费);这里不再喂
+            // handle_event,避免指针在视口外时示例层也滚动一次。
             let Event::Key(key) = &event else {
-                scroll_state.write().handle_event(&event);
                 return EventResult::Ignored;
             };
             if key.kind != KeyEventKind::Press {
@@ -211,7 +213,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 gap: 1,
                 border_style: Style::new().blue(),
                 top_title: Line::from(" scroll view ").blue().bold().centered(),
-                bottom_title: Line::from(" j/k select (view follows) | PageUp/Down browse | Home/End | b border | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" j/k select (view follows) | PageUp/Down browse | drag scrollbar | Home/End | b border | q quit ").dark_gray().centered(),
             ) {
                 View(
                     flex_direction: Direction::Horizontal,

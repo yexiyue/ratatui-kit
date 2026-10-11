@@ -130,7 +130,7 @@ where
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "atom"))]
     pub(crate) fn has_waker(&self, key: &ElementKey) -> bool
     where
         N: WakerLookup,
@@ -216,12 +216,12 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "atom"))]
 pub(crate) trait WakerLookup {
     fn has_waker(&self, key: &ElementKey) -> bool;
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "atom"))]
 impl WakerLookup for WakerMap {
     fn has_waker(&self, key: &ElementKey) -> bool {
         self.wakers.contains_key(key)

@@ -10,7 +10,7 @@ All hooks are obtained by calling a method on `Hooks` (`#[component] fn Foo(mut 
 
 - [`State<T>` / `AtomState<T>` capabilities](#statet--atomstatet-capabilities-core-data-type)
 - Core hooks: `use_state`, `use_future`, `use_effect` / `use_async_effect`, `use_async_state`, `use_memo`, `use_context*`, `use_palette` / `use_component_theme`, `use_event_handler*`, `use_input_layer`, `use_insert_before`, `use_terminal_size`, `use_previous_size`, `use_exit`, `use_on_drop`
-- Pointer hooks (mouse capture required): `use_click`, `use_hover`, `use_drag`, `use_pointer`
+- Pointer hooks (mouse capture required): `use_click`, `use_hover`, `use_drag`, `use_pointer`, `use_hover_row`, `use_scrollbar`
 - Router hooks (feature `router`): `use_navigate`, `use_route`, `use_params`, `use_route_state` / `try_use_route_state`
 - Global state (feature `atom`): `use_atom`
 
@@ -267,7 +267,7 @@ All hooks are obtained by calling a method on `Hooks` (`#[component] fn Foo(mut 
   ```
 - **Pitfalls**: the returned `InputLayer` is **valid only for the current frame** (re-minted each frame; the `LayerId` is not stable across frames) — **do not store it in `use_state` for cross-frame use**; on the next frame that layer is no longer on the stack and its handlers go silently deaf. Requires a context-aware `Hooks`.
 
-## Pointer hooks: use_click / use_hover / use_drag / use_pointer
+## Pointer hooks: click / hover / drag / pointer / row hover / scrollbar
 
 Core APIs; explicitly enable `RunOptions { mouse: true }` at the entry. Read
 [pointer-events.md](pointer-events.md) for signatures, filtering, capture,

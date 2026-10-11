@@ -2,7 +2,7 @@
 
 ## 概览
 
-本主题覆盖 ratatui-kit 这个 Cargo workspace 的工程化约束：cargo 命令矩阵、**feature flags 门控带来的「改了模块却没编译到」陷阱**、lefthook/CI 一致性、release.sh 发布流程，以及单元测试与「编译即基线」的测试约定（各模块已有 `#[cfg(test)]` 单测，覆盖面有限，example/doctest 能编译仍是底线）。新增依赖、改 feature、动 CI/发布脚本前先读本文件。
+本主题覆盖 ratatui-kit 这个 Cargo workspace 的工程化约束：cargo 命令矩阵、**feature flags 门控带来的「改了模块却没编译到」陷阱**、lefthook/CI 一致性、标签触发的 CI 发布流程，以及单元测试与「编译即基线」的测试约定（各模块已有 `#[cfg(test)]` 单测，覆盖面有限，example/doctest 能编译仍是底线）。新增依赖、改 feature、动 CI/发布脚本前先读本文件。
 
 ## 命令矩阵
 
@@ -176,7 +176,8 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 |---|---|---|
 | `router` | `RouterProvider`/`Outlet`、`routes!`、`use_router`/`use_navigate` | `regex` |
 | `atom` | `Atom`、`AtomState`、`use_atom` | — |
-| `input` | `Input`、`SearchInput` 和 `tui_input` re-export | `tui-input` |
+| `input` | `Input`、`SearchInput` 和 `tui_input` re-export | `tui-input`、`unicode-width` |
+| `textarea` | `TextArea` 多行编辑与软换行 | `tui-input`、`unicode-width` |
 | `tree` | `TreeSelect` 组件 | `tui-tree-widget` |
 | `virtual-list` | `VirtualList` 虚拟列表组件 | `tui-widget-list` |
 | `test-util` | `test_util::render_frame`/`render_frames` 离屏渲染测试 helper（不在 `full` 里，测试专用面） | — |
@@ -188,15 +189,13 @@ Cargo 只会自动发现顶层 `examples/name.rs` 或 `examples/name/main.rs`。
 
 **相关文件**：`crates/ratatui-kit/Cargo.toml`、`crates/ratatui-kit/src/lib.rs`、`crates/ratatui-kit/src/components/mod.rs`
 
-### `textarea` 特性已随 ratatui 0.30 迁移下线
+### `textarea` 使用 tui-input 与自研软换行
 
-`tui-textarea`（最新 0.7.0 钉死 ratatui ^0.29）无 0.30 兼容版，故 `textarea` 的 feature / 依赖 / example 已移除。组件源码隔离保留在 `src/components/textarea.rs`（**未声明为模块、未接入树**），example 改名为 `examples/textarea.rs.disabled`。
+`textarea` 已重新接入模块树、`full` 和 `examples/components/textarea.rs`，底层使用与单行输入相同的 `tui-input`，显示层自行软换行；不依赖旧 `tui-textarea`，无需引入 ratatui 0.29。
 
-**正确做法**：待 `tui-textarea` 发布 0.30 兼容版后，恢复 feature/依赖/example 并在 `components/mod.rs` 重新 `pub mod textarea;`。todo.md 另有「用 tui-input 重写 textarea 以支持自动换行」的方案——动手前先确认走哪条路。
+**正确做法**：修改文本输入时用 `--all-features` 验证软换行、Unicode 列宽和键鼠光标映射，保持逻辑字符索引与终端列坐标分离。
 
-**相关文件**：`crates/ratatui-kit/src/components/textarea.rs`、`crates/ratatui-kit/Cargo.toml`、`todo.md`
-
-## 测试与发布
+**相关文件**：`crates/ratatui-kit/src/components/textarea.rs`、`crates/ratatui-kit/Cargo.toml`、`examples/components/textarea.rs`
 
 ### 测试约定：编译验证为基线 + 宏/运行时/组件的针对性测试
 
@@ -252,20 +251,15 @@ from_palette`/`from_props` 的纯逻辑，测不到 `use_component_theme` 真正
 
 **相关文件**：`.github/workflows/CD.yaml`、`cliff.toml`
 
-### 主库 README 是指向根 README 的符号链接（单一数据源）
+### 仓库与 crate README 分开维护
 
-仓库根 `README.md` 是唯一维护的文档；`crates/ratatui-kit/README.md` 是指向它的**符号链接**（`../../README.md`），`Cargo.toml` 用 `readme = "README.md"`。
+根 README.md 和 README.zh-CN.md 面向仓库浏览；crates/ratatui-kit/README.md 是独立文件,也是 lib.rs include_str 的 rustdoc 来源。crate 版本必须使用绝对图片与链接,避免 crates.io 不解析相对资源。共同的 API 说明和示例需要同步更新三份。
 
-**为什么不用 `readme = "../../README.md"`**：cargo 不支持包外 readme 路径——`cargo package` 会忽略它并只打包 crate 根内的 `README.md`（实测 warning：`readme '../../README.md' appears to be a path outside of the package`）。删掉子 README 后 crates.io 将拿不到任何 readme。符号链接则被 cargo 解引用，把根 README 的**内容**嵌入 `.crate` 包（实测为真实 `-rw-` 文件而非软链），crates.io / docs.rs 正常渲染且无 warning。
-
-**正确做法**：改 README 只改根 `README.md`；新增需要 README 的可发布 crate，同样 `ln -s ../../README.md crates/<crate>/README.md` + `readme = "README.md"`。
-**验证**：`cargo package -p ratatui-kit --allow-dirty --no-verify` 后 `tar tvzf target/package/ratatui-kit-*.crate | grep README` 应看到 `-rw-`（真实文件）。
-
-**相关文件**：`README.md`、`crates/ratatui-kit/README.md`(symlink)、`crates/ratatui-kit/Cargo.toml`
+README 的可运行 Rust 示例用 no_run 并执行 cargo test --locked --all-features -p ratatui-kit --doc。发布前 cargo publish --dry-run -p ratatui-kit --all-features 验证打包与依赖解析；不要恢复 readme 指向包外路径。
 
 ### 文档站安装版本号从 Cargo.toml 单一数据源注入
 
-文档里展示的 `ratatui-kit = "x.y.z"` 安装版本号**不写死**：`docs/astro.config.mjs` 在构建时从 `crates/ratatui-kit/Cargo.toml` 用正则 `^version\s*=\s*"([^"]+)"` 读出 version，经 `vite.define` 注入全局常量 `__RK_VERSION__`，再由 `docs/src/consts.ts` 导出 `RK_VERSION` 供 `.astro` / `.mdx` 引用。`release.sh` 升 crate version 后，下次 docs 构建自动用上新版本，无需手改任何文档。
+文档里展示的 `ratatui-kit = "x.y.z"` 安装版本号**不写死**：`docs/astro.config.mjs` 在构建时从 `crates/ratatui-kit/Cargo.toml` 用正则 `^version\s*=\s*"([^"]+)"` 读出 version，经 `vite.define` 注入全局常量 `__RK_VERSION__`，再由 `docs/src/consts.ts` 导出 `RK_VERSION` 供 `.astro` / `.mdx` 引用。Cargo.toml 升 crate version 后，下次 docs 构建自动用上新版本，无需手改任何文档。
 
 根 README 是静态 Markdown，不能像 Astro 文档页一样在 GitHub/crates.io 渲染时读取 `Cargo.toml`。README 的安装示例应使用 `cargo add ratatui-kit --features full`，或在展示生成后的 `Cargo.toml` 形态时用 `version = "..."` 占位，避免发布时手动同步版本号。
 
@@ -288,3 +282,8 @@ workspace 成员位于 `crates/ratatui-kit` 与 `crates/ratatui-kit-macros`（�
 文档类引用（`CLAUDE.md` / `AGENTS.md` / `dev-notes/` / docs 站）一并更新；`openspec/changes/**` 为历史快照，保持原样。
 
 **相关文件**：`Cargo.toml`、`.github/workflows/CD.yaml`、`.claude/settings.json`
+
+
+### 空默认 feature 的测试也要可编译
+
+全 feature 检查不会暴露测试对可选依赖的无条件引用。render harness 的 Input/SearchInput、TreeSelect、Table 和 Atom 用例需按对应 feature 门控；仅 Atom 测试使用的 has_waker 探针也要带 atom 门控。保留默认 feature 为空的核心使用方式时,额外运行 cargo test --locked --no-default-features -p ratatui-kit --lib。

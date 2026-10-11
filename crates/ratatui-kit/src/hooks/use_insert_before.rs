@@ -34,8 +34,9 @@ impl Hook for InsertBeforeHandler {
     }
 
     fn post_component_update(&mut self, updater: &mut crate::ComponentUpdater) {
-        let mut queue = self.queue.lock().unwrap();
-        for (height, callback) in queue.drain(..) {
+        // 同步绘制回调可以再次排队;执行前释放锁,新增任务留到下一次更新。
+        let pending = std::mem::take(&mut *self.queue.lock().unwrap());
+        for (height, callback) in pending {
             updater.terminal().insert_before(height, callback);
         }
     }
@@ -73,5 +74,73 @@ pub trait UseInsertBefore: private::Sealed {
 impl UseInsertBefore for Hooks<'_, '_> {
     fn use_insert_before(&mut self) -> InsertBeforeHandler {
         self.use_hook(InsertBeforeHandler::default).clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        ComponentUpdater, ElementKey, component::Components, context::ContextStack,
+        layout_style::LayoutStyle, terminal::UpdaterTerminal,
+    };
+    use ratatui::layout::Rect;
+    use std::io;
+
+    #[derive(Default)]
+    struct SynchronousTerminal {
+        calls: usize,
+    }
+
+    impl UpdaterTerminal for SynchronousTerminal {
+        fn insert_before(
+            &mut self,
+            height: u16,
+            draw: Box<dyn FnOnce(&mut Buffer)>,
+        ) -> io::Result<()> {
+            self.calls += 1;
+            draw(&mut Buffer::empty(Rect::new(0, 0, 10, height)));
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn insert_before_callback_can_enqueue_for_the_next_update() {
+        let mut handler = InsertBeforeHandler::default();
+        let reentrant = handler.clone();
+        handler.insert_before(1, move |_| {
+            // 旧实现直接失败,不让回归测试永久卡在重入 lock。
+            assert!(reentrant.queue.try_lock().is_ok());
+            reentrant.insert_before(2, |_| {});
+        });
+        let mut root = ();
+        let mut stack = ContextStack::root(&mut root);
+        let mut terminal = SynchronousTerminal::default();
+        let mut components = Components::default();
+        let mut layout = LayoutStyle::default();
+        {
+            let mut updater = ComponentUpdater::new(
+                ElementKey::decl(0),
+                &mut stack,
+                &mut terminal,
+                &mut components,
+                &mut layout,
+            );
+            handler.post_component_update(&mut updater);
+            assert_eq!(handler.queue.lock().unwrap().len(), 1);
+        }
+        assert_eq!(terminal.calls, 1);
+        {
+            let mut updater = ComponentUpdater::new(
+                ElementKey::decl(0),
+                &mut stack,
+                &mut terminal,
+                &mut components,
+                &mut layout,
+            );
+            handler.post_component_update(&mut updater);
+        }
+        assert_eq!(terminal.calls, 2);
+        assert!(handler.queue.lock().unwrap().is_empty());
     }
 }

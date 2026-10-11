@@ -89,13 +89,9 @@ loop {
 
 **相关文件**：`crates/ratatui-kit/src/component/instantiated_component.rs`
 
-### ScrollView 内容尺寸与滚动条判定共用公式
+### ScrollView 统一布局解析
 
-`ScrollView` 的子区域计算和滚动条渲染都通过 `ScrollBars::layout_for` 判断是否预留滚动条并缩小可见区域。尺寸推导中的 `Fill`/`Percentage`/`Ratio` 使用高位宽计算并饱和到 `u16`，负 `gap` 会饱和为 0，避免 debug 溢出或 release 回绕。
-
-**正确做法**：改 ScrollView 显隐或尺寸公式时同时走 `layout_for`，不要在 `calc_children_areas` 和 `render_scrollbars` 分叉维护两套 ±1 规则。
-
-**相关文件**：`crates/ratatui-kit/src/components/scroll_view/mod.rs`、`crates/ratatui-kit/src/components/scroll_view/scrollbars.rs`
+ScrollView 在 draw 中解析一次 ResolvedLayout,子布局、视口、滚动偏移、轨道和最终 blit 共用该快照。枚举四种滚动条显隐候选选择自洽结果,不能在 post draw 重新计算。主轴 Percentage/Ratio/Fill 参照 block.inner 的原尺寸,交叉轴参照候选视口；尺寸计算饱和到 u16,负 gap 饱和为 0。偏移在子节点绘制前裁剪,确保命中与实际显示使用同一偏移。极小弹性布局若无显隐固定点,保守预留允许的轨道并裁掉空轨道。
 
 ### Context 查找区分「已借用」与「未找到」三态
 
@@ -144,9 +140,26 @@ crossterm 0.29 的 `EnableMouseCapture` 本身包含 `1003h`，不能用于按�
 **内嵌可选择子组件仍建议外部驱动**:把 `Table`/`Select` 塞进 ScrollView 时,让子组件 `active: false`,由父级 handler 驱动选择并对导航键返回 `Consumed`(父 handler 登记在前,截断分发,ScrollView 收不到这些键);`PageUp/PageDown/滚轮` 留给 ScrollView。见 `examples/components/table.rs`。要让选中联动滚动,用 `ScrollViewState::scroll_to_visible(y, height)`(state 层原语已具备;把「子 key/index → 缓冲区 y」映射接上是后续工作)。
 
 **几何关键点(scrollbars.rs / mod.rs)**:
-- **内区单一真源**:`UseScrollImpl` 持 `Block`,`pre_component_draw` 捕获 outer、`post` 用 `block.inner(outer)`,与 `draw()` 完全一致(对部分边框/padding/标题正确)。勿再硬编码 `+1/-1/-2` 内缩。
+- **内区单一真源**:`UseScrollImpl` 持 `Block`,draw 时解析 `block.inner(outer)` 并保存布局快照,post 直接使用该结果(对部分边框/padding/标题正确)。勿再硬编码 `+1/-1/-2` 内缩。
 - **视口感知裁剪**:偏移与 `page_size` 按「扣掉已显示滚动条后的视口」算(inset 模式),否则有滚动条时最后一行/列滚不到(上游 0.6.7 修的坑)。
-- **`over_border` 开关**(`Scrollbars::over_border`,默认 true):ring 模式滚动条画在 block 边框环上、不占视口(视口=inner);inset 模式画在 inner 内、占一行/列。ring 仅当 `over_border && inner 右/下各有边框`。
+- **`over_border` 开关**(`Scrollbars::over_border`,默认 true):ring 模式滚动条画在 block 边框环上、不占视口(视口=inner);inset 模式画在 inner 内、占一行/列。ring 仅当 `over_border` 且 Block 确实含 RIGHT 和 BOTTOM 边框,轨道使用 outer 右/下边缘；padding 和底部标题不能冒充边框。Block 无边框 getter,仅 props 改变时用四种候选边框组合的 Eq 探测并缓存。
 - **嵌套安全**:`ComponentDrawer.scroll_buffers` 是**栈**(push/pop),不是单槽;ScrollView 套 ScrollView 不再 `take().unwrap()` on None。
 
 **相关文件**：`crates/ratatui-kit/src/components/scroll_view/{mod.rs,state.rs,scrollbars.rs}`、`crates/ratatui-kit/src/render/drawer.rs`、`examples/components/{scrollview,table}.rs`
+
+
+### 绘制作用域与布局临时集合
+
+父组件调用子节点 draw 后要恢复 calc_children_areas 完成时的 drawer.area,再运行父级 post_component_draw,避免最后一个子节点的区域泄漏。ScrollView 仍保留自己的内容缓冲 push/pop 生命周期。
+
+普通布局和 ScrollView 通过内部 constraints iterator 直接遍历子约束,不再先收集临时 Vec 再遍历；叶子组件直接返回空区域集合。公开 get_constraints 仍保留显式收集入口。
+
+### Context 作用域必须支持 panic 展开
+
+with_context 内部把短借用 Context 暂挂到长生命周期栈,必须用 RAII 在正常退出和 panic 展开时恢复原栈深度,不能依赖闭包正常返回后的 pop。嵌套作用域各自恢复到进入前的深度。
+
+### ScrollView 坐标映射与静止指针同步
+
+Drawer 的内容缓冲栈同时组合屏幕变换和可见视口裁剪。Stamp 保存绘制区域与屏幕命中区域,PointerEvent.position 与 area 共用绘制坐标,screen_position 和原始 crossterm Event 保留终端坐标；use_drag 使用终端坐标计算连续拖拽位移。组件无需自行补滚动偏移。
+
+InputRuntime 记住最后鼠标位置,绘制结束同步变化的 Enter/Leave 与 use_hover；内置列表和 use_hover_row 还重新核对内容映射,仅状态变化请求额外绘制。渲染循环先收敛这些更新再等待输入,避免静止指针悬停残留和每帧重绘循环。

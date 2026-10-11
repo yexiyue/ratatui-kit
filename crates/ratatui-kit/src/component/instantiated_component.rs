@@ -36,13 +36,19 @@ impl DerefMut for Components {
 
 impl Components {
     pub fn get_constraints(&self, direction: Direction) -> Vec<Constraint> {
+        self.constraints(direction).collect()
+    }
+
+    pub(crate) fn constraints(
+        &self,
+        direction: Direction,
+    ) -> impl Iterator<Item = Constraint> + '_ {
         self.components
             .iter()
-            .map(|c| match direction {
-                Direction::Horizontal => c.layout_style.get_width(),
-                Direction::Vertical => c.layout_style.get_height(),
+            .map(move |component| match direction {
+                Direction::Horizontal => component.layout_style.get_width(),
+                Direction::Vertical => component.layout_style.get_height(),
             })
-            .collect()
     }
 
     fn poll_change(&mut self, cx: &mut Context) -> Poll<()> {
@@ -136,8 +142,16 @@ impl InstantiatedComponent {
 
         drawer.area = area;
 
-        // 先渲染在计算子组件的areas
+        // 透明函数组件的hook观察首子布局的实际区域,但绘制仍把原区域交子节点,
+        // 防止子节点再次应用margin/offset造成双重内缩。
+        let hook_area = if self.has_transparent_layout {
+            layout_style.inner_area(area)
+        } else {
+            area
+        };
+        drawer.area = hook_area;
         self.hooks.pre_component_draw(drawer);
+        drawer.area = area;
 
         // drawer.ares可能在组件绘制时改变
         self.component.draw(drawer);
@@ -152,6 +166,7 @@ impl InstantiatedComponent {
             "calc_children_areas must return one area per child"
         );
 
+        let children_area = drawer.area;
         for (child, area) in self
             .children
             .components
@@ -161,6 +176,12 @@ impl InstantiatedComponent {
             drawer.area = *area;
             child.draw(drawer);
         }
+        // 子节点会改写 drawer.area,不能让最后一个子节点的区域泄漏给父 hook。
+        drawer.area = if self.has_transparent_layout {
+            hook_area
+        } else {
+            children_area
+        };
         self.hooks.post_component_draw(drawer);
     }
 

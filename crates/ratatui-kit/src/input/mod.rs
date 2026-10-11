@@ -18,8 +18,8 @@
 
 use std::{cell::Cell, cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
-use crossterm::event::{Event, MouseButton, MouseEventKind};
-use ratatui::layout::Rect;
+use crossterm::event::{Event, MouseButton, MouseEvent, MouseEventKind};
+use ratatui::layout::{Position, Rect};
 
 // handler 处理事件后的结果。`Default = Ignored`（让事件继续向后传)。
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -101,8 +101,29 @@ pub(crate) struct PointerToken(u64);
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Stamp {
     pub(crate) area: Rect,
+    pub(crate) screen_area: Rect,
+    pub(crate) delta_x: i32,
+    pub(crate) delta_y: i32,
     pub(crate) frame: u64,
     pub(crate) draw_seq: u64,
+}
+
+impl Stamp {
+    pub(crate) fn contains(self, position: Position) -> bool {
+        self.frame == draw_clock_frame() && rect_contains(self.screen_area, position.x, position.y)
+    }
+    pub(crate) fn local_position(self, position: Position) -> Position {
+        Position::new(
+            (i32::from(position.x) - self.delta_x).clamp(0, i32::from(u16::MAX)) as u16,
+            (i32::from(position.y) - self.delta_y).clamp(0, i32::from(u16::MAX)) as u16,
+        )
+    }
+    pub(crate) fn same_geometry(self, other: Self) -> bool {
+        self.area == other.area
+            && self.screen_area == other.screen_area
+            && self.delta_x == other.delta_x
+            && self.delta_y == other.delta_y
+    }
 }
 
 pub(crate) type StampHandle = Rc<Cell<Stamp>>;
@@ -132,13 +153,16 @@ pub(crate) fn draw_clock_stamp(area: Rect) -> Stamp {
         c.draw_seq += 1;
         Stamp {
             area,
+            screen_area: area,
+            delta_x: 0,
+            delta_y: 0,
             frame: c.frame,
             draw_seq: c.draw_seq,
         }
     })
 }
 
-fn draw_clock_frame() -> u64 {
+pub(crate) fn draw_clock_frame() -> u64 {
     DRAW_CLOCK.with_borrow(|c| c.frame)
 }
 
@@ -154,6 +178,11 @@ struct HandlerEntry {
     stamp: StampHandle,
     // `Some` = 指针 handler（可被捕获路由命中、可登记 hover 追踪）。
     pointer: Option<PointerToken>,
+    // 移动观察独立投递,消费只请求重绘,不能截断其它组件的 Leave。
+    motion_observer: bool,
+    cancel: Option<Box<dyn FnMut(MouseButton)>>,
+    deactivate: Option<Box<dyn FnMut() -> bool>>,
+    sync_motion: Option<Box<dyn FnMut(MouseEvent) -> bool>>,
     f: Box<dyn FnMut(Event) -> EventResult>,
 }
 
@@ -175,6 +204,7 @@ pub(crate) struct InputRuntime {
     // any-motion(1003h) 棘轮:存在过 hover/Move 追踪即置位,由渲染循环惰性执行升级。
     motion_requested: bool,
     motion_enabled: bool,
+    last_pointer: Option<MouseEvent>,
 }
 
 // 铸造跨帧稳定的指针身份(hook 侧调用)。
@@ -276,8 +306,125 @@ impl InputRuntime {
             options,
             stamp,
             pointer,
+            motion_observer: false,
+            cancel: None,
+            deactivate: None,
+            sync_motion: None,
             f,
         });
+    }
+
+    // 指针主 handler 的取消回调仅当前挂载帧有效,不保留已卸载组件的状态闭包。
+    pub(crate) fn register_pointer_handler(
+        &mut self,
+        layer: LayerId,
+        stamp: StampHandle,
+        token: PointerToken,
+        f: Box<dyn FnMut(Event) -> EventResult>,
+        cancel: Box<dyn FnMut(MouseButton)>,
+    ) {
+        self.register_handler(
+            Some(layer),
+            EventPriority::Normal,
+            EventOptions { hit_test: true },
+            stamp,
+            Some(token),
+            f,
+        );
+        self.handlers.last_mut().unwrap().cancel = Some(cancel);
+    }
+
+    // 绘制结束才有完整的帧戳和输入层,避免隐藏/模态遮挡的捕获在恢复后复活。
+    pub(crate) fn finish_frame(&mut self) -> bool {
+        let mut repaint = false;
+        let cut = self
+            .layers
+            .iter()
+            .rposition(|layer| layer.blocks_lower)
+            .unwrap_or(0);
+        let frame = draw_clock_frame();
+        for (index, button) in [MouseButton::Left, MouseButton::Right, MouseButton::Middle]
+            .into_iter()
+            .enumerate()
+        {
+            let Some(token) = self.gestures[index] else {
+                continue;
+            };
+            let target = self
+                .handlers
+                .iter_mut()
+                .find(|handler| handler.pointer == Some(token));
+            let valid = target.as_ref().is_some_and(|handler| {
+                handler.stamp.get().frame == frame
+                    && !handler.stamp.get().screen_area.is_empty()
+                    && handler
+                        .layer
+                        .is_some_and(|id| self.layers[cut..].iter().any(|layer| layer.id == id))
+            });
+            if !valid {
+                self.gestures[index] = None;
+                // 卸载后 Owner 中的 State 可能已释放,只取消仍挂载的目标。
+                if let Some(cancel) = target.and_then(|handler| handler.cancel.as_mut()) {
+                    cancel(button);
+                    repaint = true;
+                }
+            }
+        }
+        for handler in self
+            .handlers
+            .iter_mut()
+            .filter(|handler| handler.motion_observer)
+        {
+            let valid = handler.stamp.get().frame == frame
+                && handler
+                    .layer
+                    .is_some_and(|id| self.layers[cut..].iter().any(|layer| layer.id == id));
+            if !valid && let Some(deactivate) = handler.deactivate.as_mut() {
+                repaint |= deactivate();
+            } else if let Some(mouse) = self.last_pointer
+                && let Some(sync) = handler.sync_motion.as_mut()
+            {
+                repaint |= sync(mouse);
+            }
+        }
+        let new_inside: HashSet<_> = self
+            .hover_trackers
+            .iter()
+            .filter(|(layer, _, stamp)| {
+                stamp.get().frame == frame
+                    && self.layers[cut..].iter().any(|entry| entry.id == *layer)
+                    && self.last_pointer.is_some_and(|mouse| {
+                        stamp.get().contains(Position::new(mouse.column, mouse.row))
+                    })
+            })
+            .map(|(_, token, _)| *token)
+            .collect();
+        repaint |= new_inside != self.hover_inside;
+        self.hover_inside = new_inside;
+        repaint
+    }
+
+    pub(crate) fn register_motion_observer(
+        &mut self,
+        layer: LayerId,
+        stamp: StampHandle,
+        f: Box<dyn FnMut(Event) -> EventResult>,
+        deactivate: Box<dyn FnMut() -> bool>,
+        sync_motion: Box<dyn FnMut(MouseEvent) -> bool>,
+    ) {
+        self.request_motion();
+        self.register_handler(
+            Some(layer),
+            EventPriority::Normal,
+            EventOptions { hit_test: false },
+            stamp,
+            None,
+            f,
+        );
+        let handler = self.handlers.last_mut().unwrap();
+        handler.motion_observer = true;
+        handler.deactivate = Some(deactivate);
+        handler.sync_motion = Some(sync_motion);
     }
 
     // 登记 hover 追踪（`use_hover` 每帧调用）。同时置 any-motion 请求棘轮。
@@ -343,6 +490,9 @@ impl InputRuntime {
             .collect();
 
         let is_mouse = matches!(event, Event::Mouse(_));
+        if let Event::Mouse(mouse) = event {
+            self.last_pointer = Some(mouse);
+        }
         let frame = draw_clock_frame();
 
         // hover 与消费无关:Global 提前截断也必须更新进入/离开状态。
@@ -357,7 +507,7 @@ impl InputRuntime {
                     let s = stamp.get();
                     active.contains_key(layer)
                         && s.frame == frame
-                        && rect_contains(s.area, m.column, m.row)
+                        && rect_contains(s.screen_area, m.column, m.row)
                 })
                 .map(|(_, token, _)| *token)
                 .collect();
@@ -367,6 +517,19 @@ impl InputRuntime {
         } else {
             false
         };
+
+        // 所有活跃组件先同步 Enter/Move/Leave,不受 Global 或另一观察者消费影响。
+        let mut motion_changed = false;
+        if matches!(event, Event::Mouse(m) if matches!(m.kind, MouseEventKind::Moved)) {
+            for handler in handlers.iter_mut().filter(|handler| {
+                handler.motion_observer
+                    && handler
+                        .layer
+                        .is_some_and(|layer| active.contains_key(&layer))
+            }) {
+                motion_changed |= (handler.f)(event.clone()) == EventResult::Consumed;
+            }
+        }
 
         // Phase 0：指针捕获路由。捕获是对捕获者的投递承诺,先于 Global/层内链。
         if is_mouse
@@ -378,6 +541,7 @@ impl InputRuntime {
                 // 当前帧仍注册且在活跃层内的捕获者才直送;否则捕获自动失效(组件卸载/层失活)。
                 let target = (0..handlers.len()).find(|&i| {
                     handlers[i].pointer == Some(token)
+                        && handlers[i].stamp.get().frame == frame
                         && handlers[i].layer.is_some_and(|l| active.contains_key(&l))
                 });
                 match target {
@@ -397,7 +561,7 @@ impl InputRuntime {
 
         // Phase 1：Global handler，按 (priority desc, order asc)。Consumed 即终止全程。
         let mut global_idx: Vec<usize> = (0..handlers.len())
-            .filter(|&i| handlers[i].layer.is_none())
+            .filter(|&i| handlers[i].layer.is_none() && !handlers[i].motion_observer)
             .collect();
         global_idx.sort_by(|&a, &b| {
             handlers[b]
@@ -411,7 +575,10 @@ impl InputRuntime {
 
         // Phase 2：活跃层内。鼠标事件按绘制序倒排 tie-break（冒泡）;键盘维持注册序。
         let mut layer_idx: Vec<usize> = (0..handlers.len())
-            .filter(|&i| handlers[i].layer.is_some_and(|l| active.contains_key(&l)))
+            .filter(|&i| {
+                !handlers[i].motion_observer
+                    && handlers[i].layer.is_some_and(|l| active.contains_key(&l))
+            })
             .collect();
         if is_mouse {
             layer_idx.sort_by(|&a, &b| {
@@ -450,7 +617,7 @@ impl InputRuntime {
         }
 
         if matches!(event, Event::Mouse(m) if matches!(m.kind, MouseEventKind::Moved)) {
-            return consumed || hover_changed;
+            return consumed || hover_changed || motion_changed;
         }
 
         // handlers 由外层 dispatch 归还(见 dispatch 说明);下一帧 begin_frame 后由组件重建。
@@ -477,7 +644,7 @@ impl InputRuntime {
             && let Event::Mouse(m) = event
         {
             let s = h.stamp.get();
-            if s.frame != frame || !rect_contains(s.area, m.column, m.row) {
+            if s.frame != frame || !rect_contains(s.screen_area, m.column, m.row) {
                 return EventResult::Ignored;
             }
         }
@@ -523,6 +690,7 @@ mod tests {
             area,
             frame: 0,
             draw_seq: 0,
+            ..Stamp::default()
         }))
     }
 
@@ -1188,6 +1356,68 @@ mod tests {
         );
         rt.dispatch(mouse(MouseEventKind::Up(MouseButton::Left), 5, 5));
         assert_eq!(*log.borrow(), ["bystander"]);
+    }
+
+    #[test]
+    fn hidden_captor_is_cancelled_after_draw_and_never_revives() {
+        let mut runtime = InputRuntime::default();
+        let token = mint_pointer_token();
+        let cancelled = Rc::new(Cell::new(0));
+        let calls = Rc::new(Cell::new(0));
+        let rebuild = |runtime: &mut InputRuntime, drawn: bool, blocked: bool| {
+            runtime.begin_frame();
+            let root = runtime.root_layer();
+            let cancel_count = cancelled.clone();
+            let call_count = calls.clone();
+            runtime.register_pointer_handler(
+                root,
+                if drawn {
+                    stamp(Rect::new(0, 0, 10, 10))
+                } else {
+                    undrawn(Rect::new(0, 0, 10, 10))
+                },
+                token,
+                Box::new(move |_| {
+                    call_count.set(call_count.get() + 1);
+                    EventResult::Consumed
+                }),
+                Box::new(move |_| cancel_count.set(cancel_count.get() + 1)),
+            );
+            runtime.push_layer(blocked, true);
+            runtime.finish_frame();
+        };
+        for (drawn, blocked) in [(false, false), (true, true)] {
+            rebuild(&mut runtime, true, false);
+            runtime.dispatch(mouse_at(5, 5));
+            rebuild(&mut runtime, drawn, blocked);
+            assert!(runtime.gestures[0].is_none());
+            let before = calls.get();
+            // 恢复时未发生任何释放事件,旧捕获仍必须保持取消。
+            rebuild(&mut runtime, true, false);
+            runtime.dispatch(mouse(MouseEventKind::Drag(MouseButton::Left), 50, 50));
+            assert_eq!(calls.get(), before);
+        }
+        assert_eq!(cancelled.get(), 2);
+    }
+
+    #[test]
+    fn unmounted_pointer_releases_capture_without_calling_disposed_callback() {
+        let mut runtime = InputRuntime::default();
+        runtime.begin_frame();
+        let cancelled = Rc::new(Cell::new(false));
+        let flag = cancelled.clone();
+        runtime.register_pointer_handler(
+            runtime.root_layer(),
+            stamp(Rect::new(0, 0, 10, 10)),
+            mint_pointer_token(),
+            Box::new(|_| EventResult::Consumed),
+            Box::new(move |_| flag.set(true)),
+        );
+        runtime.dispatch(mouse_at(5, 5));
+        runtime.begin_frame();
+        runtime.finish_frame();
+        assert!(!cancelled.get());
+        assert!(runtime.gestures[0].is_none());
     }
 
     // ⑰ 多按键独立捕获:Left 由 A 捕获、Right 由 B 捕获,互不干扰

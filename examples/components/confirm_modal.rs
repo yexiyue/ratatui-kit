@@ -3,6 +3,7 @@
 //! 按 `d` 打开确认弹窗；弹窗内部使用独占 input layer，背景列表不会处理 `j/k/q`。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -23,7 +24,7 @@ const RELEASES: [&str; 5] = [
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }

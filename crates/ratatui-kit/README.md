@@ -51,6 +51,7 @@ The website includes real terminal recordings with playback controls. Clone this
 
 - [Features](#features)
 - [Quick start](#quick-start)
+- [Mouse input](#mouse-input)
 - [Built-in components and hooks](#built-in-components-and-hooks)
 - [Feature flags](#feature-flags)
 - [Documentation and examples](#documentation-and-examples)
@@ -76,7 +77,7 @@ The website includes real terminal recordings with playback controls. Clone this
 - **Local and global state**: use component-local `State<T>` for local lifetimes and `Atom<T>` for process-wide shared state.
 - **Built-in router**: `RouterProvider`, `Outlet`, `routes!`, `use_navigate`, `use_route`, and `use_params` are available behind the `router` feature.
 - **Native widget escape hatch**: use `widget(expr)` and `stateful(widget, state)` to embed existing Ratatui widgets directly.
-- **Small default dependency surface**: the default feature set is empty; opt into `router`, `atom`, `input`, `tree`, `table`, `virtual-list`, `serde`, or `full` as needed. The theming protocol is always-on with no extra dependency.
+- **Small default dependency surface**: the default feature set is empty; opt into `router`, `atom`, `input`, `tree`, `table`, `virtual-list`, `textarea`, `serde`, or `full` as needed. The theming protocol is always-on with no extra dependency.
 
 ---
 
@@ -177,6 +178,57 @@ cargo run --example counter
 
 ---
 
+## Mouse input
+
+Enable capture once at the application entry; pointer hooks are core APIs and need no feature flag:
+
+```rust,no_run
+use ratatui_kit::{prelude::*, ratatui::layout::Constraint};
+
+#[tokio::main]
+async fn main() {
+    element!(MouseCounter)
+        .fullscreen_with(RunOptions { mouse: true })
+        .await
+        .expect("failed to run the application");
+}
+
+#[component]
+fn MouseCounter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut count = hooks.use_state(|| 0usize);
+    let hovered = hooks.use_hover();
+    hooks.use_click(move |_| count += 1);
+    element!(Border(height: Constraint::Length(3)) {
+        Text(text: format!("Clicks: {} | hovered: {}", count.get(), hovered))
+    })
+}
+```
+
+`fullscreen()` leaves capture off. Use `render_loop_with(terminal_options, RunOptions { mouse: true })` for an inline viewport. The framework restores terminal mouse modes on exit.
+
+| Interaction | API | Contract |
+| --- | --- | --- |
+| Visible action button | `Button` | Left Down invokes `on_press`; register keyboard shortcuts separately |
+| Release inside the same component | `use_click` | Down + Up; `Click.count` reports single/double/triple clicks |
+| Region feedback | `use_hover` | Boolean hover; also updates after layout changes with a stationary mouse |
+| Drag or resize | `use_drag` | `DragPhase::Start/Move/End/Cancel`; captured outside the region |
+| Custom pointer handling | `use_pointer` | `PointerOptions` controls buttons, motion and input layer; return `EventResult` |
+| Hover for a custom list | `use_hover_row` | Map drawing coordinates to an item ID; returns `State<Option<T>>` |
+| Scrollbar for custom content | `use_scrollbar` | `ScrollbarOptions` + `on_seek(usize)` render and control one track |
+
+`ScrollView` and `TreeSelect` provide draggable scrollbars. Use `ScrollbarStyle` to configure thumb, track, hover and drag feedback. For custom content, keep `content_length`, `viewport_length`, `position`, and `on_seek` in the same unit (lines or items); the seek range is `0..=content_length - viewport_length`.
+
+A consumed pointer Down captures that button until release or cancellation. `Enter/Move/Leave` are independent observations: consuming them requests repaint without blocking another component's hover update. `PointerEvent.position` and `area` share drawing coordinates, including ScrollView content coordinates; `screen_position`, raw crossterm events, `Click.position` and `DragUpdate.from/to` use terminal coordinates. Nested viewports are mapped and clipped by the framework.
+
+Keep hook order stable; put changing enable/disable checks inside callbacks. Bind input-layer handles within the current frame. In hand-written `Component::update`, attach `hooks.with_context_stack(updater.component_context_stack())` before calling pointer hooks. For custom widgets, reject loading/empty/out-of-range hits and release `state.read()` guards before `state.write()`. See the [mouse guide](https://yexiyue.github.io/ratatui-kit/core/pointer-events/) and [skill reference](https://github.com/yexiyue/ratatui-kit/blob/main/skills/ratatui-kit/references/pointer-events.md) for composition examples and the integration checklist.
+
+```bash
+cargo run --example mouse
+cargo run --example custom_scrollbar
+```
+
+---
+
 ## AI-assisted development
 
 Ratatui Kit ships an **AI agent skill** — a packaged knowledge base that teaches your AI coding assistant the framework's real components, props, and hooks, the `element!` macro, input layers, and the router — so you can ask it to *"build me a terminal todo app"* and get code that **compiles and follows the framework's idioms**, instead of guessed APIs.
@@ -207,6 +259,7 @@ README keeps the API overview intentionally compact. See the [documentation site
 | `PaletteProvider`, `ThemeOverride` | Theme injection — global palette and per-component overrides | core |
 | `Button` | Mouse action button (left Down) | core |
 | `Input`, `SearchInput` | Single-line input and search input | `input` |
+| `TextArea` | Soft-wrapped multi-line editing and cursor seeking | `textarea` |
 | `TreeSelect` | Tree selection | `tree` |
 | `Table` | Data-driven table with cell-grid borders, wrapping, responsive columns, footer rows, and row/column highlighting | `table` |
 | `VirtualList` | Virtualized list rendering | `virtual-list` |
@@ -224,6 +277,7 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `use_context` | Read values from the nearest context provider | core |
 | `use_palette`, `use_component_theme` | Read the current palette or a resolved component theme | core |
 | `use_click` / `use_hover` / `use_drag` / `use_pointer` | Click, hover, drag, pointer events | core |
+| `use_hover_row` / `use_scrollbar` | Custom list hover and rendered draggable scrollbars | core |
 | `use_event_handler` | Register scoped input handlers | core |
 | `use_input_layer` | Create a same-frame input layer handle | core |
 | `use_insert_before`, `use_terminal_size` | Insert content before render and read terminal size | core |
@@ -245,13 +299,14 @@ You can also bridge any native Ratatui widget with `widget(expr)` or `stateful(w
 | `router` | `RouterProvider`, `Outlet`, `routes!`, `use_navigate`, `use_route`, `use_params` | `regex` |
 | `atom` | `Atom`, `AtomState`, `use_atom` | - |
 | `input` | `Input`, `SearchInput`, and the `tui_input` re-export | `tui-input` |
+| `textarea` | `TextArea` with soft wrapping, keyboard editing and mouse seeking | `tui-input`, `unicode-width` |
 | `tree` | `TreeSelect` and the `tui_tree_widget` re-export | `tui-tree-widget` |
 | `table` | `Table`, width-aware wrapping, responsive columns, and grid borders | `unicode-width` |
 | `virtual-list` | `VirtualList` and the `tui_widget_list` re-export | `tui-widget-list` |
 | `serde` | `Serialize` / `Deserialize` for `Palette` | `serde`, `ratatui/serde` |
 | `full` | All optional features above | - |
 
-The `textarea` feature is currently disabled during the Ratatui 0.30 migration because `tui-textarea` does not yet provide a compatible release.
+`textarea` uses `tui-input` and the framework's soft-wrap renderer on Ratatui 0.30; it is included in `full`. `test-util` exposes off-screen rendering helpers and is enabled separately for tests.
 
 ---
 
@@ -289,7 +344,8 @@ search_input         scrollview           wrapped_text         modal
 confirm_modal        alert_modal          shortcut_info_modal  select
 multi_select         tree_select          table                 virtual_list
 virtual_multi_select custom_widget        custom_hook           custom_provider
-todo_app
+todo_app             mouse                search_filter        custom_scrollbar
+textarea
 ```
 
 Some examples require optional features such as `input`, `tree`, `table`, `virtual-list`, or `router`. Running examples from this repository uses the workspace configuration and enables `full`.
@@ -347,5 +403,3 @@ This repository uses lefthook for local pre-commit checks.
 ## License
 
 Ratatui Kit is released under the [MIT License](https://github.com/yexiyue/ratatui-kit/blob/main/LICENSE).
-
-Mouse interactions: `cargo run --example mouse`. Enable capture with `fullscreen_with(RunOptions { mouse: true })`. See [Pointer Events](https://yexiyue.github.io/ratatui-kit/core/pointer-events/).

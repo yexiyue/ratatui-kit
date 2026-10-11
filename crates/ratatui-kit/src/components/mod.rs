@@ -51,7 +51,12 @@ pub use center::*;
 
 // 文本组件，用于显示文本内容，支持样式、超链接等。
 pub mod text;
+/// 多行文本输入(`textarea` feature)。
+#[cfg(feature = "textarea")]
+pub mod textarea;
 pub use text::*;
+#[cfg(feature = "textarea")]
+pub use textarea::*;
 // 自动换行文本组件，用于长文档、日志、小说正文等需要把换行高度交给布局的场景。
 pub mod wrapped_text;
 pub use wrapped_text::*;
@@ -84,9 +89,6 @@ pub mod virtual_list;
 pub use tui_widget_list;
 #[cfg(feature = "virtual-list")]
 pub use virtual_list::*;
-
-// 注:`textarea` 组件暂时下线(其底层 tui-textarea 尚无 ratatui 0.30 兼容版)。
-// 源码隔离保留在 `textarea.rs`(未声明为模块),待依赖支持 0.30 后恢复接入。
 
 #[cfg(feature = "router")]
 // 路由组件，支持页面跳转、参数、嵌套路由等，适合多页面终端应用。

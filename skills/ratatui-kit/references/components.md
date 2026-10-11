@@ -27,7 +27,7 @@ Two `element!` macro conveniences used throughout this reference:
 
 ### Style props are theme-backed `Option<Style>` (read this)
 
-Every `*_style` / style prop listed below (Border's `border_style` / `style`, Select's `highlight_style`, Table's `header_style`, …) is actually **`Option<Style>`, defaulting to the component's theme** — the per-component types below still write `Style` for brevity, so **read every style prop as `Option<Style>`**. Behavior:
+Every `*_style` / style prop listed below (Border's `border_style` / `style`, Select's `highlight_style`, Table's `header_style`, …) is actually **`Option<Style>`, defaulting to the component's theme** — the per-component types below still write `Style` for brevity, so **read every style prop as `Option<Style>`**. This applies to component theme-override props, not configuration structs: `ScrollbarStyle` fields are plain `Style`. Behavior:
 
 - Omit it or pass `None` → use the theme.
 - Pass a bare `Style` (auto-wrapped to `Some`) → patch over the theme (your fields win, the rest stay themed).

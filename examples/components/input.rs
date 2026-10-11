@@ -3,6 +3,7 @@
 //! `Input` 只负责渲染 `tui_input::Input` 状态；键盘事件由页面 handler 转发。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::{tui_input::backend::crossterm::EventHandler, *},
     ratatui::{
@@ -17,7 +18,7 @@ const EMPTY_VALUE: &str = "<empty>";
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -91,7 +92,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 gap: 1,
                 border_style: Style::new().blue(),
                 top_title: Line::from(" input component ").blue().bold().centered(),
-                bottom_title: Line::from(" type text | Enter submit | Esc clear / quit ").dark_gray().centered(),
+                bottom_title: Line::from(" type text | click positions cursor | Enter submit | Esc clear / quit ").dark_gray().centered(),
             ) {
                 View(
                     flex_direction: Direction::Horizontal,
@@ -109,6 +110,11 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                         ) {
                             Input(
                                 input: input_view,
+                                on_seek: move |cursor: usize| {
+                                    input
+                                        .write()
+                                        .handle(tui_input::InputRequest::SetCursor(cursor));
+                                },
                                 cursor_style: Style::new().bg(Color::Yellow),
                                 placeholder: "Type a note and press Enter".to_string(),
                                 placeholder_style: Style::new().dark_gray(),

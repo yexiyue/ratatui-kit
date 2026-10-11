@@ -128,3 +128,8 @@ The `scrollview` example toggles this at runtime (press `b`) so you can compare 
 `ScrollView` registers its handler in `EventScope::Current`. When placed inside `Modal` or `ShortcutInfoModal`, it naturally belongs to the foreground modal's current layer, so scrolling inside the modal does not pass through to the background page.
 
 If you only need to display shortcut groups, prefer [ShortcutInfoModal](/ratatui-kit/components/shortcut-info-modal/). If you need to render a very long selectable list, see [VirtualList](/ratatui-kit/components/virtual-list/).
+
+
+## Mouse interaction
+
+Enable `RunOptions { mouse: true }` at the application entry. ScrollView handles thumb dragging, track jumps and one-unit arrow steps; its scrollbar remains interactive with `active: false`. `ScrollbarStyle.hover_style` and `drag_style` provide feedback. Main-axis Percentage/Ratio/Fill use the original `block.inner` size, while the cross axis uses the resolved viewport. Child drawing, hit mapping and scrolling share the clamped offset and layout snapshot. See [Pointer Events](/ratatui-kit/core/pointer-events/) for custom scrollbars and coordinate rules.

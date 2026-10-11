@@ -70,8 +70,9 @@ impl<'a> Tree<'a> {
     }
 
     // 只跑一次 draw（把树绘到给定 drawer）。供渲染 harness 直接画到 TestBackend Buffer。
-    pub(crate) fn draw_root(&mut self, drawer: &mut ComponentDrawer) {
+    pub(crate) fn draw_root(&mut self, drawer: &mut ComponentDrawer) -> bool {
         self.root_component.draw(drawer);
+        self.system_context.input.finish_frame()
     }
 
     // 测试专用:驱动事件分发(mouse_test harness)。
@@ -83,16 +84,17 @@ impl<'a> Tree<'a> {
     fn render<T: TerminalImpl<Event = crossterm::event::Event>>(
         &mut self,
         terminal: &mut Terminal<T>,
-    ) -> io::Result<()> {
+    ) -> io::Result<bool> {
         self.update_once(terminal);
 
+        let mut repaint = false;
         terminal.draw(|frame| {
             let area = frame.area();
             let mut drawer = ComponentDrawer::new(frame, area);
-            self.draw_root(&mut drawer);
+            repaint = self.draw_root(&mut drawer);
         })?;
 
-        Ok(())
+        Ok(repaint)
     }
 
     async fn render_loop<T: TerminalImpl<Event = crossterm::event::Event>>(
@@ -101,8 +103,8 @@ impl<'a> Tree<'a> {
     ) -> io::Result<()> {
         let mut skip_render = false;
         loop {
-            if !skip_render {
-                self.render(terminal)?;
+            if !skip_render && self.render(terminal)? {
+                continue;
             }
             // 首帧 update 完成后再检查注册,确保无需额外键盘/鼠标事件就能开始 hover。
             // 惰性升级 any-motion 上报:存在 hover/Move 追踪注册时补开 1003h(只升不降)。

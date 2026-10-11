@@ -1,8 +1,10 @@
 //! VirtualList 内置组件示例。
 
 use ratatui_kit::{
-    components::tui_widget_list::{ListBuildContext, ListState},
+    RunOptions,
+    components::tui_widget_list::ListState,
     crossterm::event::{Event, KeyCode, KeyEventKind},
+    prelude::VirtualItemContext,
     prelude::*,
     ratatui::{
         layout::{Constraint, Direction, Flex},
@@ -18,7 +20,7 @@ const DEFAULT_INDEX: usize = 42;
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -99,7 +101,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 flex_direction: Direction::Vertical,
                 border_style: Style::new().fg(Color::Blue),
                 top_title: Line::from(" virtual list ").fg(Color::Blue).bold().centered(),
-                bottom_title: Line::from(" j/k move | Home/End jump | Enter select | e empty | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" j/k move | click select | wheel scroll | Home/End jump | e empty | q quit ").dark_gray().centered(),
             ) {
                 View(
                     flex_direction: Direction::Horizontal,
@@ -116,11 +118,13 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                             .title_bottom(Line::from(list_hint).centered()),
                         scroll_padding: 2u16,
                         infinite_scrolling: false,
-                        render_item: |context: &ListBuildContext| {
+                        render_item: |context: &VirtualItemContext| {
                             let row = context.index + 1;
                             let label = format!("row {row:05}  task/{:03}", row % 128);
                             let style = if context.is_selected {
                                 Style::new().fg(Color::Black).bg(Color::Green)
+                            } else if context.is_hovered {
+                                Style::new().bold()
                             } else if row.is_multiple_of(25) {
                                 Style::new().fg(Color::Yellow)
                             } else {

@@ -9,12 +9,16 @@ use ratatui_kit_macros::{Props, component, element, with_layout_style};
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    AnyElement, ComponentTheme, Handler, Hooks, Palette, UseEffect, UseEventHandler, UseInputLayer,
-    UseState, UseTheme,
+    AnyElement, ComponentTheme, EventResult, Handler, Hooks, Palette, PointerKind, PointerOptions,
+    State, UseEffect, UseEventHandler, UseInputLayer, UsePointer, UseState, UseTheme,
+    components::input::cursor_char_index,
     components::theme::resolve_style,
     components::{Border, Input},
-    input::{EventPriority, EventResult, EventScope},
+    hooks::use_pointer::pointer_enabled,
+    input::{EventPriority, EventScope},
 };
+use crossterm::event::MouseButton;
+use ratatui::layout::Rect;
 
 /// SearchInput 组件的主题 slot。状态色(active/success/error)、占位符、光标、状态文案样式
 /// 全部从 [`Palette`] 派生。
@@ -127,6 +131,19 @@ impl Default for SearchInputProps {
     }
 }
 
+/// 把光标定位到点击列:宽度/滚动公式与 `Input` 渲染同源(内区 = 边框内,`input_width` = 内宽 - 1)。
+fn seek_cursor(input: &State<tui_input::Input>, area: Rect, x: u16) {
+    let inner_width = area.width.saturating_sub(2);
+    let input_width = inner_width.saturating_sub(1) as usize;
+    let scroll = input.read().visual_scroll(input_width);
+    let cell = x.saturating_sub(area.x + 1) as usize;
+    let value = input.read().value().to_string();
+    let index = cursor_char_index(&value, scroll + cell);
+    input
+        .write()
+        .handle(tui_input::InputRequest::SetCursor(index));
+}
+
 #[component]
 pub fn SearchInput(
     props: &mut SearchInputProps,
@@ -206,7 +223,8 @@ pub fn SearchInput(
             }
 
             let Event::Key(key) = event else {
-                return EventResult::Consumed;
+                // 鼠标放行给本层的指针处理器(点击定位光标);层本身独占,不会漏到背景。
+                return EventResult::Ignored;
             };
             if key.kind != KeyEventKind::Press {
                 return EventResult::Consumed;
@@ -265,6 +283,33 @@ pub fn SearchInput(
         },
     );
 
+    // 编辑前归属当前层,编辑中归属独占层;统一使用绘制坐标定位光标。
+    if pointer_enabled(&hooks) {
+        hooks.use_pointer(
+            PointerOptions {
+                layer: editing.get().then_some(layer),
+                ..Default::default()
+            },
+            move |event| {
+                if !is_enabled {
+                    return EventResult::Ignored;
+                }
+                let activate = !editing.get() && matches!(event.kind, PointerKind::Click { .. });
+                let seek =
+                    editing.get() && matches!(event.kind, PointerKind::Down(MouseButton::Left));
+                if activate || seek {
+                    if activate {
+                        editing.set(true);
+                    }
+                    seek_cursor(&input, event.area, event.position.x);
+                    EventResult::Consumed
+                } else {
+                    EventResult::Ignored
+                }
+            },
+        );
+    }
+
     let is_active = props.is_editing && editing.get();
     let status_title = if is_active && !status.read().is_empty() {
         let style = if valid.get() == Some(false) {
@@ -304,4 +349,120 @@ pub fn SearchInput(
             hide_cursor: !is_active,
         )
     })
+}
+
+#[cfg(test)]
+mod mouse_tests {
+    use super::*;
+    use crate::mouse_test::Mounted;
+    use crossterm::event::{KeyCode, MouseButton, MouseEventKind};
+    use std::sync::{Arc, Mutex};
+
+    type Log = Arc<Mutex<Vec<String>>>;
+
+    #[derive(Clone, Default, Props)]
+    struct HarnessProps {
+        log: Log,
+    }
+
+    #[component]
+    fn Harness(props: &HarnessProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        let log = props.log.clone();
+        crate::element!(SearchInput(
+            width: Constraint::Length(20),
+            placeholder: "type here",
+            on_change: move |value: String| log.lock().unwrap().push(value),
+        ))
+    }
+
+    // 点击进入编辑态;未点击时按普通键不应进入输入。
+    #[test]
+    fn clicking_activates_editing() {
+        let log: Log = Default::default();
+        let mut m = Mounted::mount(crate::element!(Harness(log: log.clone())), true);
+
+        m.dispatch_key(KeyCode::Char('x'));
+        assert!(log.lock().unwrap().is_empty(), "未激活时普通键不进输入");
+
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), 5, 1);
+        m.dispatch(MouseEventKind::Up(MouseButton::Left), 5, 1);
+        m.dispatch_key(KeyCode::Char('x'));
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec!["x".to_string()],
+            "点击后进入编辑"
+        );
+    }
+
+    // 编辑中点击文本,光标定位到点击处(再输入从该位置插入)。
+    #[test]
+    fn clicking_while_editing_positions_cursor() {
+        let log: Log = Default::default();
+        let mut m = Mounted::mount(crate::element!(Harness(log: log.clone())), true);
+
+        // 先点击进入编辑态,键入 "abcd",再点击中间(ab 结束处:内区自边框下一列起)。
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), 10, 1);
+        m.dispatch(MouseEventKind::Up(MouseButton::Left), 10, 1);
+        for ch in ['a', 'b', 'c', 'd'] {
+            m.dispatch_key(KeyCode::Char(ch));
+        }
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), 3, 1);
+        m.dispatch_key(KeyCode::Char('Z'));
+        assert_eq!(
+            *log.lock().unwrap().last().unwrap(),
+            "abZcd",
+            "点击第 2 列 → 光标在 b 后,Z 插在 ab 与 cd 之间"
+        );
+    }
+    #[component]
+    fn ScrolledSearch(props: &HarnessProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        use crate::components::{ScrollView, ScrollViewState, View};
+        use ratatui::layout::{Margin, Position};
+        let scroll = hooks.use_state(|| ScrollViewState::with_offset(Position::new(0, 3)));
+        let log = props.log.clone();
+        crate::element!(View(margin: Margin::new(4, 1)) {
+            ScrollView(state: scroll) {
+                View(height: Constraint::Length(3))
+                SearchInput(width: Constraint::Length(20), placeholder: "type here",
+                    on_change: move |value: String| log.lock().unwrap().push(value))
+                View(height: Constraint::Length(5))
+            }
+        })
+    }
+
+    #[test]
+    fn scrolled_search_uses_the_same_coordinates_before_and_during_editing() {
+        let log: Log = Default::default();
+        let mut mounted = Mounted::mount_sized(
+            crate::element!(ScrolledSearch(log: log.clone())),
+            true,
+            32,
+            9,
+        );
+        let (x, y) =
+            crate::mouse_test::find_text(&mounted.buffer(), "type here").expect("visible search");
+        mounted.dispatch(MouseEventKind::Down(MouseButton::Left), x + 2, y);
+        mounted.dispatch(MouseEventKind::Up(MouseButton::Left), x + 2, y);
+        for ch in ['a', 'b', 'c', 'd'] {
+            mounted.dispatch_key(KeyCode::Char(ch));
+        }
+        let (x, y) = crate::mouse_test::find_text(&mounted.buffer(), "abcd").expect("search text");
+        mounted.dispatch(MouseEventKind::Down(MouseButton::Left), x + 2, y);
+        mounted.dispatch(MouseEventKind::Up(MouseButton::Left), x + 2, y);
+        mounted.dispatch_key(KeyCode::Char('Z'));
+        assert_eq!(log.lock().unwrap().last().unwrap(), "abZcd");
+    }
+
+    #[test]
+    fn cursor_highlight_preserves_the_character_under_it() {
+        let log: Log = Default::default();
+        let mut m = Mounted::mount(crate::element!(Harness(log: log.clone())), true);
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), 5, 1);
+        m.dispatch(MouseEventKind::Up(MouseButton::Left), 5, 1);
+        for ch in ['a', 'b', 'c', 'd'] {
+            m.dispatch_key(KeyCode::Char(ch));
+        }
+        m.dispatch_key(KeyCode::Home);
+        assert_eq!(m.buffer()[(1, 1)].symbol(), "a");
+    }
 }

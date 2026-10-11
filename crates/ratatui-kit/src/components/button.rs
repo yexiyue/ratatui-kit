@@ -129,6 +129,7 @@ pub fn Button(props: &mut ButtonProps, mut hooks: Hooks) -> impl Into<AnyElement
         PointerOptions {
             buttons: MouseButtons::LEFT,
             track_move: false,
+            ..Default::default()
         },
         move |ev| {
             if !disabled && matches!(ev.kind, PointerKind::Down(MouseButton::Left)) {

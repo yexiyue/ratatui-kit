@@ -3,6 +3,7 @@
 //! 按 `a` 打开提示弹窗；弹窗打开时会消费键盘事件，背景列表不会继续移动。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -24,7 +25,7 @@ const WORKSPACES: [&str; 5] = [
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }

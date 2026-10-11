@@ -32,14 +32,22 @@ use crate::{
 };
 use std::{
     any::Any,
+    borrow::Cow,
+    cell::Cell,
     task::{Context, Poll},
 };
 mod use_context;
 pub use use_context::*;
 mod use_input;
 pub use use_input::*;
-mod use_pointer;
+pub(crate) mod use_pointer;
 pub use use_pointer::*;
+
+mod use_hover_row;
+pub use use_hover_row::*;
+
+mod use_scrollbar;
+pub use use_scrollbar::*;
 mod use_future;
 pub use use_future::*;
 mod use_state;
@@ -156,7 +164,8 @@ impl Hook for Vec<Box<dyn AnyHook>> {
 pub struct Hooks<'a, 'b: 'a> {
     hooks: &'a mut Vec<Box<dyn AnyHook>>,
     first_update: bool,
-    hook_index: usize,
+    // 根 Hooks 持有游标;context view 借用同一游标,无需每帧分配共享句柄。
+    hook_index: Cow<'a, Cell<usize>>,
     pub(crate) context: Option<&'a ContextStack<'b>>,
 }
 
@@ -165,7 +174,7 @@ impl<'a> Hooks<'a, '_> {
         Self {
             hooks,
             first_update,
-            hook_index: 0,
+            hook_index: Cow::Owned(Cell::new(0)),
             context: None,
         }
     }
@@ -177,7 +186,7 @@ impl<'a> Hooks<'a, '_> {
         Hooks {
             hooks: self.hooks,
             first_update: self.first_update,
-            hook_index: self.hook_index,
+            hook_index: Cow::Borrowed(self.hook_index.as_ref()),
             context: Some(context),
         }
     }
@@ -190,12 +199,44 @@ impl<'a> Hooks<'a, '_> {
         if self.first_update {
             self.hooks.push(Box::new(f()));
         }
-        let idx = self.hook_index;
-        self.hook_index += 1;
+        let idx = self.hook_index.get();
+        self.hook_index.set(idx + 1);
 
         self.hooks
             .get_mut(idx)
             .and_then(|hook| hook.any_self_mut().downcast_mut::<H>())
             .expect("Hook type mismatch, ensure the hook is of the correct type")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct First(u8);
+    struct Second(u8);
+    impl Hook for First {}
+    impl Hook for Second {}
+
+    #[test]
+    fn contextual_hook_views_share_the_parent_cursor_across_frames() {
+        let mut stored = Vec::new();
+        let mut root = ();
+        let stack = ContextStack::root(&mut root);
+        for first_update in [true, false] {
+            let mut hooks = Hooks::new(&mut stored, first_update);
+            assert_eq!(hooks.use_hook(|| First(1)).0, 1);
+            {
+                let mut contextual = hooks.with_context_stack(&stack);
+                assert_eq!(contextual.use_hook(|| Second(2)).0, 2);
+                {
+                    let mut nested = contextual.with_context_stack(&stack);
+                    assert_eq!(nested.use_hook(|| First(3)).0, 3);
+                }
+                assert_eq!(contextual.use_hook(|| Second(4)).0, 4);
+            }
+            assert_eq!(hooks.use_hook(|| First(5)).0, 5);
+        }
+        assert_eq!(stored.len(), 5);
     }
 }

@@ -9,14 +9,14 @@ description: >-
   command-line app in Rust, OR mentions ratatui-kit, the element! macro,
   #[component], use_state / use_atom / use_event_handler, RouterProvider, or asks
   to "make a TUI", "build a terminal app", "add a screen/panel/widget", or "wire
-  up keyboard input" in a ratatui-kit project — even if they don't name the
+  up keyboard or mouse input" in a ratatui-kit project — even if they don't name the
   framework explicitly. Reach for it before writing ratatui-kit code by hand, so
   the output uses correct APIs and idioms instead of guessed ones.
 license: MIT
 metadata:
   author: yexiyue
   framework: ratatui-kit
-  version: "1.0.2"
+  version: "1.1.0"
 ---
 
 # ratatui-kit — Building Terminal UIs in Rust
@@ -98,7 +98,7 @@ runtime is required — the docs and examples use Tokio.
 
 ```toml
 [dependencies]
-ratatui-kit = { version = "0.11", features = ["full"] }
+ratatui-kit = { version = "0.12", features = ["full"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 
@@ -115,14 +115,17 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 | `tree` | `TreeSelect` |
 | `table` | `Table` (data grid: cell-grid borders, wrapping, row/column highlight, footer) |
 | `virtual-list` | `VirtualList` (windowed list for huge data) |
+| `textarea` | `TextArea` (multi-line text entry with soft wrap) |
 | `full` | all of the above |
 
 Core components need **no feature**: `View`, `Border`, `Center`, `Fragment`,
 `Text`, `WrappedText`, `Positioned`, `Modal`, `ConfirmModal`, `AlertModal`,
 `ShortcutInfoModal`, `Button`, `Select`, `MultiSelect`, `ScrollView`, `ContextProvider`.
 
-> The `textarea` feature is currently offline (its dependency has no Ratatui 0.30
-> build). Don't reference `TextArea`.
+> `TextArea` is a full redesign on `tui-input` (not tui-textarea): soft-wrapped
+> display rows, display-row Up/Down/Home/End, click-to-position (cursor stops
+> before the clicked cell), `on_submit` fires on Enter in single-line mode.
+> Value + cursor are caller-owned: feed `value` back through `on_change`.
 
 Standard imports — `prelude::*` for framework items, `ratatui::` for styles/layout
 types, `crossterm::event::` for key types:
@@ -312,12 +315,27 @@ reacting) use an **input layer**. Prefer the built-in `ConfirmModal` / `AlertMod
 callback. Roll your own layer only for custom modal interactions; see
 `references/events-state-routing.md` for `use_input_layer` and the layering rules.
 
-**Mouse interactions.** Enable capture explicitly at the app entry with
-`fullscreen_with(RunOptions { mouse: true })`. Use `Button` for left-button Down
-activation, `use_click` for release-inside activation, and `use_hover` / `use_drag`
-for region feedback and resizing. These are core APIs with no feature gate;
-Button has no built-in keyboard focus/activation. Read
-`references/pointer-events.md` before building a pointer interaction.
+**Mouse integration.** Read [references/pointer-events.md](references/pointer-events.md)
+before adding pointer behavior. Enable `RunOptions { mouse: true }` at the entry;
+these APIs are core and require no feature flag. Choose the API by ownership:
+
+- Built-in action → `Button` (left Down); release-to-activate → `use_click`.
+- Region feedback/resizing → `use_hover` / `use_drag`; custom dispatch → `use_pointer`.
+- Third-party/custom list → `use_hover_row(hit)`; custom scrollable content →
+  `use_scrollbar(ScrollbarOptions, on_seek)` with one content unit throughout.
+- ScrollView and TreeSelect scrollbars already support drag, track jump and arrow
+  steps. Configure `ScrollbarStyle` once, including hover and drag feedback.
+
+Keep hooks stable when props change; guard callbacks instead. A hand-written
+`Component::update` must attach the updater's context stack before hooks.
+`PointerEvent.position` and `area` use drawing coordinates; `screen_position`,
+raw events, `Click.position`, and drag positions use terminal coordinates. Let
+nested ScrollViews map and clip hits. Pass an explicit same-frame
+`PointerOptions.layer` for editing/modal handlers. Handle drag cancellation by
+clearing transient feedback. For custom lists, reject loading/empty/out-of-range
+hits, release read guards before writing, and write hover state only on change.
+Button does not provide keyboard focus or activation; register shortcuts for the
+same business action separately.
 
 **Custom Ctrl+C behavior.** The default remains immediate framework exit. To
 implement agent cancellation, confirmation, or double-press exit, call
@@ -392,7 +410,7 @@ option*, not a rule.
 styles from a shared `Palette`, and the default palette already gives a coherent
 scheme — you get sensible colors without setting any style prop. Recolor the whole
 app by tuning a `Palette` inside `PaletteProvider`; override one spot with a bare
-`Style` prop (every style prop is `Option<Style>`, patched over the theme);
+`Style` prop (component theme overrides are `Option<Style>`, patched over the theme; configuration structs such as `ScrollbarStyle` use plain `Style` fields);
 re-style one component type with `ThemeOverride::<FooTheme>(theme: ...)` (turbofish
 required); or drive the `Palette` from an `Atom<Palette>` to switch themes at
 runtime. If the user wants a named color scheme (Dracula, Nord, Catppuccin, ...)

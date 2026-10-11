@@ -3,6 +3,7 @@
 //! 按 `i` 打开快捷键帮助；弹窗内部可滚动，背景列表不会处理弹窗期间的 `j/k/q`。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -23,7 +24,7 @@ const TASKS: [&str; 5] = [
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -88,7 +89,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 gap: 1,
                 border_style: Style::new().blue(),
                 top_title: Line::from(" shortcut info modal ").blue().bold().centered(),
-                bottom_title: Line::from(" j/k move | i shortcuts | j/k scroll inside | Esc close | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" j/k move | i shortcuts (click closes) | Esc close | q quit ").dark_gray().centered(),
             ) {
                 View(
                     flex_direction: Direction::Horizontal,

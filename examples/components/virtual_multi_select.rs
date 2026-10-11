@@ -3,8 +3,10 @@
 use std::collections::HashSet;
 
 use ratatui_kit::{
-    components::tui_widget_list::{ListBuildContext, ListState},
+    RunOptions,
+    components::tui_widget_list::ListState,
     crossterm::event::{Event, KeyCode, KeyEventKind},
+    prelude::VirtualItemContext,
     prelude::*,
     ratatui::{
         layout::{Constraint, Direction},
@@ -17,7 +19,7 @@ use ratatui_kit::{
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -85,10 +87,10 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 block: Block::bordered()
                     .border_style(Style::default().fg(Color::Blue))
                     .title_top(Line::from("Virtual Multi Select").centered())
-                    .title_bottom(Line::from("Space toggles · Enter submits").centered()),
+                    .title_bottom(Line::from("Space/click toggles · Enter submits · wheel moves").centered()),
                 scroll_padding: 2u16,
                 infinite_scrolling: false,
-                render_item: move |context: &ListBuildContext| {
+                render_item: move |context: &VirtualItemContext| {
                     let checked = if selected_snapshot.contains(&context.index) {
                         "[x]"
                     } else {
@@ -97,6 +99,8 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                     let label = format!("{checked} Row {:05}", context.index + 1);
                     let style = if context.is_selected {
                         Style::default().black().on_cyan()
+                    } else if context.is_hovered {
+                        Style::default().bold()
                     } else if selected_snapshot.contains(&context.index) {
                         Style::default().fg(Color::Yellow)
                     } else {

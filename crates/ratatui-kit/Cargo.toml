@@ -1,6 +1,6 @@
 [package]
 name = "ratatui-kit"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/yexiyue/ratatui-kit"
@@ -35,14 +35,12 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 [features]
 default = []
-# 注:`textarea` feature 暂时下线——其底层 `tui-textarea` 截至本次升级仍无支持
-# ratatui 0.30 的版本(最新 0.7.0 钉死 ratatui ^0.29),会与 0.30 栈冲突。
-# 组件源码隔离保留在 `src/components/textarea.rs`(未接入模块树),待 tui-textarea
-# 发布 0.30 兼容版后,恢复下方 feature/依赖/example 并重新接入即可。
+# 多行文本输入(基于 tui-input + 自研软换行,不依赖 tui-textarea)。
+textarea = ["tui-input", "unicode-width"]
 router = ["regex", "ratatui-kit-macros/router"]
 # 全局响应式原子（Atom/use_atom）。纯主库实现，无宏依赖。
 atom = []
-input = ["tui-input"]
+input = ["tui-input", "unicode-width"]
 tree = ["tui-tree-widget"]
 virtual-list = ["tui-widget-list"]
 table = ["unicode-width"]
@@ -61,6 +59,7 @@ full = [
     "tree",
     "virtual-list",
     "table",
+    "textarea",
     "serde",
     "ratatui-kit-macros/full",
 ]

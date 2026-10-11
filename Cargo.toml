@@ -109,6 +109,15 @@ path = "examples/components/table.rs"
 required-features = ["ratatui-kit/table"]
 
 [[example]]
+name = "textarea"
+path = "examples/components/textarea.rs"
+required-features = ["ratatui-kit/textarea"]
+
+[[example]]
+name = "custom_scrollbar"
+path = "examples/components/custom_scrollbar.rs"
+
+[[example]]
 name = "tree_select"
 path = "examples/components/tree_select.rs"
 

@@ -95,6 +95,18 @@ pub struct ContextStack<'a> {
     stack: Vec<ContextEntry<'a>>,
 }
 
+// 短生命周期 context 必须在退出作用域时移除,包括组件 panic 的展开路径。
+struct ContextScope<'a, 'b> {
+    stack: &'b mut ContextStack<'a>,
+    previous_depth: usize,
+}
+
+impl Drop for ContextScope<'_, '_> {
+    fn drop(&mut self) {
+        self.stack.stack.truncate(self.previous_depth);
+    }
+}
+
 impl<'a> ContextStack<'a> {
     pub(crate) fn root(root_context: &'a mut dyn Any) -> Self {
         ContextStack {
@@ -108,12 +120,17 @@ impl<'a> ContextStack<'a> {
     {
         if let Some(context) = context {
             // SAFETY: 可变引用在生命周期上是不变的，为了插入更短生命周期的上下文，需要对 'a 进行转变。
-            // 只有在不允许对栈进行其他更改，并且在调用后立即恢复栈的情况下才是安全的。
+            // 已有条目覆盖这个较短生命周期;新增条目仅在 f 内可用,ContextScope
+            // 在正常返回和 panic 展开时均恢复原深度,短借用不会留到外层栈中。
             let shorter_lived_self =
                 unsafe { std::mem::transmute::<&mut Self, &mut ContextStack<'b>>(self) };
+            let previous_depth = shorter_lived_self.stack.len();
             shorter_lived_self.stack.push(ContextEntry::new(context));
-            f(shorter_lived_self);
-            shorter_lived_self.stack.pop();
+            let scope = ContextScope {
+                stack: shorter_lived_self,
+                previous_depth,
+            };
+            f(&mut *scope.stack);
         } else {
             f(self);
         };
@@ -200,5 +217,43 @@ impl SystemContext {
     // 终端鼠标捕获是否启用(见 [`crate::RunOptions::mouse`])。
     pub(crate) fn mouse_enabled(&self) -> bool {
         self.mouse_enabled
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    #[test]
+    fn nested_context_scopes_restore_ancestors_during_unwind() {
+        let mut root = 1i32;
+        let mut stack = ContextStack::root(&mut root);
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            let temporary = 2i32;
+            stack.with_context(Some(Context::from_ref(&temporary)), |stack| {
+                assert!(
+                    matches!(stack.get_context::<i32>(), ContextLookup::Found(value) if *value == 2)
+                );
+                let nested = String::from("temporary");
+                stack.with_context(Some(Context::from_ref(&nested)), |_| {
+                    panic!("component failed")
+                });
+            });
+        }));
+        assert!(panic.is_err());
+        assert_eq!(stack.stack.len(), 1);
+        assert!(matches!(stack.get_context::<i32>(), ContextLookup::Found(value) if *value == 1));
+        assert!(matches!(
+            stack.get_context::<String>(),
+            ContextLookup::NotFound
+        ));
+        let after = 3i32;
+        stack.with_context(Some(Context::from_ref(&after)), |stack| {
+            assert!(
+                matches!(stack.get_context::<i32>(), ContextLookup::Found(value) if *value == 3)
+            );
+        });
+        assert_eq!(stack.stack.len(), 1);
     }
 }

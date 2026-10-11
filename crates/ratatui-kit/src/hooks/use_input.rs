@@ -73,7 +73,7 @@ struct UseEventHandlerImpl {
 
 impl Hook for UseEventHandlerImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.stamp.set(crate::input::draw_clock_stamp(drawer.area));
+        self.stamp.set(drawer.input_stamp());
     }
 }
 

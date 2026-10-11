@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -129,7 +130,7 @@ const DEPLOYMENTS: [Deployment; 10] = [
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }
@@ -259,7 +260,7 @@ fn App(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
                 flex_direction: Direction::Vertical,
                 border_style: Style::new().fg(Color::Blue),
                 top_title: Line::from(" table showcase ").fg(Color::Blue).bold().centered(),
-                bottom_title: Line::from(" j/k row · h/l column · PageUp/Down/wheel scroll | c compact | e empty | q quit ").dark_gray().centered(),
+                bottom_title: Line::from(" j/k row · h/l column · click row · PageUp/Down/wheel scroll | c compact | e empty | q quit ").dark_gray().centered(),
             ) {
                 View(flex_direction: Direction::Vertical, gap: 1) {
                     ScrollView(

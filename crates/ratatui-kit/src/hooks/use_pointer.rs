@@ -24,8 +24,8 @@ use super::use_input::new_stamp_handle;
 use crate::{
     Hook, Hooks, SystemContext, UseContext,
     input::{
-        CurrentLayer, EventOptions, EventPriority, EventResult, LayerId, PointerToken, StampHandle,
-        rect_contains,
+        CurrentLayer, EventOptions, EventPriority, EventResult, InputLayer, LayerId, PointerToken,
+        Stamp, StampHandle, rect_contains,
     },
 };
 
@@ -38,6 +38,7 @@ const CLICK_COUNT_MAX: u8 = 3;
 
 /// 指针事件种类。`Down`/`Up`/`Drag`/`Click` 携带相关按键;`Scroll*` 四向;
 /// `Move`/`Enter`/`Leave` 需要 [`PointerOptions::track_move`]。
+/// `Cancel` 保留最后已知位置和修饰键,仅清理交互,不应提交释放动作。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PointerKind {
     /// 按键按下。
@@ -48,6 +49,8 @@ pub enum PointerKind {
     Click { button: MouseButton, count: u8 },
     /// 按住移动(经由指针捕获,拖出区域仍会收到)。
     Drag(MouseButton),
+    /// 捕获因隐藏、卸载或输入层失活而取消,不合成点击。
+    Cancel(MouseButton),
     /// 无按键移动(区域内)。
     Move,
     /// 指针进入组件区域。
@@ -64,13 +67,16 @@ pub enum PointerKind {
     ScrollRight,
 }
 
-/// 指针事件:`use_pointer` 回调的入参。`area` 为本组件上一帧绘制区域。
+/// 指针事件:`position` 与 `area` 共用组件绘制坐标,可直接交给组件widget命中。
+/// `screen_position` 保留终端绝对坐标;滚动容器统一处理内容坐标映射与视口裁剪。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct PointerEvent {
     /// 事件种类。
     pub kind: PointerKind,
-    /// 事件位置(终端单元格坐标)。
+    /// 事件位置(组件绘制单元格坐标,与area同一坐标空间)。
     pub position: Position,
+    /// 终端屏幕绝对坐标,不受滚动容器的内容坐标变换影响。
+    pub screen_position: Position,
     /// 修饰键。
     pub modifiers: KeyModifiers,
     /// 本组件上一帧绘制区域。
@@ -124,8 +130,11 @@ pub(crate) fn buttons_of(button: MouseButton) -> MouseButtons {
 pub struct PointerOptions {
     /// 参与的按键(Down/Up/Drag/Click 过滤;Scroll 不受影响)。默认仅左键。
     pub buttons: MouseButtons,
+    /// 显式归属输入层,None使用最近Current层。句柄仅同帧有效。
+    pub layer: Option<InputLayer>,
     /// 是否接收 `Move`/`Enter`/`Leave`。开启后框架会向终端请求全量移动上报
     /// (any-motion,惰性升级、只升不降),移动事件频率较高,按需开启。
+    /// 移动观察独立投递:返回 Consumed 请求重绘,不截断其它组件的进入/离开通知。
     pub track_move: bool,
 }
 
@@ -151,6 +160,8 @@ pub enum DragPhase {
     Move,
     /// 释放结束。
     End,
+    /// 组件隐藏、卸载或输入层失活,拖拽取消。
+    Cancel,
 }
 
 /// `use_drag` 的回调入参。
@@ -206,6 +217,12 @@ impl ClickSynthesizer {
         self.pending = Some((button, now, column, row));
     }
 
+    fn cancel(&mut self) {
+        self.pending = None;
+        self.last_click = None;
+        self.count = 0;
+    }
+
     // Up 匹配 pending 时产出计数;`inside` 为释放位置是否仍在组件区域内
     // (跨目标 / 拖出后的释放不合成,连击链随之中断)。
     pub(crate) fn on_up(&mut self, button: MouseButton, inside: bool) -> Option<u8> {
@@ -251,8 +268,32 @@ impl PointerHookBase {
         (self.stamp.clone(), token)
     }
 
-    fn pre_draw(&self, area: Rect) {
-        self.stamp.set(crate::input::draw_clock_stamp(area));
+    fn pre_draw(&self, drawer: &crate::ComponentDrawer) {
+        self.stamp.set(drawer.input_stamp());
+    }
+}
+
+/// 指针交互可用性:应用入口启用鼠标捕获才为真。
+///
+/// 组件内置的 `use_pointer` 注册前应先查它——未启用捕获时 `use_pointer` 会 debug 断言。
+/// `mouse_enabled` 在进程生命周期内不变,故「条件注册」的分支跨帧稳定,不违反 hook 顺序。
+///
+/// 注意:**手写 `Component::update` 必须先 `hooks.with_context_stack(updater.component_context_stack())`**
+/// 再调本函数——未接 context stack 时读不到 `SystemContext`,本函数返回 false,指针功能被静默跳过。
+pub(crate) fn pointer_enabled(hooks: &Hooks<'_, '_>) -> bool {
+    match hooks.try_use_context::<SystemContext>() {
+        Some(sys) => sys.mouse_enabled(),
+        None => {
+            // 读不到 SystemContext 通常是手写 Component 忘了接 context stack
+            //(fn 组件由宏自动接)。debug 断言给出指引;release 仍静默返回 false。
+            debug_assert!(
+                false,
+                "pointer hooks called on Hooks without a context stack; hand-written \
+                 Component::update must call \
+                 hooks.with_context_stack(updater.component_context_stack()) first"
+            );
+            false
+        }
     }
 }
 
@@ -309,7 +350,7 @@ impl AsPointerBase for UseClickImpl {
 
 impl Hook for UseClickImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.base.pre_draw(drawer.area);
+        self.base.pre_draw(drawer);
     }
 }
 
@@ -322,15 +363,14 @@ impl UseClick for Hooks<'_, '_> {
         let (stamp, token) = hook.as_base().identity();
         let synth = hook.synth.clone();
         let hit_area = stamp.clone();
+        let cancel_synth = synth.clone();
         let layer = current_layer_id(self);
         let mut sys = self.use_context_mut::<SystemContext>();
         debug_assert_mouse_enabled(&sys);
-        sys.input.register_handler(
-            Some(layer),
-            EventPriority::Normal,
-            EventOptions { hit_test: true },
+        sys.input.register_pointer_handler(
+            layer,
             stamp,
-            Some(token),
+            token,
             Box::new(move |event| {
                 let Event::Mouse(m) = event else {
                     return EventResult::Ignored;
@@ -342,7 +382,7 @@ impl UseClick for Hooks<'_, '_> {
                         EventResult::Consumed
                     }
                     MouseEventKind::Up(button) => {
-                        let inside = rect_contains(hit_area.get().area, m.column, m.row);
+                        let inside = hit_area.get().contains(Position::new(m.column, m.row));
                         if let Some(count) = synth.borrow_mut().on_up(button, inside) {
                             f(Click {
                                 count,
@@ -356,6 +396,7 @@ impl UseClick for Hooks<'_, '_> {
                     _ => EventResult::Ignored,
                 }
             }),
+            Box::new(move |_| cancel_synth.borrow_mut().cancel()),
         );
     }
 }
@@ -385,7 +426,7 @@ impl AsPointerBase for UseHoverImpl {
 
 impl Hook for UseHoverImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.base.pre_draw(drawer.area);
+        self.base.pre_draw(drawer);
     }
 }
 
@@ -429,27 +470,28 @@ impl AsPointerBase for UseDragImpl {
 
 impl Hook for UseDragImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.base.pre_draw(drawer.area);
+        self.base.pre_draw(drawer);
     }
 }
 
 impl UseDrag for Hooks<'_, '_> {
-    fn use_drag<F>(&mut self, mut f: F)
+    fn use_drag<F>(&mut self, f: F)
     where
         F: FnMut(DragUpdate) + 'static,
     {
+        let f = Rc::new(RefCell::new(f));
+        let cancel_f = f.clone();
         let hook = self.use_hook(UseDragImpl::new_pointer_hook);
         let (stamp, token) = hook.as_base().identity();
         let active = hook.active.clone();
+        let cancel_active = active.clone();
         let layer = current_layer_id(self);
         let mut sys = self.use_context_mut::<SystemContext>();
         debug_assert_mouse_enabled(&sys);
-        sys.input.register_handler(
-            Some(layer),
-            EventPriority::Normal,
-            EventOptions { hit_test: true },
+        sys.input.register_pointer_handler(
+            layer,
             stamp,
-            Some(token),
+            token,
             Box::new(move |event| {
                 let Event::Mouse(m) = event else {
                     return EventResult::Ignored;
@@ -458,7 +500,7 @@ impl UseDrag for Hooks<'_, '_> {
                 match m.kind {
                     MouseEventKind::Down(button) if button == MouseButton::Left => {
                         active.set(Some((button, to)));
-                        f(DragUpdate {
+                        (f.borrow_mut())(DragUpdate {
                             phase: DragPhase::Start,
                             button,
                             from: to,
@@ -470,7 +512,7 @@ impl UseDrag for Hooks<'_, '_> {
                     MouseEventKind::Drag(MouseButton::Left) => {
                         if let Some((b, last)) = active.get() {
                             active.set(Some((b, to)));
-                            f(DragUpdate {
+                            (f.borrow_mut())(DragUpdate {
                                 phase: DragPhase::Move,
                                 button: b,
                                 from: last,
@@ -484,7 +526,7 @@ impl UseDrag for Hooks<'_, '_> {
                     }
                     MouseEventKind::Up(MouseButton::Left) => {
                         if let Some((b, last)) = active.take() {
-                            f(DragUpdate {
+                            (f.borrow_mut())(DragUpdate {
                                 phase: DragPhase::End,
                                 button: b,
                                 from: last,
@@ -497,6 +539,17 @@ impl UseDrag for Hooks<'_, '_> {
                         }
                     }
                     _ => EventResult::Ignored,
+                }
+            }),
+            Box::new(move |button| {
+                if let Some((_, position)) = cancel_active.take() {
+                    (cancel_f.borrow_mut())(DragUpdate {
+                        phase: DragPhase::Cancel,
+                        button,
+                        from: position,
+                        to: position,
+                        modifiers: KeyModifiers::NONE,
+                    });
                 }
             }),
         );
@@ -518,6 +571,8 @@ struct UsePointerImpl {
     base: PointerHookBase,
     synth: Rc<RefCell<ClickSynthesizer>>,
     last_inside: Rc<Cell<bool>>,
+    last_event: Rc<Cell<(Position, KeyModifiers)>>,
+    last_geometry: Rc<Cell<Option<Stamp>>>,
 }
 
 impl AsPointerBase for UsePointerImpl {
@@ -529,13 +584,15 @@ impl AsPointerBase for UsePointerImpl {
             base: PointerHookBase::new(),
             synth: Rc::new(RefCell::new(ClickSynthesizer::new())),
             last_inside: Rc::new(Cell::new(false)),
+            last_event: Rc::new(Cell::new((Position::new(0, 0), KeyModifiers::NONE))),
+            last_geometry: Rc::new(Cell::new(None)),
         }
     }
 }
 
 impl Hook for UsePointerImpl {
     fn pre_component_draw(&mut self, drawer: &mut crate::ComponentDrawer) {
-        self.base.pre_draw(drawer.area);
+        self.base.pre_draw(drawer);
     }
 }
 
@@ -544,113 +601,193 @@ impl UsePointer for Hooks<'_, '_> {
     where
         F: FnMut(PointerEvent) -> EventResult + 'static,
     {
-        // 主 handler 与 track_move 观察者共享同一回调。
-        let f = Rc::new(RefCell::new(f));
-        let hook = self.use_hook(UsePointerImpl::new_pointer_hook);
-        let (stamp, token) = hook.as_base().identity();
-        let synth = hook.synth.clone();
-        let last_inside = hook.last_inside.clone();
-        let layer = current_layer_id(self);
-        let buttons = options.buttons;
+        register_pointer(self, options, false, f);
+    }
+}
 
-        // 主 handler:命中过滤(Down/Up/Drag/Click/Scroll;Moved 交由 track_move 观察者)。
-        {
-            let hit_area = stamp.clone();
-            let f = f.clone();
-            let mut sys = self.use_context_mut::<SystemContext>();
-            debug_assert_mouse_enabled(&sys);
-            sys.input.register_handler(
-                Some(layer),
-                EventPriority::Normal,
-                EventOptions { hit_test: true },
-                stamp.clone(),
-                Some(token),
-                Box::new(move |event| {
-                    let Event::Mouse(m) = event else {
-                        return EventResult::Ignored;
-                    };
-                    let area = hit_area.get().area;
-                    let ev = |kind| PointerEvent {
-                        kind,
-                        position: Position::new(m.column, m.row),
-                        modifiers: m.modifiers,
-                        area,
-                    };
-                    match m.kind {
-                        MouseEventKind::Down(button) if buttons.contains(buttons_of(button)) => {
-                            synth.borrow_mut().on_down(button, m.column, m.row);
-                            (f.borrow_mut())(ev(PointerKind::Down(button)))
-                        }
-                        MouseEventKind::Up(button) if buttons.contains(buttons_of(button)) => {
-                            // hit_test 命中到达时必在区域内;捕获路由到达时可能在外。
-                            let inside = rect_contains(area, m.column, m.row);
-                            let mut result = (f.borrow_mut())(ev(PointerKind::Up(button)));
-                            if let Some(count) = synth.borrow_mut().on_up(button, inside)
-                                && (f.borrow_mut())(ev(PointerKind::Click { button, count }))
-                                    == EventResult::Consumed
-                            {
-                                result = EventResult::Consumed;
-                            }
-                            result
-                        }
-                        MouseEventKind::Drag(button) if buttons.contains(buttons_of(button)) => {
-                            (f.borrow_mut())(ev(PointerKind::Drag(button)))
-                        }
-                        MouseEventKind::ScrollUp => (f.borrow_mut())(ev(PointerKind::ScrollUp)),
-                        MouseEventKind::ScrollDown => (f.borrow_mut())(ev(PointerKind::ScrollDown)),
-                        MouseEventKind::ScrollLeft => (f.borrow_mut())(ev(PointerKind::ScrollLeft)),
-                        MouseEventKind::ScrollRight => {
-                            (f.borrow_mut())(ev(PointerKind::ScrollRight))
-                        }
-                        // Moved 由 track_move 观察者统一处理(避免双投递)。
-                        _ => EventResult::Ignored,
-                    }
-                }),
-            );
-        }
+// 受控悬停回调仅状态变化时消费,可每帧核对内容变化（条目offset等）,无需伪造全局Move。
+pub(crate) fn use_pointer_with_layout_sync<F>(
+    hooks: &mut Hooks<'_, '_>,
+    options: PointerOptions,
+    f: F,
+) where
+    F: FnMut(PointerEvent) -> EventResult + 'static,
+{
+    register_pointer(hooks, options, true, f);
+}
 
-        // Move/Enter/Leave 观察者:无命中过滤(需看到区域外的移动才能判 Leave),
-        // 只处理 Moved,其余一律放行;请求 any-motion 上报。
-        if options.track_move {
-            let f = f.clone();
-            let mut sys = self.use_context_mut::<SystemContext>();
-            sys.input.request_motion();
-            sys.input.register_handler(
-                Some(layer),
-                EventPriority::Normal,
-                EventOptions { hit_test: false },
-                stamp.clone(),
-                None,
-                Box::new(move |event| {
-                    let Event::Mouse(m) = event else {
-                        return EventResult::Ignored;
-                    };
-                    if !matches!(m.kind, MouseEventKind::Moved) {
-                        return EventResult::Ignored;
+fn register_pointer<F>(
+    hooks: &mut Hooks<'_, '_>,
+    options: PointerOptions,
+    sync_on_render: bool,
+    f: F,
+) where
+    F: FnMut(PointerEvent) -> EventResult + 'static,
+{
+    // 主 handler 与 track_move 观察者共享同一回调。
+    let f = Rc::new(RefCell::new(f));
+    let hook = hooks.use_hook(UsePointerImpl::new_pointer_hook);
+    let (stamp, token) = hook.as_base().identity();
+    let synth = hook.synth.clone();
+    let last_inside = hook.last_inside.clone();
+    let last_event = hook.last_event.clone();
+    let last_geometry = hook.last_geometry.clone();
+    let layer = options
+        .layer
+        .map(|layer| layer.id)
+        .unwrap_or_else(|| current_layer_id(hooks));
+    let buttons = options.buttons;
+
+    // 主 handler:命中过滤(Down/Up/Drag/Click/Scroll;Moved 交由 track_move 观察者)。
+    {
+        let hit_area = stamp.clone();
+        let cancel_area = stamp.clone();
+        let cancel_synth = synth.clone();
+        let cancel_inside = last_inside.clone();
+        let cancel_f = f.clone();
+        let cancel_event = last_event.clone();
+        let pointer_event = last_event.clone();
+        let f = f.clone();
+        let mut sys = hooks.use_context_mut::<SystemContext>();
+        debug_assert_mouse_enabled(&sys);
+        sys.input.register_pointer_handler(
+            layer,
+            stamp.clone(),
+            token,
+            Box::new(move |event| {
+                let Event::Mouse(m) = event else {
+                    return EventResult::Ignored;
+                };
+                pointer_event.set((Position::new(m.column, m.row), m.modifiers));
+                let stamp = hit_area.get();
+                let area = stamp.area;
+                let screen_position = Position::new(m.column, m.row);
+                let ev = |kind| PointerEvent {
+                    kind,
+                    position: stamp.local_position(screen_position),
+                    screen_position,
+                    modifiers: m.modifiers,
+                    area,
+                };
+                match m.kind {
+                    MouseEventKind::Down(button) if buttons.contains(buttons_of(button)) => {
+                        synth.borrow_mut().on_down(button, m.column, m.row);
+                        (f.borrow_mut())(ev(PointerKind::Down(button)))
                     }
-                    let area = stamp.get().area;
-                    let ev = |kind| PointerEvent {
-                        kind,
-                        position: Position::new(m.column, m.row),
-                        modifiers: m.modifiers,
-                        area,
-                    };
-                    let inside = rect_contains(area, m.column, m.row);
-                    match (last_inside.get(), inside) {
-                        (false, true) => {
-                            last_inside.set(true);
-                            (f.borrow_mut())(ev(PointerKind::Enter))
+                    MouseEventKind::Up(button) if buttons.contains(buttons_of(button)) => {
+                        // hit_test 命中到达时必在区域内;捕获路由到达时可能在外。
+                        let inside = stamp.contains(screen_position);
+                        let mut result = (f.borrow_mut())(ev(PointerKind::Up(button)));
+                        if let Some(count) = synth.borrow_mut().on_up(button, inside)
+                            && (f.borrow_mut())(ev(PointerKind::Click { button, count }))
+                                == EventResult::Consumed
+                        {
+                            result = EventResult::Consumed;
                         }
-                        (true, false) => {
-                            last_inside.set(false);
-                            (f.borrow_mut())(ev(PointerKind::Leave))
-                        }
-                        (true, true) => (f.borrow_mut())(ev(PointerKind::Move)),
-                        (false, false) => EventResult::Ignored,
+                        result
                     }
-                }),
-            );
-        }
+                    MouseEventKind::Drag(button) if buttons.contains(buttons_of(button)) => {
+                        (f.borrow_mut())(ev(PointerKind::Drag(button)))
+                    }
+                    MouseEventKind::ScrollUp => (f.borrow_mut())(ev(PointerKind::ScrollUp)),
+                    MouseEventKind::ScrollDown => (f.borrow_mut())(ev(PointerKind::ScrollDown)),
+                    MouseEventKind::ScrollLeft => (f.borrow_mut())(ev(PointerKind::ScrollLeft)),
+                    MouseEventKind::ScrollRight => (f.borrow_mut())(ev(PointerKind::ScrollRight)),
+                    // Moved 由 track_move 观察者统一处理(避免双投递)。
+                    _ => EventResult::Ignored,
+                }
+            }),
+            Box::new(move |button| {
+                cancel_synth.borrow_mut().cancel();
+                cancel_inside.set(false);
+                let stamp = cancel_area.get();
+                let area = stamp.area;
+                let (position, modifiers) = cancel_event.get();
+                (cancel_f.borrow_mut())(PointerEvent {
+                    kind: PointerKind::Cancel(button),
+                    position: stamp.local_position(position),
+                    screen_position: position,
+                    modifiers,
+                    area,
+                });
+            }),
+        );
+    }
+
+    // Move/Enter/Leave 观察者:无命中过滤(需看到区域外的移动才能判 Leave),
+    // 只处理 Moved,其余一律放行;请求 any-motion 上报。
+    if options.track_move {
+        let motion_stamp = stamp.clone();
+        let motion_inside = last_inside.clone();
+        let motion_event = last_event.clone();
+        let motion_geometry = last_geometry.clone();
+        let motion_f = f.clone();
+        // 同一处理器用于真实Moved和绘制后几何同步;后者只在几何发生变化时发Move。
+        let motion = Rc::new(RefCell::new(
+            move |m: crossterm::event::MouseEvent, sync: bool| {
+                motion_event.set((Position::new(m.column, m.row), m.modifiers));
+                let stamp = motion_stamp.get();
+                let changed_geometry = motion_geometry
+                    .replace(Some(stamp))
+                    .is_none_or(|previous| !previous.same_geometry(stamp));
+                let screen_position = Position::new(m.column, m.row);
+                let inside = stamp.contains(screen_position);
+                let kind = match (motion_inside.replace(inside), inside) {
+                    (false, true) => PointerKind::Enter,
+                    (true, false) => PointerKind::Leave,
+                    (true, true) if !sync || changed_geometry || sync_on_render => {
+                        PointerKind::Move
+                    }
+                    _ => return false,
+                };
+                (motion_f.borrow_mut())(PointerEvent {
+                    kind,
+                    position: stamp.local_position(screen_position),
+                    screen_position,
+                    modifiers: m.modifiers,
+                    area: stamp.area,
+                }) == EventResult::Consumed
+            },
+        ));
+        let dispatch_motion = motion.clone();
+        let leave_f = f.clone();
+        let leave_stamp = stamp.clone();
+        let leave_event = last_event.clone();
+        let mut sys = hooks.use_context_mut::<SystemContext>();
+        sys.input.register_motion_observer(
+            layer,
+            stamp,
+            Box::new(move |event| {
+                if let Event::Mouse(mouse) = event
+                    && matches!(mouse.kind, MouseEventKind::Moved)
+                {
+                    if (dispatch_motion.borrow_mut())(mouse, false) {
+                        EventResult::Consumed
+                    } else {
+                        EventResult::Ignored
+                    }
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+            Box::new(move || {
+                if last_inside.replace(false) {
+                    let stamp = leave_stamp.get();
+                    let (position, modifiers) = leave_event.get();
+                    (leave_f.borrow_mut())(PointerEvent {
+                        kind: PointerKind::Leave,
+                        position: stamp.local_position(position),
+                        screen_position: position,
+                        modifiers,
+                        area: stamp.area,
+                    });
+                    true
+                } else {
+                    false
+                }
+            }),
+            Box::new(move |mouse| (motion.borrow_mut())(mouse, true)),
+        );
     }
 }
 
@@ -669,7 +806,7 @@ mod tests {
     use ratatui_kit_macros::{Props, component};
 
     use crate::{
-        UseEventHandler,
+        UseEventHandler, UseState,
         input::EventScope,
         mouse_test::{Mounted, TestLog, log_of},
     };
@@ -738,6 +875,7 @@ mod tests {
         hooks.use_pointer(
             PointerOptions {
                 buttons,
+                layer: None,
                 track_move: props.track_move,
             },
             move |ev| {
@@ -794,6 +932,207 @@ mod tests {
     #[component]
     fn PlainArea() -> impl Into<AnyElement<'static>> {
         crate::element!(Text(text: "plain"))
+    }
+
+    type PressLog = std::sync::Arc<std::sync::Mutex<Vec<&'static str>>>;
+
+    #[derive(Clone, Default, Props)]
+    struct ScrolledButtonsProps {
+        presses: PressLog,
+        nested: bool,
+    }
+
+    #[component]
+    fn ScrolledButtons(
+        props: &ScrolledButtonsProps,
+        mut hooks: Hooks,
+    ) -> impl Into<AnyElement<'static>> {
+        use crate::components::{Button, ScrollView, ScrollViewState};
+        use ratatui::{
+            layout::{Constraint, Position},
+            widgets::Block,
+        };
+        let outer = hooks.use_state(|| ScrollViewState::with_offset(Position::new(0, 3)));
+        let inner = hooks.use_state(|| ScrollViewState::with_offset(Position::new(0, 3)));
+        let first = props.presses.clone();
+        let target = props.presses.clone();
+        let last = props.presses.clone();
+        let buttons = crate::element!(ScrollView(state: if props.nested {inner} else {outer},
+            block: Block::bordered(), height: if props.nested {Constraint::Length(8)} else {Constraint::Fill(1)}) {
+            Button(label: "FIRST".to_string(), on_press: move |()| first.lock().unwrap().push("first"))
+            Button(label: "TARGET".to_string(), on_press: move |()| target.lock().unwrap().push("target"))
+            Button(label: "THIRD".to_string(), on_press: move |()| last.lock().unwrap().push("third"))
+        });
+        if props.nested {
+            crate::element!(ScrollView(state: outer, block: Block::bordered()) {
+                View(height: Constraint::Length(3)) { Text(text: "spacer") }
+                { buttons }
+            })
+            .into_any()
+        } else {
+            buttons.into_any()
+        }
+    }
+
+    #[test]
+    fn scrolled_button_hits_screen_position_and_clips_hidden_button() {
+        for nested in [false, true] {
+            let presses: PressLog = Default::default();
+            let mut mounted = Mounted::mount_sized(
+                crate::element!(ScrolledButtons(presses: presses.clone(), nested: nested)),
+                true,
+                20,
+                7,
+            );
+            let buffer = mounted.buffer();
+            assert!(crate::mouse_test::find_text(&buffer, "FIRST").is_none());
+            let (x, y) = crate::mouse_test::find_text(&buffer, "TARGET").expect("target visible");
+            mounted.dispatch(MouseEventKind::Down(MouseButton::Left), x, y);
+            mounted.dispatch(MouseEventKind::Up(MouseButton::Left), x, y);
+            assert_eq!(*presses.lock().unwrap(), ["target"], "nested={nested}");
+            // 顶边框邻接被裁剪的第一个按钮,不能激活不可见条目。
+            mounted.dispatch(MouseEventKind::Down(MouseButton::Left), x, 0);
+            assert_eq!(*presses.lock().unwrap(), ["target"]);
+        }
+    }
+
+    #[derive(Clone, Default, Props)]
+    struct MovingHoverProps {
+        hovered: Rc<Cell<bool>>,
+        moves: TestLog,
+    }
+
+    #[component]
+    fn MovingHover(props: &MovingHoverProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        use ratatui::layout::{Constraint, Offset};
+        let mut shifted = hooks.use_state(|| false);
+        let hovered = hooks.use_hover();
+        props.hovered.set(hovered);
+        let log = props.moves.clone();
+        hooks.use_pointer(
+            PointerOptions {
+                track_move: true,
+                ..Default::default()
+            },
+            move |event| {
+                log.borrow_mut().push(format!("{:?}", event.kind));
+                EventResult::Ignored
+            },
+        );
+        hooks.use_event_handler(EventScope::Global, EventPriority::Normal, move |event| {
+            if matches!(event, Event::Key(_)) {
+                shifted.set(!shifted.get());
+                EventResult::Consumed
+            } else {
+                EventResult::Ignored
+            }
+        });
+        crate::element!(View(height:Constraint::Length(2),width:Constraint::Length(8),offset:Offset {x:0,y:if shifted.get(){4}else{0}}) { Text(text:"hover") })
+    }
+
+    #[test]
+    fn stationary_pointer_leaves_and_enters_when_layout_moves() {
+        let hovered = Rc::new(Cell::new(false));
+        let moves = TestLog::default();
+        let mut mounted = Mounted::mount_sized(
+            crate::element!(MovingHover(hovered:hovered.clone(),moves:moves.clone())),
+            true,
+            10,
+            8,
+        );
+        mounted.dispatch(MouseEventKind::Moved, 1, 1);
+        assert!(hovered.get());
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        assert!(!hovered.get());
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        assert!(hovered.get());
+        assert_eq!(*moves.borrow(), log_of(&["Enter", "Leave", "Enter"]));
+    }
+
+    #[test]
+    fn stationary_pointer_hover_reconciles_after_terminal_resize() {
+        let hovered = Rc::new(Cell::new(false));
+        let moves = TestLog::default();
+        let mut mounted = Mounted::mount_sized(
+            crate::element!(MovingHover(hovered:hovered.clone(),moves:moves.clone())),
+            true,
+            10,
+            8,
+        );
+        mounted.dispatch(MouseEventKind::Moved, 5, 1);
+        assert!(hovered.get());
+        mounted.resize(3, 8);
+        assert!(!hovered.get());
+        mounted.resize(10, 8);
+        assert!(hovered.get());
+        assert_eq!(*moves.borrow(), log_of(&["Enter", "Leave", "Enter"]));
+    }
+
+    type CoordinateLog = std::sync::Arc<std::sync::Mutex<Vec<(PointerKind, Position, Position)>>>;
+    #[derive(Clone, Default, Props)]
+    struct CoordinateProps {
+        log: CoordinateLog,
+    }
+
+    #[component]
+    fn CapturedCoordinates(
+        props: &CoordinateProps,
+        mut hooks: Hooks,
+    ) -> impl Into<AnyElement<'static>> {
+        use ratatui::layout::Constraint;
+        let log = props.log.clone();
+        hooks.use_pointer(PointerOptions::default(), move |event| {
+            log.lock()
+                .unwrap()
+                .push((event.kind, event.position, event.screen_position));
+            EventResult::Consumed
+        });
+        crate::element!(View(height:Constraint::Length(12),width:Constraint::Length(18)) { Text(text:"drag") })
+    }
+
+    #[component]
+    fn CoordinateScroll(
+        props: &CoordinateProps,
+        mut hooks: Hooks,
+    ) -> impl Into<AnyElement<'static>> {
+        use crate::components::{ScrollView, ScrollViewState};
+        let state = hooks.use_state(|| ScrollViewState::with_offset(Position::new(0, 3)));
+        let log = props.log.clone();
+        crate::element!(ScrollView(state:state,block:ratatui::widgets::Block::bordered()) { CapturedCoordinates(log:log) })
+    }
+
+    #[test]
+    fn captured_pointer_preserves_screen_coordinates_and_maps_outside_drag() {
+        let log: CoordinateLog = Default::default();
+        let mut mounted = Mounted::mount_sized(
+            crate::element!(CoordinateScroll(log:log.clone())),
+            true,
+            20,
+            7,
+        );
+        mounted.dispatch(MouseEventKind::Down(MouseButton::Left), 4, 2);
+        mounted.dispatch(MouseEventKind::Drag(MouseButton::Left), 30, 9);
+        mounted.dispatch(MouseEventKind::Up(MouseButton::Left), 30, 9);
+        assert_eq!(
+            *log.lock().unwrap(),
+            [
+                (
+                    PointerKind::Down(MouseButton::Left),
+                    Position::new(3, 4),
+                    Position::new(4, 2)
+                ),
+                (
+                    PointerKind::Drag(MouseButton::Left),
+                    Position::new(29, 11),
+                    Position::new(30, 9)
+                ),
+                (
+                    PointerKind::Up(MouseButton::Left),
+                    Position::new(29, 11),
+                    Position::new(30, 9)
+                ),
+            ]
+        );
     }
 
     // ---- use_click ----
@@ -860,6 +1199,92 @@ mod tests {
         assert_eq!(
             *log.0.borrow(),
             log_of(&["Start:1->1", "Move:1->5", "Move:5->30", "End:30->39"])
+        );
+    }
+
+    #[derive(Default, Props)]
+    struct CancellableProps {
+        log: SharedLog,
+        blocked: Rc<Cell<bool>>,
+        drag: bool,
+    }
+
+    #[component]
+    fn Cancellable(props: &CancellableProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        use crate::UseInputLayer;
+        let log = props.log.clone();
+        if props.drag {
+            hooks.use_drag(move |event| log.0.borrow_mut().push(format!("{:?}", event.phase)));
+        } else {
+            hooks.use_pointer(
+                PointerOptions {
+                    track_move: true,
+                    ..Default::default()
+                },
+                move |event| {
+                    log.0.borrow_mut().push(format!("{:?}", event.kind));
+                    EventResult::Consumed
+                },
+            );
+        }
+        hooks.use_input_layer(props.blocked.get(), true);
+        let blocked = props.blocked.clone();
+        hooks.use_event_handler(EventScope::Global, EventPriority::Normal, move |event| {
+            if matches!(event, Event::Key(_)) {
+                blocked.set(!blocked.get());
+                EventResult::Consumed
+            } else {
+                EventResult::Ignored
+            }
+        });
+        crate::element!(Text(text: "cancellable"))
+    }
+
+    #[test]
+    fn modal_cancels_pointer_without_click_or_reviving_capture() {
+        let log = SharedLog(TestLog::default());
+        let mut mounted = Mounted::mount(crate::element!(Cancellable(log: log.clone())), true);
+        mounted.dispatch(MouseEventKind::Down(MouseButton::Left), 2, 1);
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        assert_eq!(
+            *log.0.borrow(),
+            log_of(&["Down(Left)", "Enter", "Cancel(Left)"])
+        );
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        mounted.dispatch(MouseEventKind::Up(MouseButton::Left), 2, 1);
+        assert_eq!(
+            *log.0.borrow(),
+            log_of(&["Down(Left)", "Enter", "Cancel(Left)", "Enter", "Up(Left)"])
+        );
+    }
+
+    #[test]
+    fn modal_cancels_drag_and_clears_local_active_state() {
+        let log = SharedLog(TestLog::default());
+        let mut mounted = Mounted::mount(
+            crate::element!(Cancellable(log: log.clone(), drag: true)),
+            true,
+        );
+        mounted.dispatch(MouseEventKind::Down(MouseButton::Left), 2, 1);
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        mounted.dispatch(MouseEventKind::Drag(MouseButton::Left), 2, 2);
+        mounted.dispatch(MouseEventKind::Up(MouseButton::Left), 2, 2);
+        assert_eq!(*log.0.borrow(), log_of(&["Start", "Cancel"]));
+    }
+
+    #[test]
+    fn modal_clears_pointer_hover_without_another_move() {
+        let log = SharedLog(TestLog::default());
+        let mut mounted = Mounted::mount(crate::element!(Cancellable(log: log.clone())), true);
+        mounted.dispatch(MouseEventKind::Moved, 2, 1);
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        assert_eq!(*log.0.borrow(), log_of(&["Enter", "Leave"]));
+        mounted.dispatch_key(crossterm::event::KeyCode::Char('m'));
+        mounted.dispatch(MouseEventKind::Moved, 2, 1);
+        assert_eq!(
+            *log.0.borrow(),
+            log_of(&["Enter", "Leave", "Enter", "Move"])
         );
     }
 

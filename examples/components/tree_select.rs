@@ -1,6 +1,7 @@
 //! TreeSelect 内置组件示例。
 
 use ratatui_kit::{
+    RunOptions,
     components::tui_tree_widget::{TreeItem, TreeState},
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
@@ -15,7 +16,7 @@ use ratatui_kit::{
 #[tokio::main]
 async fn main() {
     element!(App)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }

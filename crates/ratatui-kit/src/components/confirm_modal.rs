@@ -2,21 +2,27 @@
 //
 // 组件内部自开独占输入层并把同一层传给 `Modal`，封装父级 handler + Modal
 // 的三件套配对，避免背景组件处理确认弹窗期间的按键。
+//
+// 鼠标:键盘 handler 只 match `Key`(非键盘事件 Ignored 放行),按钮子组件
+// (Normal,命中过滤)先收到点击;未被按钮消费的点击(遮罩/面板空白)落到
+// Low + `hit_test:false` 的遮罩关闭 handler → `on_cancel`。层本身独占
+// (`blocks_lower`),放行不会让背景透过响应。
 
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Margin},
     style::{Modifier, Style},
     text::Line,
 };
 use ratatui_kit_macros::{Props, component, element};
+use std::sync::{Arc, Mutex};
 
 use crate::{
-    AnyElement, ComponentTheme, Handler, Hooks, Palette, UseEffect, UseEventHandler, UseInputLayer,
-    UseState, UseTheme,
+    AnyElement, ComponentTheme, Handler, Hooks, Palette, PointerKind, PointerOptions, UseEffect,
+    UseEventHandler, UseHover, UseInputLayer, UsePointer, UseState, UseTheme,
     components::theme::resolve_style,
     components::{Border, Modal, Text, TextParagraph, View},
-    input::{EventPriority, EventResult, EventScope},
+    input::{EventOptions, EventPriority, EventResult, EventScope},
 };
 
 /// ConfirmModal 组件的主题 slot。遮罩(背景变暗)委托给 [`Modal`] 的 `ModalTheme`,
@@ -115,15 +121,19 @@ pub fn ConfirmModal(
     );
 
     let layer = hooks.use_input_layer(props.open, true);
-    let mut on_confirm = props.on_confirm.take();
-    let mut on_cancel = props.on_cancel.take();
+    // 键盘 handler、遮罩关闭 handler 与两个按钮共享同一对回调(Handler 不 Clone;
+    // 按钮的 props 回调要求 Send+Sync,故用 Arc<Mutex> 而非 Rc<RefCell>)。
+    let on_confirm = Arc::new(Mutex::new(props.on_confirm.take()));
+    let on_cancel = Arc::new(Mutex::new(props.on_cancel.take()));
 
-    hooks.use_event_handler(
-        EventScope::Layer(layer),
-        EventPriority::High,
+    // 键盘:只消费 Key 事件(模态独占键盘);鼠标事件 Ignored 放行给本层的
+    // 按钮与遮罩关闭 handler —— 层已 blocks_lower,放行不会漏到背景。
+    hooks.use_event_handler(EventScope::Layer(layer), EventPriority::High, {
+        let on_confirm = on_confirm.clone();
+        let on_cancel = on_cancel.clone();
         move |event| {
             let Event::Key(key) = event else {
-                return EventResult::Consumed;
+                return EventResult::Ignored;
             };
             if key.kind != KeyEventKind::Press {
                 return EventResult::Consumed;
@@ -135,17 +145,39 @@ pub fn ConfirmModal(
                 }
                 KeyCode::Enter => {
                     if confirm_selected.get() {
-                        on_confirm(());
+                        (on_confirm.lock().unwrap())(());
                     } else {
-                        on_cancel(());
+                        (on_cancel.lock().unwrap())(());
                     }
                 }
-                KeyCode::Char('y') | KeyCode::Char('Y') => on_confirm(()),
-                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => on_cancel(()),
+                KeyCode::Char('y') | KeyCode::Char('Y') => (on_confirm.lock().unwrap())(()),
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    (on_cancel.lock().unwrap())(())
+                }
                 _ => {}
             }
 
             EventResult::Consumed
+        }
+    });
+
+    // 遮罩点击取消:Low + hit_test=false,按钮(Normal,命中过滤)先消费各自
+    // 区域内的 Down;未被消费的左键 Down(遮罩/面板空白)落到这里 → on_cancel。
+    hooks.use_event_handler_with_options(
+        EventScope::Layer(layer),
+        EventPriority::Low,
+        EventOptions { hit_test: false },
+        {
+            let on_cancel = on_cancel.clone();
+            move |event| {
+                if let Event::Mouse(m) = event
+                    && m.kind == MouseEventKind::Down(MouseButton::Left)
+                {
+                    (on_cancel.lock().unwrap())(());
+                    return EventResult::Consumed;
+                }
+                EventResult::Ignored
+            }
         },
     );
 
@@ -195,6 +227,7 @@ pub fn ConfirmModal(
                         width: button_width,
                         style: button_style,
                         selected_style: selected_button_style,
+                        on_press: shared_handler(&on_cancel),
                     )
                     ConfirmButton(
                         label: props.confirm_text.clone(),
@@ -202,6 +235,7 @@ pub fn ConfirmModal(
                         width: button_width,
                         style: button_style,
                         selected_style: selected_button_style,
+                        on_press: shared_handler(&on_confirm),
                     )
                 }
             }
@@ -216,17 +250,41 @@ struct ConfirmButtonProps {
     width: u16,
     style: Style,
     selected_style: Style,
+    on_press: Handler<'static, ()>,
+}
+
+/// 把共享回调包装成可传给子组件 props 的 `Handler`。
+fn shared_handler(shared: &Arc<Mutex<Handler<'static, ()>>>) -> Handler<'static, ()> {
+    let shared = Arc::clone(shared);
+    Handler::from(move |()| (shared.lock().unwrap())(()))
 }
 
 #[component]
-fn ConfirmButton(props: &ConfirmButtonProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let label_style = if props.selected {
+fn ConfirmButton(
+    props: &mut ConfirmButtonProps,
+    mut hooks: Hooks,
+) -> impl Into<AnyElement<'static>> {
+    let mut on_press = props.on_press.take();
+    // 悬停视同选中(仅视觉强调,不改键盘的 confirm_selected 状态);
+    // 左键 Down 即触发并消费 —— 与 Button 组件一致的终端惯例。
+    let hovered = hooks.use_hover();
+    hooks.use_pointer(PointerOptions::default(), move |ev| {
+        if let PointerKind::Down(MouseButton::Left) = ev.kind {
+            on_press(());
+            EventResult::Consumed
+        } else {
+            EventResult::Ignored
+        }
+    });
+
+    let selected = props.selected || hovered;
+    let label_style = if selected {
         selected_button_label_style(props.selected_style)
     } else {
         props.style
     };
     let border_style = button_border_style(label_style);
-    let label = if props.selected {
+    let label = if selected {
         format!(" {} ", props.label)
     } else {
         props.label.clone()
@@ -269,4 +327,107 @@ fn confirm_button_width(cancel_text: &str, confirm_text: &str) -> u16 {
         .max(confirm_text.chars().count())
         .max(6);
     label_width.saturating_add(6).min(u16::MAX as usize) as u16
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mouse_test::{Mounted, find_text};
+    use crossterm::event::{KeyCode, MouseButton, MouseEventKind};
+    use std::sync::{Arc, Mutex};
+
+    type SyncLog = Arc<Mutex<Vec<String>>>;
+
+    #[derive(Clone, Default, Props)]
+    struct HarnessProps {
+        log: SyncLog,
+    }
+
+    #[component]
+    fn Harness(props: &HarnessProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        let confirm_log = props.log.clone();
+        let cancel_log = props.log.clone();
+        element!(ConfirmModal(
+            open: true,
+            // 默认标题就是 "Confirm",会干扰 find_text 定位按钮,故换一个。
+            title: Line::from("Prompt"),
+            on_confirm: move |_| confirm_log.lock().unwrap().push("confirm".into()),
+            on_cancel: move |_| cancel_log.lock().unwrap().push("cancel".into()),
+        ))
+    }
+
+    fn mount(log: &SyncLog) -> Mounted {
+        // 60x16:默认 40x10 时按钮行会溢出内区,标签画到命中盒外、点击落空。
+        Mounted::mount_sized(element!(Harness(log: log.clone())), true, 60, 16)
+    }
+
+    fn click(m: &mut Mounted, col: u16, row: u16) {
+        m.dispatch(MouseEventKind::Down(MouseButton::Left), col, row);
+        m.dispatch(MouseEventKind::Up(MouseButton::Left), col, row);
+    }
+
+    // 点击确认按钮 → on_confirm;点击取消按钮 → on_cancel(左键 Down 即触发)。
+    #[test]
+    fn clicking_buttons_fires_matching_callback() {
+        let log: SyncLog = Default::default();
+        let mut m = mount(&log);
+
+        let (cx, cy) = find_text(&m.buffer(), "Confirm").expect("确认按钮已渲染");
+        click(&mut m, cx, cy);
+        assert_eq!(*log.lock().unwrap(), vec!["confirm".to_string()]);
+
+        let (x, y) = find_text(&m.buffer(), "Cancel").expect("取消按钮已渲染");
+        click(&mut m, x, y);
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec!["confirm".to_string(), "cancel".to_string()]
+        );
+    }
+
+    // 点击遮罩/面板空白 → on_cancel(未被按钮消费的左键 Down 落到 Low 级遮罩关闭)。
+    #[test]
+    fn scrim_click_cancels() {
+        let log: SyncLog = Default::default();
+        let mut m = mount(&log);
+
+        click(&mut m, 0, 0); // 面板(居中 20x10)之外的遮罩
+        assert_eq!(*log.lock().unwrap(), vec!["cancel".to_string()]);
+    }
+
+    // 滚轮在弹窗上滚动不触发任何回调(只放行、不误关)。
+    #[test]
+    fn wheel_over_modal_does_nothing() {
+        let log: SyncLog = Default::default();
+        let mut m = mount(&log);
+
+        m.dispatch(MouseEventKind::ScrollDown, 20, 4);
+        m.dispatch(MouseEventKind::ScrollUp, 20, 4);
+        assert!(log.lock().unwrap().is_empty());
+    }
+
+    // 键盘语义回归:y 确认、Esc 取消、Enter 走当前选中(默认取消)。
+    #[test]
+    fn keyboard_semantics_unchanged() {
+        let log: SyncLog = Default::default();
+        let mut m = mount(&log);
+
+        m.dispatch_key(KeyCode::Char('y'));
+        assert_eq!(*log.lock().unwrap(), vec!["confirm".to_string()]);
+
+        m.dispatch_key(KeyCode::Enter); // 初始选中取消按钮
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec!["confirm".to_string(), "cancel".to_string()]
+        );
+
+        m.dispatch_key(KeyCode::Esc);
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec![
+                "confirm".to_string(),
+                "cancel".to_string(),
+                "cancel".to_string()
+            ]
+        );
+    }
 }

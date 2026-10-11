@@ -271,3 +271,41 @@ TRNovel 多处页面把异步请求拆成 `data/loading/error` 三个 `State`，
 - 不要给中性组件的 slot 硬塞可见色而破坏原语义,除非是刻意的默认改进(如 `TreeSelectTheme` 补默认可见选中、`ModalTheme` 默认 DIM 遮罩——均可被 `Style::reset()` 清掉)。
 
 **相关文件**:`crates/ratatui-kit/src/components/theme/{mod.rs,palette.rs}`、各组件的 `FooTheme`(如 `components/border.rs`、`components/table/component.rs`)、`examples/components/theme.rs`、`render/harness.rs`(`theme_tests`/`runtime_theme_tests`)、`EXTENSION_API.md`
+
+### 滚动条内容单位与终端坐标分离
+
+`ScrollbarOptions` 的内容、视口和偏移使用 `usize`，终端滑轨坐标仍是 `u16`；不要为了共享 ScrollView 几何而截断长文本的内容范围。最大偏移为 `content_length - viewport_length`，转换到 ratatui `ScrollbarState` 时要传 `content_length = max_offset + 1` 并显式设置 `viewport_content_length`。
+
+ScrollView 和 `use_scrollbar` 共用内部 `ScrollbarInteraction` 状态机。Down 命中滑块只记录抓点，不反算当前偏移（避免终端格量化引起跳动）；轨道点击与 Drag 才产生 seek。空区域和仅容得下箭头的短轨道不注册可交互几何。
+
+交互滚动条用 `ScrollbarStyle` 配置外观，不接收 opaque ratatui widget：ratatui 的 `orientation()` 会重置符号，而其符号配置没有 getter。统一持有符号集和 `arrows` 开关才能让渲染与命中使用相同的箭头长度；几何类型保留为内部实现。
+
+**相关文件**：`crates/ratatui-kit/src/hooks/use_scrollbar.rs`、`crates/ratatui-kit/src/components/scroll_view/scrollbars.rs`
+
+### 树滚动条与交互反馈
+
+`TreeSelect` 不再接 `tui-tree-widget::experimental_scrollbar`（仅绘制）。`scrollbar: Some(ScrollbarStyle)` 使用框架共享的捕获/拖拽协议,即使业务自管导航而传 `active: false`,也能独立滚动视口；拖动不改变选中节点。
+
+`TreeState::get_offset()` 是展开后的条目索引,不是屏幕行偏移。命中和滚动条要按 `flatten` 的条目索引与实际 `TreeItem::height()` 计算；上游只绘制完整放入视口的条目。
+
+`ScrollbarStyle::hover_style`/`drag_style` 只叠加到滑块。抓住后状态跟随捕获,拖出轨道仍保持拖拽反馈；Up 清除拖拽并按释放位置恢复悬停。ScrollView、TreeSelect、自绘 hook 都共用同一状态机。
+
+
+### 移动观察与捕获取消
+
+`use_pointer(track_move:true)` 的 Enter/Move/Leave 独立投递给所有活跃观察者,返回 Consumed 仅请求重绘。否则后一组件的 Enter 消费会截断前一组件的 Leave,留下悬停样式。命中事件仍遵循冒泡与独占捕获。
+
+绘制结束核对捕获者的当帧帧戳和输入层；隐藏或被独占层阻断的组件收到 `PointerKind::Cancel`,`use_drag` 收到 `DragPhase::Cancel`,用于清理抓取态,不能伪造 Up 或 Click。滚动条箭头按一个内容单位滚动,滑轨空白跳转,滑块才开启拖拽。
+
+`Input` 的 on_seek 由默认变为回调时不能新增 Hook；鼠标启用时始终注册 pointer hook,在闭包内检查回调是否启用。
+
+普通 ratatui List 只绘制完整放入视口的 ListItem；多行条目剩余高度不足时,下面的空白不应命中该条目。
+
+
+### Context Hook 视图共享调用游标
+
+with_context_stack 只是借用同一个 Hooks 容器的上下文视图,不能复制 hook_index 后独立推进。根 Hooks 持有 Cell 游标,借用视图共享它；临时上下文作用域结束后继续使用原 Hooks,调用序号仍应累加,不重用旧槽位。
+
+### InsertBefore 回调必须在队列锁外执行
+
+post_component_update 先 mem::take 待绘制队列并释放 Mutex,再调用终端插入绘制。终端可能同步执行 draw_fn,其回调可以继续 enqueue；新任务留给下一帧,不能持锁调用回调导致重入死锁。

@@ -205,7 +205,7 @@ reading that *exact* theme type.
 ## 6. Persisting a theme (`serde` feature)
 
 `Palette` derives `Serialize`/`Deserialize` behind the `serde` feature
-(`ratatui-kit = { version = "0.11", features = ["serde", ...] }`), useful for
+(`ratatui-kit = { version = "0.12", features = ["serde", ...] }`), useful for
 saving a user's chosen theme to a config file between runs:
 
 ```rust

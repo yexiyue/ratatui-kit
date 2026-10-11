@@ -4,6 +4,7 @@
 //! `ConfirmModal` 负责删除确认，展示多个内置能力如何组合成真实应用流。
 
 use ratatui_kit::{
+    RunOptions,
     crossterm::event::{Event, KeyCode, KeyEventKind},
     prelude::*,
     ratatui::{
@@ -55,7 +56,7 @@ impl TodoFilter {
 #[tokio::main]
 async fn main() {
     element!(TodoApp)
-        .fullscreen()
+        .fullscreen_with(RunOptions { mouse: true })
         .await
         .expect("Failed to run the application");
 }

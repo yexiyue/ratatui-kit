@@ -105,7 +105,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 ```
 
 > [!NOTE]
-> 主库默认不启用任何特性。`router` / `atom` / `input` / `tree` / `table` / `virtual-list` 可按需开启，`full` 一次性启用全部。`textarea` 特性已随 Ratatui 0.30 迁移暂时下线（`tui-textarea` 暂无 0.30 兼容版）。
+> 主库默认不启用任何特性。`router` / `atom` / `input` / `tree` / `table` / `virtual-list` 可按需开启，`full` 一次性启用全部。`textarea` 基于 `tui-input` 与自研软换行显示层，支持 Ratatui 0.30，已加入 `full`。
 
 ### 一个计数器
 
@@ -194,6 +194,57 @@ skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参�
 
 ---
 
+## 接入鼠标事件
+
+在应用入口开启一次捕获。指针 Hook 属于核心 API，无需额外 feature：
+
+```rust,no_run
+use ratatui_kit::{prelude::*, ratatui::layout::Constraint};
+
+#[tokio::main]
+async fn main() {
+    element!(MouseCounter)
+        .fullscreen_with(RunOptions { mouse: true })
+        .await
+        .expect("运行失败");
+}
+
+#[component]
+fn MouseCounter(mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let mut count = hooks.use_state(|| 0usize);
+    let hovered = hooks.use_hover();
+    hooks.use_click(move |_| count += 1);
+    element!(Border(height: Constraint::Length(3)) {
+        Text(text: format!("点击: {} | 悬停: {}", count.get(), hovered))
+    })
+}
+```
+
+`fullscreen()` 默认不开鼠标；内嵌视口使用 `render_loop_with(terminal_options, RunOptions { mouse: true })`。框架退出时恢复终端鼠标模式。
+
+| 交互 | API | 语义 |
+| --- | --- | --- |
+| 可见操作按钮 | `Button` | 左键 Down 调用 `on_press`，键盘快捷键另行注册 |
+| 同一组件内释放触发 | `use_click` | Down + Up，`Click.count` 区分单击、双击、三击 |
+| 区域悬停反馈 | `use_hover` | 返回 bool，鼠标不动时也随布局更新 |
+| 拖拽或调整尺寸 | `use_drag` | `DragPhase::Start/Move/End/Cancel`，拖出区域仍捕获 |
+| 自定义指针处理 | `use_pointer` | `PointerOptions` 配置按键、移动和输入层，返回 `EventResult` |
+| 自绘列表悬停 | `use_hover_row` | 绘制坐标映射到条目 ID，返回 `State<Option<T>>` |
+| 自绘内容滚动条 | `use_scrollbar` | `ScrollbarOptions` + `on_seek(usize)` 完成绘制与控制 |
+
+`ScrollView` 和 `TreeSelect` 内置可拖拽滚动条；`ScrollbarStyle` 配置滑块、轨道、悬停和拖拽反馈。自绘内容的 `content_length`、`viewport_length`、`position` 和 `on_seek` 必须使用相同单位（行或条目），目标范围为 `0..=content_length - viewport_length`。
+
+指针 Down 返回 `Consumed` 后捕获对应按键，直到释放或取消。`Enter/Move/Leave` 独立同步，消费只请求重绘，不阻止其他组件更新悬停。`PointerEvent.position` 与 `area` 共用绘制坐标，ScrollView 内就是内容坐标；`screen_position`、原始 crossterm 事件、`Click.position` 和 `DragUpdate.from/to` 使用终端坐标。嵌套视口的变换与裁剪由框架统一处理。
+
+保持 Hook 顺序稳定，动态启停判断放进回调。输入层句柄只能在当前帧使用；手写 `Component::update` 必须先接 `hooks.with_context_stack(updater.component_context_stack())`。自绘列表要排除加载、空态和越界命中，并在 `state.write()` 前释放 `state.read()` 守卫。完整组合示例与接入检查见[鼠标指南](https://yexiyue.github.io/ratatui-kit/zh-cn/core/pointer-events/)和 [skill 参考](https://github.com/yexiyue/ratatui-kit/blob/main/skills/ratatui-kit/references/pointer-events.md)。
+
+```bash
+cargo run --example mouse
+cargo run --example custom_scrollbar
+```
+
+---
+
 ## 内置组件与 Hooks 一览
 
 > README 不罗列完整 API，详细签名与用法见[官方文档站](https://yexiyue.github.io/ratatui-kit/zh-cn/)与 [docs.rs](https://docs.rs/ratatui-kit)。
@@ -212,7 +263,9 @@ skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参�
 | `PaletteProvider` / `ThemeOverride` | 主题注入 —— 全局调色板与组件级覆盖 | 核心 |
 | `Button` | 鼠标操作按钮（左键 Down 触发） | 核心 |
 | `Input` / `SearchInput` | 文本输入 / 搜索框 | `input` |
-| `TreeSelect` | 树形选择 | `tree` |
+| `TextArea` | 软换行多行编辑与点击定位 | `textarea` |
+| `TreeSelect` | 树形选择 | `textarea` | `TextArea` 多行编辑与软换行 | `tui-input`、`unicode-width` |
+| `tree` |
 | `Table` | 数据驱动表格，支持单元格网格边框、换行、响应式列、页脚和行/列高亮 | `table` |
 | `VirtualList` | 虚拟列表 | `virtual-list` |
 | `RouterProvider` / `Outlet` | 路由容器与出口 | `router` |
@@ -229,6 +282,8 @@ skill 就在 [`skills/ratatui-kit/`](skills/ratatui-kit/)，助手会自动参�
 | `use_context` | 向上查找 Context | 核心 |
 | `use_palette` / `use_component_theme` | 读取当前 Palette / 解析后的组件主题 | 核心 |
 | `use_click` / `use_hover` / `use_drag` / `use_pointer` | 点击、悬停、拖拽与自定义指针事件 | 核心 |
+| `use_hover_row` / `use_scrollbar` | 自绘列表悬停与可拖拽滚动条 | 核心 |
+| `use_input_layer` | 创建当前帧有效的输入层句柄 | 核心 |
 | `use_event_handler` | 注册输入事件处理器 | 核心 |
 | `use_insert_before` / `use_size` | 在渲染区之前插入内容 / 读取尺寸 | 核心 |
 | `use_exit` / `use_on_drop` | 退出应用 / 卸载回调 | 核心 |

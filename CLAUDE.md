@@ -40,7 +40,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-fe
 
 ```bash
 cargo run --example counter      # 其它：custom_list hello_world input list modal router scrollview store
-# 注：textarea 示例随 textarea 特性下线已禁用（examples/textarea.rs.disabled）
+cargo run --example textarea     # tui-input 多行编辑与软换行
 ```
 
 发布由「打 tag 触发 CI」驱动：改 `crates/<crate>/Cargo.toml` 版本 → commit → `git tag <crate>-v<version>` → `git push --tags`，[.github/workflows/CD.yaml](.github/workflows/CD.yaml) 据标签 `cargo publish` 并（仅主库标签）用 git-cliff（[cliff.toml](cliff.toml)）生成 CHANGELOG 与 GitHub Release（弃用了 release.sh）。详见 [dev-notes/knowledge/toolchain.md](dev-notes/knowledge/toolchain.md)。
@@ -58,7 +58,7 @@ cargo run --example counter      # 其它：custom_list hello_world input list m
 
 宏库有独立的 `router` 特性，由主库的同名特性透传；`atom` 是纯主库 feature，无宏库透传。
 
-**`textarea` 特性已下线**：随 ratatui 0.30 迁移，底层 `tui-textarea`（最新 0.7.0 钉死 ratatui ^0.29）尚无 0.30 兼容版，故移除了 `textarea` feature/依赖/example。组件源码隔离保留在 [components/textarea.rs](crates/ratatui-kit/src/components/textarea.rs)（未声明为模块、未接入树），待依赖支持 0.30 后恢复接入即可。todo.md 另计划用 `tui-input` 重写 textarea 以支持自动换行——改动前先确认方向。
+**`textarea` 特性**：使用 `tui-input` 与自研显示层软换行，已加入 `full`；不依赖旧 `tui-textarea` 或 ratatui 0.29。示例为 `examples/components/textarea.rs`。
 
 ## 核心架构
 

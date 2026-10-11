@@ -16,6 +16,8 @@ pub(super) struct RenderedRow {
     pub(super) cells: Vec<RenderedCell>,
     pub(super) style: Style,
     pub(super) selected: bool,
+    /// 正文体行号(供鼠标命中映射);表头/分隔线/表脚为 `None`。
+    pub(super) row_index: Option<usize>,
 }
 
 impl RenderedRow {
@@ -24,6 +26,7 @@ impl RenderedRow {
             cells: Vec::new(),
             style,
             selected: false,
+            row_index: None,
         }
     }
 
@@ -70,7 +73,10 @@ pub(super) struct RenderTable<'a> {
     pub(super) gutter: u16,
 }
 
-pub(super) fn render_table(mut table: RenderTable<'_>) {
+/// 渲染表格并返回正文行的命中矩形 `(area, row_index)`(供鼠标悬停/点击映射;
+/// 含换行增高与分隔线偏移,换行模式下行高 > 1 也精确)。
+pub(super) fn render_table(mut table: RenderTable<'_>) -> Vec<(Rect, usize)> {
+    let mut row_hits = Vec::new();
     let mut y = table.area.y;
 
     if matches!(
@@ -96,13 +102,21 @@ pub(super) fn render_table(mut table: RenderTable<'_>) {
         }
 
         let height = row.render_height(table.border_mode);
+        let row_start = y;
+        let mut hit = Rect::default();
 
         for line_index in 0..height {
             if y >= table.area.bottom() {
                 break;
             }
-            render_row_line(&mut table, row, line_index as usize, y);
+            hit = render_row_line(&mut table, row, line_index as usize, y);
             y += 1;
+        }
+
+        if let Some(index) = row.row_index {
+            hit.y = row_start;
+            hit.height = y - row_start;
+            row_hits.push((hit, index));
         }
     }
 
@@ -115,6 +129,8 @@ pub(super) fn render_table(mut table: RenderTable<'_>) {
         let style = table.border_style;
         render_border_line(&mut table, y, '└', '┴', '┘', style);
     }
+
+    row_hits
 }
 
 fn render_border_line(
@@ -151,7 +167,12 @@ fn render_border_line(
     put(table.buf, x, y, right, style);
 }
 
-fn render_row_line(table: &mut RenderTable<'_>, row: &RenderedRow, line_index: usize, y: u16) {
+fn render_row_line(
+    table: &mut RenderTable<'_>,
+    row: &RenderedRow,
+    line_index: usize,
+    y: u16,
+) -> Rect {
     let row_style = row.style;
     let mut x = table.area.x;
 
@@ -162,6 +183,8 @@ fn render_row_line(table: &mut RenderTable<'_>, row: &RenderedRow, line_index: u
             x += 1;
         }
     }
+
+    let hit_start = x;
 
     // 前置 gutter:选中行首行画符号(左对齐、按视宽裁剪),其余填空格,列宽已为它预留。
     if table.gutter > 0 {
@@ -228,6 +251,7 @@ fn render_row_line(table: &mut RenderTable<'_>, row: &RenderedRow, line_index: u
     ) {
         put(table.buf, x, y, '│', table.border_style);
     }
+    Rect::new(hit_start, y, x.saturating_sub(hit_start), 1).intersection(table.area)
 }
 
 fn render_line(

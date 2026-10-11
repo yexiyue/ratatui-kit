@@ -57,6 +57,9 @@ That means a bare dependency includes only the core runtime, component model, ho
 | `input` | `Input`, `SearchInput`, and the `tui_input` re-export | `tui-input` |
 | `tree` | `TreeSelect` and the `tui_tree_widget` re-export | `tui-tree-widget` |
 | `virtual-list` | `VirtualList` and the `tui_widget_list` re-export | `tui-widget-list` |
+| `textarea` | `TextArea`, soft wrapping and mouse seeking | `tui-input`, `unicode-width` |
+| `table` | Tables with width-aware wrapping | `unicode-width` |
+| `serde` | Palette serialization | `serde`, `ratatui/serde` |
 | `full` | All features above | All dependencies above |
 
 Examples:
@@ -96,10 +99,8 @@ cargo fmt --all --check
 
 This also matters for documentation maintenance: if a page covers `TreeSelect`, `VirtualList`, or Router, verification should compile the corresponding feature.
 
-## textarea is temporarily unavailable
+## Multi-line editing
 
-The `textarea` feature is not currently wired in. The underlying `tui-textarea` version does not yet support the current Ratatui 0.30 stack. The source remains in the repository, but it is not declared as a module and is not included in `full`.
-
-For multi-line body display, prefer [WrappedText](/ratatui-kit/components/wrapped-text/). For editable single-line input, use [Input](/ratatui-kit/components/input/) or [SearchInput](/ratatui-kit/components/search-input/).
+Enable `textarea` for `TextArea`, including soft wrapping, keyboard editing and mouse cursor seeking. It uses `tui-input` and the framework's own display layer on Ratatui 0.30, and is included in `full`. Run `cargo run --example textarea`. For read-only multi-line display use [WrappedText](/ratatui-kit/components/wrapped-text/).
 
 Next, go to [Quick start](/ratatui-kit/start/quick-start/) and run your first terminal interface.

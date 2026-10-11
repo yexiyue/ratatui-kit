@@ -128,3 +128,8 @@ ScrollView(
 `ScrollView` 的 handler 注册在 `EventScope::Current`。放进 `Modal` 或 `ShortcutInfoModal` 时，它会自然归属前景弹层的 current layer，所以弹窗内滚动不会穿透到背景页面。
 
 如果你只需要展示快捷键分组，优先用 [ShortcutInfoModal](/ratatui-kit/zh-cn/components/shortcut-info-modal/)；如果要渲染非常长的、带选择态的列表，看 [VirtualList](/ratatui-kit/zh-cn/components/virtual-list/)。
+
+
+## 鼠标交互
+
+入口开启 `RunOptions { mouse: true }` 后，ScrollView 支持滑块拖动、轨道跳转和一个单位的箭头步进；`active: false` 仍能拖动滚动条。`ScrollbarStyle.hover_style` 和 `drag_style` 提供反馈。主轴 Percentage/Ratio/Fill 参照原始 `block.inner`，交叉轴参照最终视口，子绘制、命中变换和滚动共用裁剪后的偏移与布局快照。自绘滚动条和坐标规则见[指针事件](/ratatui-kit/zh-cn/core/pointer-events/)。

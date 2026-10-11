@@ -33,6 +33,12 @@ npx skills add rust-async-patterns
 - **`SKILL.md`** — the mental model, a from-zero build workflow, a minimal compiling app template, the `element!` essentials, input/state guidance, palette-neutral visual-polish principles, and a pitfalls checklist.
 - **`references/`** — deeper references the assistant reads on demand: every built-in component with its exact props, every hook signature, the macro grammar, the events / state / routing model, the full theming system (every `Palette`/`*Theme` field, writing a theme-aware custom component), and idioms for building polished UIs.
 
+## Mouse integration reference
+
+The skill's `references/pointer-events.md` covers capture at the entry, Button and all six pointer-related hooks, custom list hover, custom scrollbars, same-frame input layers, coordinates through nested ScrollViews, and cancellation/feedback. It records the integration failures behind the API: cached hits during loading, read guards across match branches, changing hook order, and stale hover after layout changes.
+
+Ask it: *"Add two independently draggable scrollbars to my reader, with hovered chapters and drag feedback."* The assistant chooses the built-in components or managed hooks according to who owns the content and verifies the actual enabled features. Read the [mouse guide](/ratatui-kit/core/pointer-events/) for the same contracts.
+
 ## How to use it
 
 Just describe what you want to your assistant:

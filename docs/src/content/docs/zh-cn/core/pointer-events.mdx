@@ -43,7 +43,9 @@ async fn main() {
 | 可见操作按钮 | [Button](/ratatui-kit/zh-cn/components/button/) | 左键 Down |
 | 按下并在同一组件内释放 | `use_click` | Down + Up，支持所有鼠标按键 |
 | 区域内视觉反馈 | `use_hover() -> bool` | 移入或移出绘制区域 |
-| 拖动或调整尺寸 | `use_drag` | 左键 Start / Move / End |
+| 拖动或调整尺寸 | `use_drag` | 左键 Start / Move / End / Cancel |
+| 自绘列表条目悬停 | `use_hover_row` | 绘制坐标映射条目 ID，返回 `State<Option<T>>` |
+| 自绘内容滚动条 | `use_scrollbar` | `ScrollbarOptions` + `on_seek(usize)` |
 | 自定义过滤、传播 | `use_pointer` | `PointerEvent`，回调返回 `EventResult` |
 
 所有 Hook 都必须无条件、按固定顺序调用。启停交互可在回调中判断，或挂载/卸载子组件，不要在同一组件中条件调用 Hook。
@@ -92,12 +94,79 @@ hooks.use_pointer(PointerOptions::default(), move |event| {
 });
 ```
 
-默认选项仅选择左键、不开移动追踪。多个按键可用 `MouseButtons::LEFT.union(MouseButtons::RIGHT)`，`track_move: true` 开启 `Enter` / `Move` / `Leave`。滚轮不受按键集合过滤。`PointerEvent` 包含 `kind`、`position`、`modifiers` 和最近绘制的 `area`。能够配对按下时，Up 后还会合成 Click；消费 Down 可通过捕获保证释放送回当前 handler。
+默认选项仅选择左键、不开移动追踪。多个按键可用 `MouseButtons::LEFT.union(MouseButtons::RIGHT)`，`track_move: true` 开启 `Enter` / `Move` / `Leave`。滚轮不受按键集合过滤。`PointerEvent` 包含 `kind`、`position`、`screen_position`、`modifiers` 和最近绘制的 `area`。`PointerOptions.layer: None` 跟随最近的 Current 层，`Some(layer)` 显式归属当前帧的层。能够配对按下时，Up 后还会合成 Click；消费 Down 可通过捕获保证释放送回当前 handler。
 
 ## 传播与弹窗
 
-除已捕获的 Drag/Up 外，Global handler 先执行。活跃层中层级优先于 priority；同优先级鼠标 handler 按绘制序倒排，内层、后画的兄弟先收到。`Consumed` 截断，`Ignored` 继续传播。键盘仍按注册序投递。
+除已捕获的 Drag/Up 外，Global handler 先执行。活跃层中层级优先于 priority；同优先级鼠标 handler 按绘制序倒排，内层、后画的兄弟先收到。命中事件的 `Consumed` 截断，`Ignored` 继续传播；Enter/Move/Leave 独立观察，消费只请求重绘。键盘仍按注册序投递。
 
 示例在根组件调用 `use_input_layer(open, true)`，把同一 handle 传给 `Modal(layer: Some(layer))`。Low 优先级的 `Layer(layer)` handler 收到未消费的左键 Down 后关闭弹窗。内部 Button 先消费点击；面板空白刻意放行，因此也会关闭。键盘隔离见[输入层](/ratatui-kit/zh-cn/core/input-layers/)。
 
-命中使用最近绘制的组件矩形，并排除旧帧区域。目前矩形不与视觉裁剪求交；嵌套 ScrollView 到边缘时不向外传递滚轮。指针交互不建立键盘焦点，Button 也不内置键盘激活。
+
+
+## 坐标契约
+
+| API 值 | 坐标空间 |
+| --- | --- |
+| `PointerEvent.position`、`area` | 组件绘制坐标，ScrollView 内为内容缓冲坐标 |
+| `PointerEvent.screen_position` | 终端绝对坐标 |
+| `Click.position`、`DragUpdate.from/to`、原始 `Event::Mouse` | 终端绝对坐标 |
+| `use_hover_row` 命中闭包 | 组件绘制坐标 |
+
+将 `event.position` 直接传给同一绘制缓冲内的 widget 命中方法。只有 widget 明确要求相对区域坐标时才减去 `event.area.x/y`，不要自行添加滚动偏移。框架统一组合嵌套 ScrollView 的变换与祖先视口裁剪，屏幕外内容不能命中；已捕获的拖拽仍可在区域外收到事件。
+
+布局移动、滚动、resize 和输入层变化后，框架使用最后鼠标位置同步进入、离开与 `use_hover`，不需要再动鼠标。`use_hover_row` 和内置列表还会核对条目映射变化；公开 `use_pointer(track_move: true)` 不会在区域与内容坐标均不变时每帧伪造 Move。
+
+## 接入自绘列表悬停
+
+直接绘制第三方 widget 时，用 `use_hover_row` 映射到稳定条目 ID；返回状态在条目渲染闭包中读取：
+
+```rust
+let hover = hooks.use_hover_row(move |position| {
+    let hit = list.read().hit_test(position.x, position.y);
+    match hit {
+        Some(Hit::Item(index)) if !loading && index < item_count => Some(index),
+        _ => None,
+    }
+});
+// 条目渲染: hover.get() == Some(row_index)
+```
+
+加载和空态可能保留 widget 的旧命中表，必须同时判断当前内容可用性及索引范围。先把命中结果存入局部变量再写 state：`match list.read().hit_test(...)` 的读守卫会存活到整个 match 结束，与分支里的写借用冲突。
+
+## 滚动条与拖拽反馈
+
+开启鼠标后，ScrollView 自动支持滑块拖动、轨道跳转和箭头步进。`TreeSelect(scrollbar: ScrollbarStyle::default())` 使用相同实现，`active: false` 时仍能拖动滚动条，仅改变视口，不选择或确认章节。箭头每次移动一个内容单位，抓住滑块后捕获持续到释放或取消。
+
+自绘正文或列表，用 `use_scrollbar` 注册在轨道所贴靠的组件上：
+
+```rust
+let mut offset = hooks.use_state(|| 0usize);
+hooks.use_scrollbar(
+    ScrollbarOptions {
+        content_length: total_lines,
+        viewport_length: visible_lines,
+        position: offset.get(),
+        placement: TrackPlacement::RightInward(1),
+        scrollbar: ScrollbarStyle::default(),
+    },
+    move |target| offset.set(target),
+);
+```
+
+正文也使用这个 offset。内容长度、可见长度、当前位置和 `on_seek` 必须共用单位。`TrackPlacement` 另有 `LeftInward`、`TopInward`、`BottomInward`，参数表示沿轨道轴缩进；未开启鼠标时仍可绘制，内容完全可见时自动隐藏。不要只绘制原生 Scrollbar 后期待它自动接入拖动。
+
+`ScrollbarStyle` 在三种滚动条入口共用 `style`、`thumb_style`、`track_style`、`hover_style`、`drag_style`、`symbols` 和 `arrows`。拖拽样式优先于悬停，默认悬停加粗、拖拽加粗并反色；业务主题可从 palette 集中派生后复用。运行 `cargo run --example custom_scrollbar` 查看效果。
+
+ScrollView 统一解析内容、视口与滚动条显隐：主轴 Percentage/Ratio/Fill 参照原始 `block.inner`，交叉轴参照最终视口，子节点绘制前裁剪 offset。`over_border` 需要真正的 RIGHT 和 BOTTOM 边框，padding 和底部标题不算边框；轨道落在 outer 的右/下边缘。
+
+## 接入检查与踩坑
+
+- Button 或直接指针 Hook 挂载前先开启捕获；`disabled`、`active`、`on_seek` 或外部 state 改变时保持 Hook 顺序稳定。
+- 手写 `Component::update` 先接 `hooks.with_context_stack(updater.component_context_stack())`；函数组件自动接入。布局属性写在函数组件返回的根元素上，Hook 区域跟随这个根元素。
+- 编辑层/弹窗自己的指针处理器使用 `PointerOptions { layer: Some(layer), ..Default::default() }`；`InputLayer` 在当前帧创建与使用，不存到 state。
+- `DragPhase::Cancel` / `PointerKind::Cancel(button)` 只清除临时拖拽态，不提交拖放动作。隐藏或层失活会取消捕获；卸载组件不再回调已释放的状态。
+- 悬停值变化时才写响应式状态；Enter/Move/Leave 独立投递，`Consumed` 只请求重绘，不阻止其他组件清理悬停。
+- 验证两个独立面板、嵌套滚动、部分边框与 padding、轨道两端、拖出后释放、加载空态，以及鼠标静止时的布局变化。
+
+鼠标点击不会自动建立键盘焦点；嵌套 ScrollView 到边缘后也不会自动把滚轮向外层传递。需要此行为时在业务层明确设计。

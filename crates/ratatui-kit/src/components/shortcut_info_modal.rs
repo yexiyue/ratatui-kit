@@ -1,6 +1,6 @@
 // ShortcutInfoModal 组件：带输入互斥的快捷键帮助弹窗。
 
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
 use ratatui::{
     layout::{Constraint, Direction, Margin},
     style::Style,
@@ -8,11 +8,13 @@ use ratatui::{
 };
 use ratatui_kit_macros::{Props, component, element};
 
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     AnyElement, ComponentTheme, Handler, Hooks, Palette, UseEventHandler, UseInputLayer, UseTheme,
     components::theme::resolve_style,
     components::{Border, Modal, ScrollView, Text, View},
-    input::{EventPriority, EventResult, EventScope},
+    input::{EventOptions, EventPriority, EventResult, EventScope},
 };
 
 /// ShortcutInfoModal 组件的主题 slot。快捷键取 `accent` 高亮,其余中性;遮罩委托给 [`Modal`]。
@@ -136,20 +138,43 @@ pub fn ShortcutInfoModal(
 ) -> impl Into<AnyElement<'static>> {
     let layer = hooks.use_input_layer(props.open, true);
     let close_keys = props.close_keys.clone();
-    let mut on_close = props.on_close.take();
+    // 键盘与鼠标(点击关闭)两个闭包共享同一个回调。
+    let on_close = Rc::new(RefCell::new(props.on_close.take()));
 
-    hooks.use_event_handler(
-        EventScope::Layer(layer),
-        EventPriority::High,
+    let open = props.open;
+
+    hooks.use_event_handler(EventScope::Layer(layer), EventPriority::High, {
+        let on_close = Rc::clone(&on_close);
         move |event| {
             if let Event::Key(key) = event
                 && key.kind == KeyEventKind::Press
                 && close_keys.contains(&key.code)
             {
-                on_close(());
+                (on_close.borrow_mut())(());
                 return EventResult::Consumed;
             }
             EventResult::Ignored
+        }
+    });
+
+    // 点击关闭:浮层内容是静态快捷键表,点击任意处唯一合理的动作就是关闭。
+    // Low + hit_test:false,不与层内更高优先级的处理器抢事件。
+    hooks.use_event_handler_with_options(
+        EventScope::Layer(layer),
+        EventPriority::Low,
+        EventOptions { hit_test: false },
+        {
+            let on_close = Rc::clone(&on_close);
+            move |event| {
+                if open
+                    && let Event::Mouse(m) = event
+                    && m.kind == MouseEventKind::Down(MouseButton::Left)
+                {
+                    (on_close.borrow_mut())(());
+                    return EventResult::Consumed;
+                }
+                EventResult::Ignored
+            }
         },
     );
 

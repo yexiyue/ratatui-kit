@@ -30,6 +30,12 @@ fn render_to_buffer(el: impl Into<AnyElement<'static>>, width: u16, height: u16)
     render_to_buffer_frames(el, width, height, 1)
 }
 
+// 同 `render_to_buffer`,但启用 SystemContext 鼠标标志(组件注册了指针 hook 时必须,
+// 否则 debug 构建下 `debug_assert_mouse_enabled` 断言)。
+fn render_to_buffer_mouse(el: impl Into<AnyElement<'static>>, width: u16, height: u16) -> Buffer {
+    render_to_buffer_frames_mouse(el, width, height, 1)
+}
+
 // 多帧离屏渲染：用于依赖上一帧布局信息的组件，例如 `Input::use_previous_size`。
 fn render_to_buffer_frames(
     el: impl Into<AnyElement<'static>>,
@@ -37,23 +43,54 @@ fn render_to_buffer_frames(
     height: u16,
     frames: usize,
 ) -> Buffer {
+    render_to_buffer_frames_inner(el, width, height, frames, false)
+}
+
+fn render_to_buffer_frames_mouse(
+    el: impl Into<AnyElement<'static>>,
+    width: u16,
+    height: u16,
+    frames: usize,
+) -> Buffer {
+    render_to_buffer_frames_inner(el, width, height, frames, true)
+}
+
+fn render_to_buffer_frames_inner(
+    el: impl Into<AnyElement<'static>>,
+    width: u16,
+    height: u16,
+    frames: usize,
+    mouse: bool,
+) -> Buffer {
     let mut el = el.into();
     let helper = el.helper();
-    let mut tree = Tree::new_with_mouse(el.props_mut(), helper, false);
+    let mut tree = Tree::new_with_mouse(el.props_mut(), helper, mouse);
 
     let mut noop = NoopTerminal;
     let mut terminal =
         ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height)).unwrap();
 
     for _ in 0..frames.max(1) {
-        tree.update_once(&mut noop);
-        terminal
-            .draw(|frame| {
-                let area = frame.area();
-                let mut drawer = ComponentDrawer::new(frame, area);
-                tree.draw_root(&mut drawer);
-            })
-            .unwrap();
+        let mut settled = false;
+        for _ in 0..16 {
+            tree.update_once(&mut noop);
+            let mut redraw = false;
+            terminal
+                .draw(|frame| {
+                    let area = frame.area();
+                    let mut drawer = ComponentDrawer::new(frame, area);
+                    redraw = tree.draw_root(&mut drawer);
+                })
+                .unwrap();
+            if !redraw {
+                settled = true;
+                break;
+            }
+        }
+        assert!(
+            settled,
+            "pointer layout synchronization did not settle within 16 frames"
+        );
     }
 
     terminal.backend().buffer().clone()
@@ -135,6 +172,7 @@ fn view_renders_children() {
 }
 
 #[test]
+#[cfg(feature = "input")]
 fn hidden_cursor_input_starts_from_value_prefix() {
     use crate::components::{Border, Input};
     use ratatui::layout::Constraint;
@@ -207,7 +245,9 @@ mod theme_tests {
     // 刻意用「Default + 改字段」构造 Palette/BorderTheme:这正是 `#[non_exhaustive]` 下
     // 外部用户唯一可用的构造方式(禁结构体字面量),测试如实反映该写法。
     #![allow(clippy::field_reassign_with_default)]
-    use super::{cell_style, find, render_to_buffer, render_to_buffer_frames};
+    use super::{
+        cell_style, find, render_to_buffer, render_to_buffer_frames, render_to_buffer_mouse,
+    };
     use crate::prelude::*;
     use ratatui::{
         buffer::Buffer,
@@ -346,6 +386,7 @@ mod theme_tests {
 
     // Input 依赖 use_previous_size,需两帧;放进定尺 Border,内容区从 (1,1) 起。
     #[test]
+    #[cfg(feature = "input")]
     fn input_value_uses_palette_fg() {
         let mut palette = Palette::default();
         palette.fg = Color::Red;
@@ -367,6 +408,7 @@ mod theme_tests {
     }
 
     #[test]
+    #[cfg(feature = "input")]
     fn input_placeholder_uses_palette_placeholder() {
         let mut palette = Palette::default();
         palette.placeholder = Color::Blue;
@@ -388,6 +430,7 @@ mod theme_tests {
     }
 
     #[test]
+    #[cfg(feature = "input")]
     fn input_cursor_uses_palette_accent_by_default() {
         // 默认 palette:accent = Cyan;空值 + 显示光标 → (1,1) 为光标块,底色 = accent。
         let buf = render_to_buffer_frames(
@@ -476,6 +519,7 @@ mod theme_tests {
     // 状态色的 patch 逻辑与已验证组件同构。
 
     #[test]
+    #[cfg(feature = "input")]
     fn search_input_default_border_from_palette() {
         let mut palette = Palette::default();
         palette.border = Color::Red;
@@ -491,6 +535,7 @@ mod theme_tests {
     }
 
     #[test]
+    #[cfg(feature = "input")]
     fn search_input_placeholder_from_palette() {
         let mut palette = Palette::default();
         palette.placeholder = Color::Blue;
@@ -515,7 +560,7 @@ mod theme_tests {
     fn confirm_modal_selected_button_is_accent_bold() {
         // confirm_selected 默认 false → 取消按钮(第一个)默认选中;title/confirm_text 均设为无 'C',
         // 使 'C' 唯一落在选中的 "Cancel" 上。
-        let buf = render_to_buffer(
+        let buf = render_to_buffer_mouse(
             crate::element!(ConfirmModal(
                 open: true,
                 title: Line::from("Prompt"),
@@ -563,6 +608,7 @@ mod theme_tests {
     // —— TreeSelect(中性组件默认选中可见)——
 
     #[test]
+    #[cfg(feature = "tree")]
     fn tree_select_default_selection_is_visible() {
         // 默认 TreeSelectTheme 提供可见高亮(bg = selection = 默认 Cyan);
         // 迁移前默认 highlight 为空、选中不可见。
@@ -587,6 +633,7 @@ mod theme_tests {
     // —— Table ——
 
     #[test]
+    #[cfg(feature = "table")]
     fn table_header_border_and_selection_from_palette() {
         use std::sync::Arc;
         let mut palette = Palette::default();
@@ -631,6 +678,7 @@ mod theme_tests {
 
 // 运行时换肤:写 `Atom<Palette>` → 订阅它的 `PaletteProvider` 在下一帧重渲并换色。
 // 手动驱动两帧(帧间写入),而非 render_to_buffer_frames,以在中途改状态。
+#[cfg(feature = "atom")]
 mod runtime_theme_tests {
     #![allow(clippy::field_reassign_with_default)]
     use super::{NoopTerminal, cell_style};
@@ -906,5 +954,37 @@ mod router_tests {
             "嵌套应渲染 HOME, 实际: {:?}",
             row(&buf, 0)
         );
+    }
+}
+
+#[cfg(test)]
+mod draw_scope_tests {
+    use super::*;
+    use crate::{Hook, Hooks, components::View};
+    use ratatui::layout::{Constraint, Rect};
+    use ratatui_kit_macros::{Props, component, element};
+    use std::{cell::RefCell, rc::Rc};
+
+    struct CaptureArea(Rc<RefCell<Option<Rect>>>);
+    impl Hook for CaptureArea {
+        fn post_component_draw(&mut self, drawer: &mut ComponentDrawer) {
+            *self.0.borrow_mut() = Some(drawer.area);
+        }
+    }
+    #[derive(Default, Props)]
+    struct ParentProps {
+        area: Rc<RefCell<Option<Rect>>>,
+    }
+    #[component]
+    fn Parent(props: &ParentProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+        let area = props.area.clone();
+        hooks.use_hook(|| CaptureArea(area));
+        element!(View { View(height: Constraint::Length(2)) })
+    }
+    #[test]
+    fn parent_post_draw_hook_keeps_parent_area() {
+        let area = Rc::new(RefCell::new(None));
+        render_to_buffer(element!(Parent(area: area.clone())), 20, 10);
+        assert_eq!(*area.borrow(), Some(Rect::new(0, 0, 20, 10)));
     }
 }
